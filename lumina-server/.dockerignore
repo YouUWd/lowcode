@@ -1,0 +1,46 @@
+# Node modules
+node_modules
+npm-debug.log
+
+# Build output
+dist
+build
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test
+coverage
+*.spec.ts
+*.test.ts
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Logs
+logs
+*.log

@@ -1,0 +1,355 @@
+{
+  "info": {
+    "name": "Lumina Backend API Collection",
+    "description": "Complete API collection for Lumina Backend Server",
+    "version": "1.1.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Module Management",
+      "item": [
+        {
+          "name": "Get All Modules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modules",
+              "host": ["{{baseUrl}}"],
+              "path": ["modules"]
+            },
+            "description": "获取所有可用的业务模块列表"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Module Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modules/MOD-HR-EMP",
+              "host": ["{{baseUrl}}"],
+              "path": ["modules", "MOD-HR-EMP"]
+            },
+            "description": "获取指定模块的完整配置信息"
+          },
+          "response": []
+        },
+        {
+          "name": "Query Module Data - Employee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/query/MOD-HR-EMP",
+              "host": ["{{baseUrl}}"],
+              "path": ["query", "MOD-HR-EMP"]
+            },
+            "description": "查询员工档案数据（需要先配置权限）"
+          },
+          "response": []
+        },
+        {
+          "name": "Query Module Data - Payroll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/query/MOD-HR-PAY",
+              "host": ["{{baseUrl}}"],
+              "path": ["query", "MOD-HR-PAY"]
+            },
+            "description": "查询薪酬数据（需要先配置权限）"
+          },
+          "response": []
+        },
+        {
+          "name": "Query Module Data - Organization",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/query/MOD-HR-ORG",
+              "host": ["{{baseUrl}}"],
+              "path": ["query", "MOD-HR-ORG"]
+            },
+            "description": "查询组织架构数据（需要先配置权限）"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Permissions Management",
+      "item": [
+        {
+          "name": "Get Permissions Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissions/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "config"]
+            },
+            "description": "获取当前的全局权限配置"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Permissions - Employee Basic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"hr_employee_base.emp_no.SELECT\",\n    \"hr_employee_base.first_name.SELECT\",\n    \"hr_employee_base.last_name.SELECT\",\n    \"hr_emp_job.emp_type.SELECT\",\n    \"hr_organization.org_name.SELECT\",\n    \"hr_employee_base.status.SELECT\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissions/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "config"]
+            },
+            "description": "设置员工基础字段权限（不包含敏感信息）"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Permissions - Employee Full",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"hr_employee_base.emp_no.SELECT\",\n    \"hr_employee_base.first_name.SELECT\",\n    \"hr_employee_base.last_name.SELECT\",\n    \"hr_emp_personal.id_card_no.SELECT\",\n    \"hr_emp_job.emp_type.SELECT\",\n    \"hr_organization.org_name.SELECT\",\n    \"hr_employee_base.status.SELECT\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissions/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "config"]
+            },
+            "description": "设置员工完整字段权限（包含身份证号等敏感信息）"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Permissions - Payroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"hr_payroll_result.payroll_year.SELECT\",\n    \"hr_payroll_result.payroll_month.SELECT\",\n    \"hr_payroll_result.gross_amount.SELECT\",\n    \"hr_social_security_record.total_personal_deduct.SELECT\",\n    \"hr_tax_record.tax_amount.SELECT\",\n    \"hr_payroll_result.net_amount.SELECT\",\n    \"hr_payroll_result.payment_status.SELECT\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissions/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "config"]
+            },
+            "description": "设置薪酬字段权限"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Permissions - Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"hr_organization.org_code.SELECT\",\n    \"hr_organization.org_name.SELECT\",\n    \"hr_organization.org_type.SELECT\",\n    \"sys_user.user_name.SELECT\",\n    \"hr_organization.headcount.SELECT\",\n    \"hr_organization.max_headcount.SELECT\",\n    \"hr_organization.effective_date.SELECT\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissions/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "config"]
+            },
+            "description": "设置组织架构字段权限"
+          },
+          "response": []
+        },
+        {
+          "name": "Check Single Permission",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissions/check?entity=hr_employee_base&fieldName=emp_no&operationType=SELECT",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "check"],
+              "query": [
+                {
+                  "key": "entity",
+                  "value": "hr_employee_base"
+                },
+                {
+                  "key": "fieldName",
+                  "value": "emp_no"
+                },
+                {
+                  "key": "operationType",
+                  "value": "SELECT"
+                }
+              ]
+            },
+            "description": "检查单个权限节点是否已授权"
+          },
+          "response": []
+        },
+        {
+          "name": "Clear All Permissions",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissions/clear",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", "clear"]
+            },
+            "description": "清空所有权限配置（拒绝所有字段访问）"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Test Scenarios",
+      "item": [
+        {
+          "name": "Scenario 1: No Permissions (Should Fail)",
+          "item": [
+            {
+              "name": "1. Clear Permissions",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/permissions/clear",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["permissions", "clear"]
+                }
+              }
+            },
+            {
+              "name": "2. Try Query (Should Fail)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/query/MOD-HR-EMP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["query", "MOD-HR-EMP"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 2: Partial Permissions",
+          "item": [
+            {
+              "name": "1. Set Limited Permissions",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"permissions\": [\n    \"hr_employee_base.emp_no.SELECT\"\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/permissions/config",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["permissions", "config"]
+                }
+              }
+            },
+            {
+              "name": "2. Query (Only empNo)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/query/MOD-HR-EMP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["query", "MOD-HR-EMP"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 3: Full Permissions",
+          "item": [
+            {
+              "name": "1. Set Full Permissions",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"permissions\": [\n    \"hr_employee_base.emp_no.SELECT\",\n    \"hr_employee_base.first_name.SELECT\",\n    \"hr_employee_base.last_name.SELECT\",\n    \"hr_emp_personal.id_card_no.SELECT\",\n    \"hr_emp_job.emp_type.SELECT\",\n    \"hr_organization.org_name.SELECT\",\n    \"hr_employee_base.status.SELECT\"\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/permissions/config",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["permissions", "config"]
+                }
+              }
+            },
+            {
+              "name": "2. Query (All Fields)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/query/MOD-HR-EMP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["query", "MOD-HR-EMP"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

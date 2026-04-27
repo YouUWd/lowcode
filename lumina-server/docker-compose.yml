@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Lumina Backend Server
+  lumina-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lumina-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DB_CLIENT=better-sqlite3
+      - DB_FILENAME=:memory:
+      - LOG_LEVEL=log
+    restart: unless-stopped
+    networks:
+      - lumina-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/modules', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # PostgreSQL Database (可选 - 用于持久化存储)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: lumina-postgres
+  #   environment:
+  #     - POSTGRES_USER=lumina_user
+  #     - POSTGRES_PASSWORD=lumina_password
+  #     - POSTGRES_DB=lumina_db
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - lumina-network
+  #   restart: unless-stopped
+
+networks:
+  lumina-network:
+    driver: bridge
+
+# volumes:
+#   postgres-data:
