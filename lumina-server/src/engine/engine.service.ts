@@ -1,112 +1,73 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { Knex } from 'knex';
-import { InjectConnection } from 'nest-knexjs';
+import { EntityRelation } from '../modules/modules.service';
+
+export interface QueryOptions {
+  includeRelations?: boolean;
+  relations?: string[];
+  page?: number;
+  pageSize?: number;
+}
 
 @Injectable()
 export class EngineService {
-  constructor(@InjectConnection() private readonly knex: Knex) {}
+  constructor(
+    @Inject('BUSINESS_DB') private readonly knex: Knex,
+    @Inject('CONFIG_DB') private readonly configDb: Knex,
+  ) {}
 
-  async executeDynamicQuery(config: any) {
+  async executeDynamicQuery(config: any, options: QueryOptions = {}) {
     const { primaryEntity, entities, mappings } = config;
 
-    console.log('\n========== 查询执行开始 ==========');
+    console.log('\n========== 混合查询开始 ==========');
     console.log(`主表: ${primaryEntity.name}`);
-    console.log(`字段映射总数: ${mappings.length}`);
+    console.log(`查询选项:`, options);
 
-    // 第1步：从主表初始化查询
-    const query = this.knex(primaryEntity.name);
-    console.log(`\n[第1步] 从表初始化查询: ${primaryEntity.name}`);
+    // ========== 第 1 步：分离关系类型 ==========
+    const oneToOneEntities = entities.filter(
+      (e: EntityRelation) => e.relationType === '1:1' || e.relationType === 'N:1'
+    );
+    const oneToManyEntities = entities.filter(
+      (e: EntityRelation) => e.relationType === '1:N'
+    );
 
-    // 第2步：识别使用的物理表
-    // 这样可以避免不必要的JOIN，提高查询性能
-    const usedEntities = new Set<string>();
-    mappings.forEach((row: any) => {
-      row.physicalFields?.forEach((pf: any) => {
-        usedEntities.add(pf.entity);
-      });
-    });
-    console.log(`\n[第2步] 识别使用的表: ${Array.from(usedEntities).join(', ')}`);
+    console.log(`\n[关系分析]`);
+    console.log(`  1:1/N:1 关系: ${oneToOneEntities.length} 个`);
+    console.log(`  1:N 关系: ${oneToManyEntities.length} 个`);
 
-    // 第3步：动态应用LEFT JOIN
-    // 只JOIN实际使用的表，避免不必要的连接
-    if (entities) {
-      entities.forEach((entity: any) => {
-        if (usedEntities.has(entity.name)) {
-          const joinCond = entity.joinCondition;
-          if (joinCond) {
-            query.leftJoin(
-              entity.name,
-              `${entity.name}.${joinCond.left}`,
-              `${primaryEntity.name}.${joinCond.right}`,
-            );
-            console.log(
-              `  ✓ LEFT JOIN ${entity.name} ON ${entity.name}.${joinCond.left} = ${primaryEntity.name}.${joinCond.right}`,
-            );
-          }
-        }
-      });
+    // ========== 第 2 步：执行主查询（只包含 1:1/N:1 关系）==========
+    const mainData = await this.executeMainQuery(
+      primaryEntity,
+      oneToOneEntities,
+      mappings,
+      options
+    );
+
+    console.log(`\n[主查询结果] ${mainData.length} 条记录`);
+
+    // ========== 第 3 步：附加 1:N 关系（如果需要）==========
+    if (options.includeRelations && oneToManyEntities.length > 0 && mainData.length > 0) {
+      console.log(`\n[关联查询] 开始查询 ${oneToManyEntities.length} 个 1:N 关系`);
+      
+      // 过滤要查询的关联表
+      let entitiesToQuery = oneToManyEntities;
+      if (options.relations && options.relations.length > 0) {
+        entitiesToQuery = oneToManyEntities.filter(
+          e => options.relations!.includes(e.name)
+        );
+        console.log(`  指定查询: ${entitiesToQuery.map(e => e.name).join(', ')}`);
+      }
+      
+      await this.attachOneToManyRelations(
+        mainData,
+        entitiesToQuery,
+        config.id
+      );
     }
 
-    // 第4步：构建SELECT字段，使用混合计算逻辑
-    // 分离后端转换（数据库层）和前端转换（应用层）
-    const fieldAliasMap = new Map<string, string>(); // 逻辑字段到别名的映射
-    const bffMappings: any[] = []; // 存储需要前端转换的映射
+    console.log('========== 混合查询结束 ==========\n');
 
-    console.log(`\n[第3步] 构建SELECT字段:`);
-
-    mappings.forEach((row: any) => {
-      const isFrontendTransform = row.transformerEnv === 'frontend';
-
-      if (isFrontendTransform) {
-        // 前端层：获取原始字段供后续计算
-        // 这些字段将在应用层进行转换
-        bffMappings.push(row);
-        console.log(
-          `  ✓ [前端转换] ${row.logicalField} (转换器: ${row.transformer || '无'})`,
-        );
-        row.physicalFields?.forEach((pf: any) => {
-          const fieldAlias = `${pf.entity}_${pf.name}`;
-          query.select(`${pf.entity}.${pf.name} AS ${fieldAlias}`);
-          console.log(`    └─ SELECT ${pf.entity}.${pf.name} AS ${fieldAlias}`);
-        });
-      } else {
-        // 数据库层：应用下推逻辑
-        // 这些转换在数据库级别执行，性能更好
-        if (row.transformer) {
-          // 将${field}替换为entity.field用于SQL执行
-          const rawSql = row.transformer.replace(/\$\{([^}]+)\}/g, (match: string, p1: string) => {
-            const pf = row.physicalFields?.find((f: any) => f.name === p1);
-            return pf ? `${pf.entity}.${pf.name}` : match;
-          });
-          query.select(this.knex.raw(`${rawSql} AS ${row.logicalField}`));
-          fieldAliasMap.set(row.logicalField, row.logicalField);
-          console.log(`  ✓ [后端转换] ${row.logicalField} = ${rawSql}`);
-        } else {
-          // 简单字段映射 - 直接映射到逻辑字段名
-          const pf = row.physicalFields?.[0];
-          if (pf) {
-            query.select(`${pf.entity}.${pf.name} AS ${row.logicalField}`);
-            fieldAliasMap.set(row.logicalField, row.logicalField);
-            console.log(`  ✓ [简单映射] ${row.logicalField} = ${pf.entity}.${pf.name}`);
-          }
-        }
-      }
-    });
-
-    // 第5步：执行查询
-    // 在执行前输出生成的SQL用于调试
-    const sqlQuery = query.toString();
-    console.log(`\n[第4步] 生成的SQL:\n${sqlQuery}\n`);
-
-    const rawData = await query;
-    console.log(`[第5步] 查询执行成功。返回行数: ${rawData.length}`);
-    // 第6步：应用前端转换（上拉逻辑）
-    // 在应用层进行数据转换
-    const result = this.applyBffTransformers(rawData, mappings);
-    console.log(`[第6步] 应用了 ${bffMappings.length} 个前端转换`);
-    console.log('========== 查询执行结束 ==========\n');
-
-    return result;
+    return mainData;
   }
 
   private applyBffTransformers(data: any[], mappings: any[]) {
@@ -120,7 +81,6 @@ export class EngineService {
 
     // 筛选只需要前端转换的映射
     const bffMappings = mappings.filter((m) => m.transformerEnv === 'frontend');
-    const logicalFieldNames = new Set(mappings.map((m) => m.logicalField));
 
     console.log(`\n[前端转换] 处理 ${data.length} 行数据，应用 ${bffMappings.length} 个转换`);
 
@@ -162,6 +122,272 @@ export class EngineService {
 
       return result;
     });
+  }
+
+  private async executeMainQuery(
+    primaryEntity: any,
+    oneToOneEntities: EntityRelation[],
+    mappings: any[],
+    options: QueryOptions
+  ) {
+    console.log(`\n[主查询] 构建查询...`);
+
+    // 初始化查询
+    const query = this.knex(primaryEntity.name);
+
+    // ========== 识别使用的表（只包含 1:1/N:1 关系）==========
+    const usedEntities = new Set<string>();
+    usedEntities.add(primaryEntity.name);
+
+    mappings.forEach((mapping: any) => {
+      mapping.physicalFields?.forEach((pf: any) => {
+        // 检查是否属于 1:1/N:1 关系
+        const isOneToOne = oneToOneEntities.some(e => e.name === pf.entity);
+        const isPrimary = pf.entity === primaryEntity.name;
+        
+        if (isOneToOne || isPrimary) {
+          usedEntities.add(pf.entity);
+        }
+      });
+    });
+
+    console.log(`  使用的表: ${Array.from(usedEntities).join(', ')}`);
+
+    // ========== 应用 LEFT JOIN（只 JOIN 1:1/N:1 关系）==========
+    oneToOneEntities.forEach((entity) => {
+      if (usedEntities.has(entity.name)) {
+        const joinCond = entity.joinCondition;
+        query.leftJoin(
+          entity.name,
+          `${entity.name}.${joinCond.left}`,
+          `${primaryEntity.name}.${joinCond.right}`,
+        );
+        console.log(
+          `  ✓ LEFT JOIN ${entity.name} (${entity.relationType})`
+        );
+      }
+    });
+
+    // ========== 构建 SELECT 字段 ==========
+    console.log(`\n[字段选择]`);
+    
+    const bffMappings: any[] = [];
+
+    mappings.forEach((mapping: any) => {
+      // 跳过 1:N 关系的字段
+      const isOneToManyField = mapping.physicalFields?.some((pf: any) => 
+        !usedEntities.has(pf.entity)
+      );
+
+      if (isOneToManyField) {
+        console.log(`  ⊗ [跳过] ${mapping.logicalField} (属于 1:N 关系)`);
+        return;
+      }
+
+      const isFrontendTransform = mapping.transformerEnv === 'frontend';
+
+      if (isFrontendTransform) {
+        // 前端转换：选择原始字段
+        bffMappings.push(mapping);
+        mapping.physicalFields?.forEach((pf: any) => {
+          const fieldAlias = `${pf.entity}_${pf.name}`;
+          query.select(`${pf.entity}.${pf.name} AS ${fieldAlias}`);
+        });
+        console.log(`  ✓ [前端转换] ${mapping.logicalField}`);
+      } else {
+        // 后端转换或简单映射
+        if (mapping.transformer) {
+          const rawSql = mapping.transformer.replace(
+            /\$\{([^}]+)\}/g, 
+            (match: string, p1: string) => {
+              const pf = mapping.physicalFields?.find((f: any) => f.name === p1);
+              return pf ? `${pf.entity}.${pf.name}` : match;
+            }
+          );
+          query.select(this.knex.raw(`${rawSql} AS ${mapping.logicalField}`));
+          console.log(`  ✓ [后端转换] ${mapping.logicalField}`);
+        } else {
+          const pf = mapping.physicalFields?.[0];
+          if (pf) {
+            query.select(`${pf.entity}.${pf.name} AS ${mapping.logicalField}`);
+            console.log(`  ✓ [简单映射] ${mapping.logicalField}`);
+          }
+        }
+      }
+    });
+
+    // ========== 应用分页 ==========
+    if (options.page && options.pageSize) {
+      const offset = (options.page - 1) * options.pageSize;
+      query.limit(options.pageSize).offset(offset);
+      console.log(`\n[分页] page=${options.page}, pageSize=${options.pageSize}`);
+    }
+
+    // ========== 执行查询 ==========
+    const sqlQuery = query.toString();
+    console.log(`\n[SQL]\n${sqlQuery}\n`);
+
+    const rawData = await query;
+    console.log(`[执行结果] ${rawData.length} 条记录`);
+
+    // ========== 应用前端转换 ==========
+    const result = this.applyBffTransformers(rawData, mappings);
+
+    return result;
+  }
+
+  private async attachOneToManyRelations(
+    mainData: any[],
+    entities: EntityRelation[],
+    moduleId: string
+  ) {
+    for (const entity of entities) {
+      console.log(`\n[子查询] ${entity.name}...`);
+
+      // ========== 获取父记录的关联键 ==========
+      const parentKeys = mainData
+        .map(row => row[entity.joinCondition.right])
+        .filter(Boolean);
+
+      if (parentKeys.length === 0) {
+        console.log(`  ⊗ 没有父记录关联键，跳过`);
+        continue;
+      }
+
+      console.log(`  父记录关联键数: ${parentKeys.length}`);
+
+      // ========== 查询子记录 ==========
+      const childRecords = await this.queryChildRecords(
+        entity,
+        parentKeys,
+        moduleId
+      );
+
+      console.log(`  查询到子记录数: ${childRecords.length}`);
+
+      // ========== 附加到主记录 ==========
+      let attachedCount = 0;
+      mainData.forEach(row => {
+        const parentKey = row[entity.joinCondition.right];
+        const children = childRecords.filter(
+          child => child[entity.joinCondition.left] === parentKey
+        );
+
+        if (children.length > 0) {
+          if (!row._relations) {
+            row._relations = {};
+          }
+          
+          // 使用友好的键名（去掉表前缀）
+          const relationKey = this.getRelationKey(entity.name);
+          row._relations[relationKey] = children;
+          attachedCount++;
+        }
+      });
+
+      console.log(`  附加到 ${attachedCount} 条主记录`);
+    }
+  }
+
+  private getRelationKey(entityName: string): string {
+    // hr_payroll_result -> payrollRecords
+    // hr_emp_education -> educationRecords
+    const mapping: Record<string, string> = {
+      'hr_payroll_result': 'payrollRecords',
+      'hr_emp_education': 'educationRecords',
+      'hr_emp_contract': 'contractRecords',
+      'hr_payroll_element': 'payrollElements',
+      'hr_position': 'positions',
+      'hr_org_hierarchy': 'orgHierarchy',
+    };
+    
+    return mapping[entityName] || entityName;
+  }
+
+  private async queryChildRecords(
+    entity: EntityRelation,
+    parentKeys: any[],
+    moduleId: string
+  ) {
+    // ========== 构建子查询 ==========
+    const query = this.knex(entity.name)
+      .whereIn(entity.joinCondition.left, parentKeys);
+
+    // ========== 获取子表的字段映射 ==========
+    const childMappings = await this.getChildMappings(entity.name, moduleId);
+
+    console.log(`  子表字段映射数: ${childMappings.length}`);
+
+    // ========== 构建 SELECT ==========
+    childMappings.forEach(mapping => {
+      if (!mapping) return;
+      
+      mapping.physicalFields.forEach((pf: any) => {
+        if (pf.entity === entity.name) {
+          if (mapping.transformer && mapping.transformerEnv === 'backend') {
+            // 后端转换
+            const rawSql = mapping.transformer.replace(
+              /\$\{([^}]+)\}/g,
+              (match: string, p1: string) => `${pf.entity}.${p1}`
+            );
+            query.select(this.knex.raw(`${rawSql} AS ${mapping.logicalField}`));
+          } else {
+            // 简单映射
+            query.select(`${pf.entity}.${pf.name} AS ${mapping.logicalField}`);
+          }
+        }
+      });
+    });
+
+    // ========== 添加关联键（用于附加到父记录）==========
+    query.select(`${entity.name}.${entity.joinCondition.left}`);
+
+    // ========== 执行查询 ==========
+    const sqlQuery = query.toString();
+    console.log(`  子查询 SQL:\n  ${sqlQuery}`);
+
+    const childRecords = await query;
+
+    // ========== 应用前端转换 ==========
+    return this.applyBffTransformers(childRecords, childMappings);
+  }
+
+  private async getChildMappings(entityName: string, moduleId: string) {
+    // 查询该实体的字段配置
+    const fields = await this.configDb('sys_module_field')
+      .where('module_id', moduleId)
+      .where('is_visible', true);
+
+    // 查询字段物理源（只查询该实体的字段）
+    const fieldSources = await this.configDb('sys_module_field_source')
+      .where('module_id', moduleId)
+      .where('source_entity', entityName);
+
+    // 构建映射
+    const mappings = fields
+      .map((field: any) => {
+        const sources = fieldSources.filter(
+          (s: any) => s.logical_field === field.logical_field
+        );
+
+        if (sources.length === 0) return null;
+
+        return {
+          displayName: field.display_name,
+          logicalField: field.logical_field,
+          physicalFields: sources.map((s: any) => ({
+            entity: s.source_entity,
+            name: s.source_field,
+          })),
+          transformer: field.transformer,
+          transformerEnv: field.transformer_env,
+          renderIcon: field.render_icon,
+          renderType: field.render_type,
+        };
+      })
+      .filter(Boolean);
+
+    return mappings;
   }
 
   private evaluateTransformer(

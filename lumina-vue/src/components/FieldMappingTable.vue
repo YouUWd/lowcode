@@ -356,8 +356,13 @@ const getIconForRenderType = (type) => {
 };
 
 const getBadgeClassForEntity = (entityName) => {
-  if (entityName.includes('部门') || entityName.includes('组织')) return 'bg-secondary-container/50 text-on-secondary-container';
-  if (entityName.includes('岗位') || entityName.includes('角色')) return 'bg-tertiary-container/20 text-tertiary-container';
+  const name = entityName.toLowerCase();
+  if (name.includes('部门') || name.includes('组织') || name.includes('org') || name.includes('dept')) 
+    return 'bg-secondary-container/50 text-on-secondary-container';
+  if (name.includes('岗位') || name.includes('角色') || name.includes('pos') || name.includes('role')) 
+    return 'bg-tertiary-container/20 text-tertiary-container border border-tertiary-container/30';
+  if (name.includes('user') || name.includes('emp'))
+    return 'bg-primary-container/40 text-on-primary-container';
   return 'bg-primary-fixed/30 text-on-primary-fixed';
 };
 

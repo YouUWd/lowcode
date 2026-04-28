@@ -4,9 +4,9 @@
       <thead>
         <tr class="bg-surface-container-low text-on-surface-variant text-xs uppercase tracking-wider font-bold">
           <th class="p-5">物理字段与来源</th>
-          <th class="p-5 text-center w-32">SELECT (查询)</th>
-          <th class="p-5 text-center w-32">UPDATE (更新)</th>
-          <th class="p-5 text-center w-32">WRITE (写入)</th>
+          <th class="p-5 text-center w-40">READ (读取)</th>
+          <th class="p-5 text-center w-40">CREATE (创建)</th>
+          <th class="p-5 text-center w-40">UPDATE (更新)</th>
         </tr>
       </thead>
       <tbody class="text-sm">
@@ -17,14 +17,19 @@
                 <span class="material-symbols-outlined">database</span>
               </div>
               <div class="flex flex-col">
-                <span class="font-mono text-sm font-bold text-on-surface">{{ field.name }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-sm font-bold text-on-surface">{{ field.name }}</span>
+                  <span v-if="field.logicalField" class="text-[10px] bg-secondary/10 text-secondary px-1.5 py-0.5 rounded font-medium">
+                    {{ field.logicalField }}
+                  </span>
+                </div>
                 <span class="text-[11px] font-semibold text-on-surface-variant opacity-60 uppercase tracking-tighter">{{ field.entity }}</span>
               </div>
             </div>
           </td>
           
           <!-- Toggles synced with ModuleList style -->
-          <td v-for="type in ['SELECT', 'UPDATE', 'WRITE']" :key="type" class="p-5 text-center">
+          <td v-for="type in ['READ', 'CREATE', 'UPDATE']" :key="type" class="p-5 text-center">
             <div class="flex justify-center">
               <button 
                 @click="emitToggle(`${field.entity}.${field.name}.${type}`)"

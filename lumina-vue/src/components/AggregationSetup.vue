@@ -32,7 +32,12 @@
           <!-- Connection Logic Pill -->
           <div class="absolute -top-5 left-1/2 -translate-x-1/2 border border-outline-variant/40 bg-surface px-3 py-1.5 rounded-full text-[11px] font-mono flex items-center shadow-sm whitespace-nowrap z-20 text-on-surface transition-all group-hover:-translate-y-1 group-hover:shadow-md group-hover:border-primary/50">
             <span class="text-primary font-medium mr-1">{{ entity.joinCondition.left }}</span>
-            <span class="material-symbols-outlined text-[14px] mx-1 text-outline">arrow_forward</span>
+            <div class="flex flex-col items-center mx-1 px-2 border-x border-outline-variant/20">
+              <span class="material-symbols-outlined text-[14px] text-outline">
+                {{ entity.relationType === '1:1' ? 'sync_alt' : (entity.relationType === '1:N' ? 'fork_right' : 'fork_left') }}
+              </span>
+              <span class="text-[8px] font-bold opacity-50">{{ entity.relationType || '1:1' }}</span>
+            </div>
             <span class="font-medium ml-1 text-on-surface">{{ entity.joinCondition.right }}</span>
           </div>
           
@@ -79,6 +84,31 @@
                     <option disabled value="">请选择关联的物理表</option>
                     <option v-for="table in availableTables" :key="table.name" :value="table.name">{{ table.name }} ({{ table.desc }})</option>
                   </select>
+                </div>
+
+                <!-- Cardinality Selection -->
+                <div class="space-y-2">
+                  <label class="text-xs font-bold text-on-surface-variant">关联关系 (Cardinality)</label>
+                  <div class="flex p-1 bg-surface-container-high rounded-xl border border-outline-variant/30">
+                    <button 
+                      v-for="type in ['1:1', '1:N', 'N:1']" 
+                      :key="type"
+                      type="button"
+                      @click="newEntity.cardinality = type"
+                      class="flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+                      :class="newEntity.cardinality === type 
+                        ? 'bg-primary text-on-primary shadow-sm' 
+                        : 'text-on-surface-variant hover:bg-surface-variant/50'"
+                    >
+                      <span class="material-symbols-outlined text-[16px]">
+                        {{ type === '1:1' ? 'sync_alt' : (type === '1:N' ? 'fork_right' : 'fork_left') }}
+                      </span>
+                      {{ type }}
+                    </button>
+                  </div>
+                  <p class="text-[10px] text-on-surface-variant opacity-60 italic px-1">
+                    {{ cardinalityHint }}
+                  </p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
@@ -142,7 +172,15 @@ const newEntity = reactive({
   name: '',
   desc: '',
   left: '',
-  right: ''
+  right: '',
+  cardinality: '1:1'
+});
+
+const cardinalityHint = computed(() => {
+  if (newEntity.cardinality === '1:1') return '一个主实体记录对应一个关联实体记录 (如: 员工与其身份证信息)';
+  if (newEntity.cardinality === '1:N') return '一个主实体记录对应多个关联实体记录 (如: 员工与其教育经历)';
+  if (newEntity.cardinality === 'N:1') return '多个主实体记录对应一个关联实体记录 (如: 多个员工属于同一个部门)';
+  return '';
 });
 
 // Auto-fill desc and select default associated field when physical table changes
@@ -150,6 +188,13 @@ watch(() => newEntity.name, (newVal) => {
   if (newVal && mockDbSchema[newVal]) {
     newEntity.desc = mockDbSchema[newVal].desc;
     newEntity.right = mockDbSchema[newVal].fields[0] || 'id';
+    
+    // 智能推断关系：如果是 hr_emp_job 等表通常是 1:1，如果是 education 通常是 1:N
+    if (newVal.includes('education') || newVal.includes('payroll') || newVal.includes('record')) {
+      newEntity.cardinality = '1:N';
+    } else {
+      newEntity.cardinality = '1:1';
+    }
   }
 });
 
@@ -160,6 +205,7 @@ const addEntity = () => {
     name: newEntity.name,
     desc: newEntity.desc || '新增拓展关联实体',
     status: '正常',
+    relationType: newEntity.cardinality,
     joinCondition: {
       left: newEntity.left,
       right: newEntity.right
@@ -169,6 +215,7 @@ const addEntity = () => {
   newEntity.desc = '';
   newEntity.left = '';
   newEntity.right = '';
+  newEntity.cardinality = '1:1';
   showAddModal.value = false;
 };
 

@@ -1,5 +1,5 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
-import { EngineService } from './engine.service';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { EngineService, QueryOptions } from './engine.service';
 import { ModulesService } from '../modules/modules.service';
 import { PermissionsService } from '../permissions/permissions.service';
 
@@ -12,13 +12,13 @@ export class EngineController {
   ) {}
 
   @Get('modules')
-  getModules() {
+  async getModules() {
     return this.modulesService.getAllModules();
   }
 
   @Get('modules/:id')
-  getModuleConfig(@Param('id') id: string) {
-    const config = this.modulesService.getModuleConfig(id);
+  async getModuleConfig(@Param('id') id: string) {
+    const config = await this.modulesService.getModuleConfig(id);
     if (!config) {
       return { error: 'Module not found' };
     }
@@ -26,10 +26,16 @@ export class EngineController {
   }
 
   @Get('query/:moduleId')
-  async query(@Param('moduleId') moduleId: string) {
+  async query(
+    @Param('moduleId') moduleId: string,
+    @Query('includeRelations') includeRelations?: string,
+    @Query('relations') relations?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
     try {
-      // 获取模块配置
-      const config = this.modulesService.getModuleConfig(moduleId);
+      // ========== 获取模块配置 ==========
+      const config = await this.modulesService.getModuleConfig(moduleId);
       if (!config) {
         return {
           success: false,
@@ -40,10 +46,13 @@ export class EngineController {
       console.log(`\n========== 权限拦截开始 ==========`);
       console.log(`[权限拦截] 模块ID: ${moduleId}`);
 
-      // 获取全局权限配置
-      const permissions = this.permissionsService.getGlobalPermissions();
-      console.log(`[权限拦截] 全局权限节点数: ${permissions.size}`);
-
+      // ========== 应用权限过滤 ==========
+      const permissions = await this.permissionsService.getModulePermissions(moduleId);
+      console.log(`[权限拦截] 模块权限节点数: ${permissions.size}`);
+      
+      // 输出详细的权限节点日志
+      await this.permissionsService.logDetailedPermissions();
+      
       // 检查权限集合是否为空
       if (permissions.size === 0) {
         console.log(`[权限拦截] ⚠️  权限集合为空，拒绝查询`);
@@ -56,15 +65,15 @@ export class EngineController {
         };
       }
 
-      // 应用权限过滤
+      // 过滤主表字段
       if (config.mappings) {
         console.log(`原始映射字段数: ${config.mappings.length}`);
-        config.mappings = this.permissionsService.filterMappingsByPermissions(
+        config.mappings = await this.permissionsService.filterMappingsByPermissions(
           config.mappings,
+          moduleId,
         );
         console.log(`过滤后映射字段数: ${config.mappings.length}`);
 
-        // 如果过滤后没有字段，也拒绝查询
         if (config.mappings.length === 0) {
           console.log(`[权限拦截] ⚠️  过滤后无可用字段，拒绝查询`);
           console.log(`========== 权限拦截结束 ==========\n`);
@@ -79,12 +88,26 @@ export class EngineController {
 
       console.log(`========== 权限拦截结束 ==========\n`);
 
-      // 执行查询
-      const result = await this.engineService.executeDynamicQuery(config);
+      // ========== 构建查询选项 ==========
+      const options: QueryOptions = {
+        includeRelations: includeRelations === 'true',
+        relations: relations ? relations.split(',') : undefined,
+        page: page ? parseInt(page) : undefined,
+        pageSize: pageSize ? parseInt(pageSize) : undefined,
+      };
+
+      // ========== 执行查询 ==========
+      const result = await this.engineService.executeDynamicQuery(config, options);
+      
       return {
         success: true,
         data: result,
         count: result.length,
+        pagination: options.page && options.pageSize ? {
+          page: options.page,
+          pageSize: options.pageSize,
+          total: result.length,
+        } : undefined,
       };
     } catch (error) {
       return {

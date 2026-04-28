@@ -1,58 +1,52 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, Param } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
 
 /**
  * 权限管理API控制器
- * 提供全局权限配置接口
+ * 
+ * 所有接口都基于模块级别，需要提供 moduleId 参数
+ * 路由: /api/permissions/module/:moduleId/*
  */
-@Controller('permissions')
+@Controller('permissions/module/:moduleId')
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   /**
-   * 设置全局权限配置
-   * POST /api/permissions/config
+   * 获取指定模块的详细权限节点信息
+   * GET /api/permissions/module/:moduleId
    * 
-   * 请求体:
+   * 响应:
    * {
+   *   "success": true,
+   *   "moduleId": "MOD-HR-ORG",
    *   "permissions": [
-   *     "hr_employee_base.emp_no.SELECT",
-   *     "hr_employee_base.first_name.SELECT",
-   *     "hr_payroll_result.net_amount.SELECT"
-   *   ]
+   *     {
+   *       "permission_node": "hr_organization.org_code.READ",
+   *       "entity": "hr_organization",
+   *       "field_name": "org_code",
+   *       "operation_type": "READ",
+   *       "module_id": "MOD-HR-ORG",
+   *       "logical_field": "orgCode"
+   *     },
+   *     ...
+   *   ],
+   *   "count": 10
    * }
-   * 
-   * 说明: 
-   * - 默认不允许任何字段
-   * - 需要显式配置权限节点才能访问字段
-   * - 如果permissions为空数组，表示不允许任何字段
    */
-  @Post('config')
-  async setPermissions(@Body() body: { permissions: string[] }) {
+  @Get()
+  async getModulePermissions(@Param('moduleId') moduleId: string) {
     try {
-      const { permissions } = body;
-
-      if (!Array.isArray(permissions)) {
-        return {
-          success: false,
-          error: '缺少必要参数: permissions 数组',
-        };
-      }
-
-      console.log(`\n[权限API] 设置全局权限配置`);
-      console.log(`权限节点数: ${permissions.length}`);
-      permissions.forEach((p) => console.log(`  - ${p}`));
-
-      // 将权限数组转换为Set并保存
-      const permissionSet = new Set(permissions);
-      await this.permissionsService.setGlobalPermissions(permissionSet);
+      console.log(`\n[权限API] 获取模块详细权限节点: ${moduleId}`);
+      
+      const modulePermissions = await this.permissionsService.getModuleDetailedPermissions(moduleId);
+      
+      console.log(`模块 ${moduleId} 权限节点数: ${modulePermissions.length}`);
 
       return {
         success: true,
-        message: permissions.length === 0 
-          ? '已清空权限配置，不允许任何字段' 
-          : `成功设置 ${permissions.length} 个权限节点`,
-        permissionCount: permissions.length,
+        moduleId,
+        permissions: modulePermissions,
+        count: modulePermissions.length,
       };
     } catch (error) {
       return {
@@ -63,36 +57,39 @@ export class PermissionsController {
   }
 
   /**
-   * 获取全局权限配置
-   * GET /api/permissions/config
+   * 获取指定模块的权限节点列表（简化格式）
+   * GET /api/permissions/module/:moduleId/simple
    * 
    * 响应:
    * {
    *   "success": true,
+   *   "moduleId": "MOD-HR-ORG",
    *   "permissions": [
-   *     "hr_employee_base.emp_no.SELECT",
+   *     "hr_organization.org_code.READ",
+   *     "hr_organization.org_name.READ",
    *     ...
    *   ],
-   *   "permissionCount": 15,
-   *   "status": "不允许任何字段" 或 "部分字段允许"
+   *   "permissionCount": 10,
+   *   "status": "部分字段允许"
    * }
    */
-  @Get('config')
-  getPermissions() {
+  @Get('sets')
+  async getModulePermissionsSets(@Param('moduleId') moduleId: string) {
     try {
-      console.log(`\n[权限API] 获取全局权限配置`);
+      console.log(`\n[权限API] 获取模块权限节点: ${moduleId}`);
 
-      const permissions = this.permissionsService.getGlobalPermissions();
+      const permissions = await this.permissionsService.getModulePermissions(moduleId);
       const permissionArray = Array.from(permissions);
 
       const status = permissionArray.length === 0 
         ? '不允许任何字段' 
         : '部分字段允许';
 
-      console.log(`权限节点数: ${permissionArray.length}, 状态: ${status}`);
+      console.log(`模块 ${moduleId} 权限节点数: ${permissionArray.length}, 状态: ${status}`);
 
       return {
         success: true,
+        moduleId,
         permissions: permissionArray,
         permissionCount: permissionArray.length,
         status,
@@ -106,21 +103,25 @@ export class PermissionsController {
   }
 
   /**
-   * 检查是否有权限访问某个字段
-   * GET /api/permissions/check?entity=hr_employee_base&fieldName=emp_no&operationType=SELECT
+   * 检查指定模块中是否有权限访问某个字段
+   * GET /api/permissions/module/:moduleId/check?entity=hr_organization&fieldName=org_code&operationType=READ
+   * 
+   * operationType 可选值: READ | CREATE | UPDATE
    * 
    * 响应:
    * {
    *   "success": true,
-   *   "permissionNode": "hr_employee_base.emp_no.SELECT",
+   *   "moduleId": "MOD-HR-ORG",
+   *   "permissionNode": "hr_organization.org_code.READ",
    *   "hasPermission": true
    * }
    */
   @Get('check')
-  checkPermission(
-    entity: string,
-    fieldName: string,
-    operationType: 'SELECT' | 'UPDATE' | 'WRITE',
+  async checkModulePermission(
+    @Param('moduleId') moduleId: string,
+    @Query('entity') entity: string,
+    @Query('fieldName') fieldName: string,
+    @Query('operationType') operationType: 'READ' | 'CREATE' | 'UPDATE',
   ) {
     try {
       if (!entity || !fieldName || !operationType) {
@@ -131,18 +132,20 @@ export class PermissionsController {
       }
 
       const permissionNode = `${entity}.${fieldName}.${operationType}`;
-      const hasPermission = this.permissionsService.hasPermission(
+      const hasPermission = await this.permissionsService.hasPermission(
         entity,
         fieldName,
         operationType,
+        moduleId,
       );
 
       console.log(
-        `[权限API] 检查权限: ${permissionNode} => ${hasPermission ? '✓' : '✗'}`,
+        `[权限API] 检查模块 ${moduleId} 权限: ${permissionNode} => ${hasPermission ? '✓' : '✗'}`,
       );
 
       return {
         success: true,
+        moduleId,
         permissionNode,
         hasPermission,
       };
@@ -155,19 +158,80 @@ export class PermissionsController {
   }
 
   /**
-   * 清空权限配置 (不允许任何字段)
-   * POST /api/permissions/clear
+   * 设置指定模块的权限节点
+   * POST /api/permissions/module/:moduleId
+   * 
+   * 请求体:
+   * {
+   *   "permissions": [
+   *     "hr_organization.org_code.READ",
+   *     "hr_organization.org_name.READ",
+   *     "hr_organization.org_type.READ"
+   *   ]
+   * }
+   * 
+   * 说明:
+   * - 只更新指定模块的权限
+   * - 其他模块的权限不受影响
+   * - 如果permissions为空数组，表示该模块不允许任何字段
    */
-  @Post('clear')
-  async clearPermissions() {
+  @Post()
+  async setModulePermissions(
+    @Param('moduleId') moduleId: string,
+    @Body() body: { permissions: string[] },
+  ) {
     try {
-      console.log(`[权限API] 清空权限配置，不允许任何字段`);
+      const { permissions } = body;
 
-      await this.permissionsService.setGlobalPermissions(new Set());
+      if (!Array.isArray(permissions)) {
+        return {
+          success: false,
+          error: '缺少必要参数: permissions 数组',
+        };
+      }
+
+      console.log(`\n[权限API] 设置模块权限节点: ${moduleId}`);
+      console.log(`权限节点数: ${permissions.length}`);
+      permissions.forEach((p) => console.log(`  - ${p}`));
+
+      // 调用服务保存模块权限
+      await this.permissionsService.setModulePermissions(moduleId, permissions);
 
       return {
         success: true,
-        message: '已清空权限配置，不允许任何字段',
+        moduleId,
+        message: permissions.length === 0 
+          ? `模块 ${moduleId} 已清空权限，不允许任何字段` 
+          : `模块 ${moduleId} 成功设置 ${permissions.length} 个权限节点`,
+        permissionCount: permissions.length,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * 清空指定模块的权限节点
+   * POST /api/permissions/module/:moduleId/clear
+   * 
+   * 说明:
+   * - 清空指定模块的所有权限
+   * - 该模块将不允许任何字段
+   */
+  @Post('clear')
+  async clearModulePermissions(@Param('moduleId') moduleId: string) {
+    try {
+      console.log(`[权限API] 清空模块权限节点: ${moduleId}`);
+
+      await this.permissionsService.setModulePermissions(moduleId, []);
+
+      return {
+        success: true,
+        moduleId,
+        message: `模块 ${moduleId} 已清空权限，不允许任何字段`,
       };
     } catch (error) {
       return {

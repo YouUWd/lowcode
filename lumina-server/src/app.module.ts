@@ -1,42 +1,38 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DatabaseModule } from './database/database.module';
 import { EngineModule } from './engine/engine.module';
 import { PermissionsModule } from './permissions/permissions.module';
-import { PermissionsService } from './permissions/permissions.service';
-import { KnexModule } from 'nest-knexjs';
+import { ModulesModule } from './modules/modules.module';
 import { DatabaseService } from './database/database.service';
 
 @Module({
   imports: [
-    KnexModule.forRoot({
-      config: {
-        client: 'better-sqlite3',
-        connection: {
-          filename: ':memory:',
-        },
-        useNullAsDefault: true,
-      },
-    }),
+    DatabaseModule,
     EngineModule,
     PermissionsModule,
+    ModulesModule,
   ],
   controllers: [AppController],
-  providers: [AppService, DatabaseService],
+  providers: [AppService],
 })
-export class AppModule {
-  constructor(
-    private readonly databaseService: DatabaseService,
-    private readonly permissionsService: PermissionsService,
-  ) {
-    this.initializeServices();
-  }
+export class AppModule implements OnModuleInit {
+  constructor(private readonly databaseService: DatabaseService) {}
 
-  private async initializeServices() {
-    // 1. 先初始化数据库 (创建表)
-    await this.databaseService.initializeDatabase();
+  async onModuleInit() {
+    console.log('[应用] 模块初始化开始...');
     
-    // 2. 再初始化权限服务 (加载权限)
-    await this.permissionsService.initialize();
+    try {
+      // 初始化数据库 (创建表 + 插入种子数据)
+      console.log('[应用] 初始化数据库...');
+      await this.databaseService.initializeDatabase();
+      console.log('[应用] 数据库初始化完成');
+      
+      console.log('[应用] 所有服务初始化完成');
+    } catch (error) {
+      console.error('[应用] 服务初始化失败:', error);
+      throw error;
+    }
   }
 }

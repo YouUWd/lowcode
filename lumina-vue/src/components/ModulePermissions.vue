@@ -63,7 +63,8 @@ const goBack = () => {
 };
 
 const saveAndGoBack = async () => {
-  const success = await updatePermissions(state.activePermissions);
+  if (!state.activeModule) return;
+  const success = await updatePermissions(state.activeModule.id, state.activePermissions);
   if (success) {
     updateView('list');
   } else {
@@ -72,6 +73,24 @@ const saveAndGoBack = async () => {
 };
 
 const derivedFields = computed(() => {
+  // 优先从后端获取的详细权限节点中推导字段列表
+  if (state.detailedPermissions && state.detailedPermissions.length > 0) {
+    const fieldsMap = new Map();
+    state.detailedPermissions.forEach(p => {
+      const key = `${p.entity}.${p.field_name}`;
+      if (!fieldsMap.has(key)) {
+        fieldsMap.set(key, { 
+          entity: p.entity, 
+          name: p.field_name, 
+          id: key,
+          logicalField: p.logical_field 
+        });
+      }
+    });
+    return Array.from(fieldsMap.values());
+  }
+
+  // 兜底方案：从本地配置映射中推导
   const modId = state.activeModule?.id;
   if (!modId) return [];
   const config = state.configs[modId];
@@ -100,7 +119,7 @@ const togglePermission = (node) => {
 
 const toggleAll = (active) => {
   derivedFields.value.forEach(f => {
-    ['SELECT', 'UPDATE', 'WRITE'].forEach(type => {
+    ['READ', 'CREATE', 'UPDATE'].forEach(type => {
       const node = `${f.entity}.${f.name}.${type}`;
       if (active) state.activePermissions.add(node);
       else state.activePermissions.delete(node);
@@ -112,7 +131,7 @@ const activePermissionCount = computed(() => {
   if (!state.activeModule) return 0;
   let count = 0;
   derivedFields.value.forEach(f => {
-    ['SELECT', 'UPDATE', 'WRITE'].forEach(type => {
+    ['READ', 'CREATE', 'UPDATE'].forEach(type => {
       if (state.activePermissions.has(`${f.entity}.${f.name}.${type}`)) count++;
     });
   });

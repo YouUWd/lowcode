@@ -15,7 +15,10 @@ export const state = reactive({
   configs: {},
   
   // 模拟权限节点 (存储当前激活的权限节点)
-  activePermissions: new Set()
+  activePermissions: new Set(),
+
+  // 详细权限节点信息
+  detailedPermissions: []
 });
 
 // 2. 模拟底层数据库模型 (保留用于 UI 字段选择参考)
@@ -100,8 +103,8 @@ export const updateView = async (view, module = null) => {
     state.activeModule = module;
     await fetchConfig(module.id);
   }
-  if (view === 'permissions') {
-    await fetchPermissions();
+  if (view === 'permissions' && state.activeModule) {
+    await fetchDetailedPermissions(state.activeModule.id);
   }
 };
 
@@ -132,22 +135,28 @@ export const addMappingToCurrentConfig = (mapping) => {
   currentConfig.value?.mappings.push(mapping);
 };
 
-export const fetchPermissions = async () => {
+
+export const fetchDetailedPermissions = async (moduleId) => {
   try {
-    const res = await fetch(`${API_BASE}/permissions/config`);
+    const res = await fetch(`${API_BASE}/permissions/module/${moduleId}`);
     const data = await res.json();
     if (data.success) {
-      state.activePermissions = new Set(data.permissions);
+      // 存储原始对象数组，用于渲染表格行
+      state.detailedPermissions = data.permissions;
+      
+      // 提取节点字符串到 Set，用于 UI 开关状态判断
+      const nodes = data.permissions.map(p => p.permission_node);
+      state.activePermissions = new Set(nodes);
     }
   } catch (e) {
-    console.error('Failed to fetch permissions:', e);
+    console.error(`Failed to fetch detailed permissions for ${moduleId}:`, e);
   }
 };
 
-export const updatePermissions = async (permissions) => {
+export const updatePermissions = async (moduleId, permissions) => {
   try {
     state.loading = true;
-    const res = await fetch(`${API_BASE}/permissions/config`, {
+    const res = await fetch(`${API_BASE}/permissions/module/${moduleId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ permissions: Array.from(permissions) })
@@ -159,7 +168,7 @@ export const updatePermissions = async (permissions) => {
     }
     return false;
   } catch (e) {
-    console.error('Failed to update permissions:', e);
+    console.error(`Failed to update permissions for ${moduleId}:`, e);
     return false;
   } finally {
     state.loading = false;
@@ -172,4 +181,3 @@ export const deleteMappingFromCurrentConfig = (index) => {
 
 // 立即执行初始化数据获取
 fetchModules();
-fetchPermissions();
