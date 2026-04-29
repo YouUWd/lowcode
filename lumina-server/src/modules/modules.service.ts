@@ -97,26 +97,26 @@ export class ModulesService {
           .orderBy('sort_order');
         console.log(`[模块服务] 查询到字段数: ${fields.length}`);
 
-        // 查询字段物理源
-        console.log(`[模块服务] 查询字段物理源: module_id = ${dbModule.module_id}`);
-        const fieldSources = await this.knex('sys_module_field_source')
-          .where('module_id', dbModule.module_id)
-          .orderBy('logical_field', 'sort_order');
-        console.log(`[模块服务] 查询到字段源数: ${fieldSources.length}`);
-
-        // 构建映射配置
+        // 构建映射配置（从 source_mapping JSON 解析）
         const mappings = fields.map((field) => {
-          const sources = fieldSources.filter(
-            (s) => s.logical_field === field.logical_field,
-          );
+          let physicalFields: Array<{ entity: string; name: string }> = [];
+          
+          if (field.source_mapping) {
+            try {
+              const sources = JSON.parse(field.source_mapping);
+              physicalFields = sources.map((s: any) => ({
+                entity: s.entity,
+                name: s.field,
+              }));
+            } catch (e) {
+              console.warn(`[模块服务] 解析 source_mapping 失败: ${field.logical_field}`, e);
+            }
+          }
 
           return {
             displayName: field.display_name,
             logicalField: field.logical_field,
-            physicalFields: sources.map((s) => ({
-              entity: s.source_entity,
-              name: s.source_field,
-            })),
+            physicalFields,
             transformer: field.transformer,
             transformerEnv: field.transformer_env as TransformerEnv,
             renderIcon: field.render_icon,

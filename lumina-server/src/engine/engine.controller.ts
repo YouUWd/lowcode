@@ -28,8 +28,6 @@ export class EngineController {
   @Get('query/:moduleId')
   async query(
     @Param('moduleId') moduleId: string,
-    @Query('includeRelations') includeRelations?: string,
-    @Query('relations') relations?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -90,8 +88,6 @@ export class EngineController {
 
       // ========== 构建查询选项 ==========
       const options: QueryOptions = {
-        includeRelations: includeRelations === 'true',
-        relations: relations ? relations.split(',') : undefined,
         page: page ? parseInt(page) : undefined,
         pageSize: pageSize ? parseInt(pageSize) : undefined,
       };

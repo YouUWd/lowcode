@@ -1,5 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Knex } from 'knex';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * 数据库服务
@@ -23,6 +25,40 @@ export class DatabaseService {
     console.log('[数据库服务] 服务已创建');
     console.log('[数据库服务] - configDb: 配置数据库 (模块、字段、权限)');
     console.log('[数据库服务] - businessDb: 业务数据库 (HR 数据)');
+  }
+
+  /**
+   * 删除数据库文件（仅适用于 SQLite）
+   */
+  async deleteDatabaseFiles() {
+    console.log('[数据库服务] 检查并删除现有数据库文件...');
+    
+    const dataDir = path.join(process.cwd(), 'data');
+    const dbFiles = ['business.db', 'config.db'];
+    
+    let deletedCount = 0;
+    
+    for (const dbFile of dbFiles) {
+      const filePath = path.join(dataDir, dbFile);
+      
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`[数据库服务] ✓ 已删除: ${dbFile}`);
+          deletedCount++;
+        } catch (error) {
+          console.error(`[数据库服务] ✗ 删除失败: ${dbFile}`, error);
+        }
+      } else {
+        console.log(`[数据库服务] - 文件不存在: ${dbFile}`);
+      }
+    }
+    
+    if (deletedCount > 0) {
+      console.log(`[数据库服务] 共删除 ${deletedCount} 个数据库文件`);
+    } else {
+      console.log(`[数据库服务] 没有需要删除的数据库文件`);
+    }
   }
 
   /**
@@ -66,8 +102,7 @@ export class DatabaseService {
    * - sys_permission_config: 权限配置表
    * - sys_module: 模块基本信息表
    * - sys_module_entity: 模块关联表信息
-   * - sys_module_field: 模块字段配置表
-   * - sys_module_field_source: 字段物理源映射表
+   * - sys_module_field: 模块字段配置表（包含 source_mapping JSON 字段）
    */
   private async createConfigTables() {
     
@@ -109,24 +144,13 @@ export class DatabaseService {
         table.string('field_id', 100).notNullable();
         table.string('display_name', 100).notNullable();
         table.string('logical_field', 100).notNullable();
+        table.text('source_mapping').nullable(); // JSON 数组: [{ entity, field, sort_order }]
         table.string('transformer', 500).nullable();
         table.string('transformer_env', 50).defaultTo('none');
         table.string('render_icon', 100).nullable();
         table.string('render_type', 50).nullable();
         table.integer('sort_order').defaultTo(0);
         table.boolean('is_visible').defaultTo(true);
-        table.timestamps(true, true);
-      });
-    }
-
-    if (!(await this.configDb.schema.hasTable('sys_module_field_source'))) {
-      await this.configDb.schema.createTable('sys_module_field_source', (table) => {
-        table.increments('id').primary();
-        table.string('module_id', 50).notNullable();
-        table.string('logical_field', 100).notNullable();
-        table.string('source_entity', 100).notNullable();
-        table.string('source_field', 100).notNullable();
-        table.integer('sort_order').defaultTo(0);
         table.timestamps(true, true);
       });
     }
@@ -152,130 +176,107 @@ export class DatabaseService {
   /**
    * 创建业务数据库表结构
    * 
-   * 包含以下表：
-   * - hr_organization: 组织架构表
-   * - sys_user: 用户表
-   * - hr_employee_base: 员工基础信息表
-   * - hr_emp_job: 员工任职信息表
-   * - hr_emp_personal: 员工隐私信息表
-   * - hr_payroll_result: 薪酬结果表
-   * - hr_salary_structure: 薪资结构表
-   * - hr_social_security_record: 社保记录表
-   * - hr_tax_record: 个税记录表
-   * - sys_operation_log: 操作日志表
+   * 学生管理系统包含以下表：
+   * - class: 班级表
+   * - teacher: 教师表
+   * - student: 学生表（主表）
+   * - course: 课程表
+   * - score: 成绩表（1:N 关系）
+   * - department: 部门表（用于教师档案模块）
+   * - enrollment: 选课表（用于学生课程模块）
    */
   private async createBusinessTables() {
-    if (!(await this.businessDb.schema.hasTable('hr_organization'))) {
-      await this.businessDb.schema.createTable('hr_organization', (table) => {
+    // 班级表
+    if (!(await this.businessDb.schema.hasTable('class'))) {
+      await this.businessDb.schema.createTable('class', (table) => {
         table.increments('id').primary();
-        table.string('org_code').unique();
-        table.string('org_name');
-        table.string('org_type');
-        table.integer('headcount').defaultTo(0);
-        table.integer('max_headcount').defaultTo(100);
-        table.date('effective_date');
-        table.string('ancestor_code').nullable();
-        table.integer('manager_id').nullable();
+        table.string('class_code', 20).unique().notNullable();
+        table.string('class_name', 100).notNullable();
+        table.string('grade_level', 20).notNullable();
+        table.integer('head_teacher_id');
+        table.integer('student_count').defaultTo(0);
+        table.integer('capacity').defaultTo(50);
         table.timestamps(true, true);
       });
     }
 
-    if (!(await this.businessDb.schema.hasTable('sys_user'))) {
-      await this.businessDb.schema.createTable('sys_user', (table) => {
+    // 教师表
+    if (!(await this.businessDb.schema.hasTable('teacher'))) {
+      await this.businessDb.schema.createTable('teacher', (table) => {
         table.increments('id').primary();
-        table.string('username').unique();
-        table.string('real_name');
-        table.string('emp_no');
-        table.integer('dept_id');
-        table.string('status');
+        table.string('teacher_code', 20).unique().notNullable();
+        table.string('first_name', 50).notNullable();
+        table.string('last_name', 50).notNullable();
+        table.string('subject', 50);
+        table.string('phone', 20);
+        table.string('email', 100);
+        table.date('hire_date');
+        table.integer('department_id');
         table.timestamps(true, true);
       });
     }
 
-    if (!(await this.businessDb.schema.hasTable('hr_employee_base'))) {
-      await this.businessDb.schema.createTable('hr_employee_base', (table) => {
+    // 学生表
+    if (!(await this.businessDb.schema.hasTable('student'))) {
+      await this.businessDb.schema.createTable('student', (table) => {
         table.increments('id').primary();
-        table.string('emp_no').unique();
-        table.string('first_name');
-        table.string('last_name');
-        table.string('full_name');
-        table.integer('dept_id');
-        table.string('status').defaultTo('1');
+        table.string('student_no', 20).unique().notNullable();
+        table.string('first_name', 50).notNullable();
+        table.string('last_name', 50).notNullable();
+        table.integer('gender');
+        table.date('birth_date');
+        table.date('enrollment_date');
+        table.integer('status').defaultTo(1);
+        table.integer('class_id');
+        table.string('contact_phone', 20);
         table.timestamps(true, true);
       });
     }
 
-    if (!(await this.businessDb.schema.hasTable('hr_emp_job'))) {
-      await this.businessDb.schema.createTable('hr_emp_job', (table) => {
+    // 课程表
+    if (!(await this.businessDb.schema.hasTable('course'))) {
+      await this.businessDb.schema.createTable('course', (table) => {
         table.increments('id').primary();
-        table.integer('emp_id');
-        table.integer('dept_id');
-        table.string('job_title');
-        table.string('emp_type');
+        table.string('course_code', 20).unique().notNullable();
+        table.string('course_name', 100).notNullable();
+        table.decimal('credits', 3, 1);
         table.timestamps(true, true);
       });
     }
 
-    if (!(await this.businessDb.schema.hasTable('hr_emp_personal'))) {
-      await this.businessDb.schema.createTable('hr_emp_personal', (table) => {
+    // 成绩表
+    if (!(await this.businessDb.schema.hasTable('score'))) {
+      await this.businessDb.schema.createTable('score', (table) => {
         table.increments('id').primary();
-        table.integer('emp_id');
-        table.string('id_card_no');
-        table.string('bank_account').nullable();
+        table.integer('student_id').notNullable();
+        table.integer('course_id').notNullable();
+        table.string('semester', 20);
+        table.decimal('score', 5, 2);
+        table.string('grade_level', 10);
+        table.date('exam_date');
         table.timestamps(true, true);
       });
     }
 
-    if (!(await this.businessDb.schema.hasTable('hr_payroll_result'))) {
-      await this.businessDb.schema.createTable('hr_payroll_result', (table) => {
+    // 部门表（用于教师档案模块）
+    if (!(await this.businessDb.schema.hasTable('department'))) {
+      await this.businessDb.schema.createTable('department', (table) => {
         table.increments('id').primary();
-        table.integer('emp_id');
-        table.integer('payroll_year');
-        table.integer('payroll_month');
-        table.decimal('gross_amount', 10, 2);
-        table.decimal('net_amount', 10, 2);
-        table.string('payment_status').defaultTo('0');
-        table.integer('structure_id').nullable();
+        table.string('department_code', 20).unique().notNullable();
+        table.string('department_name', 100).notNullable();
+        table.string('location', 100);
         table.timestamps(true, true);
       });
     }
 
-    if (!(await this.businessDb.schema.hasTable('hr_salary_structure'))) {
-      await this.businessDb.schema.createTable('hr_salary_structure', (table) => {
+    // 选课表（用于学生课程模块）
+    if (!(await this.businessDb.schema.hasTable('enrollment'))) {
+      await this.businessDb.schema.createTable('enrollment', (table) => {
         table.increments('id').primary();
-        table.string('structure_code');
-        table.decimal('base_salary', 10, 2);
-        table.decimal('allowance', 10, 2).defaultTo(0);
-        table.timestamps(true, true);
-      });
-    }
-
-    if (!(await this.businessDb.schema.hasTable('hr_social_security_record'))) {
-      await this.businessDb.schema.createTable('hr_social_security_record', (table) => {
-        table.increments('id').primary();
-        table.integer('result_id');
-        table.decimal('total_personal_deduct', 10, 2);
-        table.decimal('total_company_deduct', 10, 2);
-        table.timestamps(true, true);
-      });
-    }
-
-    if (!(await this.businessDb.schema.hasTable('hr_tax_record'))) {
-      await this.businessDb.schema.createTable('hr_tax_record', (table) => {
-        table.increments('id').primary();
-        table.integer('result_id');
-        table.decimal('tax_amount', 10, 2);
-        table.decimal('taxable_income', 10, 2);
-        table.timestamps(true, true);
-      });
-    }
-
-    if (!(await this.businessDb.schema.hasTable('sys_operation_log'))) {
-      await this.businessDb.schema.createTable('sys_operation_log', (table) => {
-        table.increments('id').primary();
-        table.string('operator_name');
-        table.string('action_type');
-        table.string('ip_address').nullable();
+        table.integer('student_id').notNullable();
+        table.integer('course_id').notNullable();
+        table.date('enrollment_date');
+        table.integer('status').defaultTo(1);
         table.timestamps(true, true);
       });
     }
@@ -284,631 +285,271 @@ export class DatabaseService {
   /**
    * 插入配置数据库样本数据
    * 
-   * 每次启动都会清空并重新插入数据（in-memory 模式）
-   * 
-   * 插入顺序：
-   * 1. 模块基本信息 (sys_module): 4 个模块
-   * 2. 模块关联表 (sys_module_entity): 13 条记录
-   * 3. 模块字段配置 (sys_module_field): 21 个字段
-   * 4. 字段物理源映射 (sys_module_field_source): 25 条映射
-   * 5. 权限配置 (sys_permission_config): 37 条权限节点
+   * 学生管理系统配置数据：
+   * 1. 模块基本信息 (sys_module): 5 个模块
+   * 2. 模块关联表 (sys_module_entity): 7 条记录
+   * 3. 模块字段配置 (sys_module_field): 28 个字段（包含 source_mapping JSON）
+   * 4. 权限配置 (sys_permission_config): 自动生成
    */
   private async seedConfigData() {
     try {
       console.log('[数据库服务] 开始清空并重新插入配置数据...');
 
-      // 清空所有表（保持顺序，避免外键约束问题）
-      console.log('[数据库服务] 清空现有数据...');
+      // 清空所有表
       await this.configDb('sys_permission_config').del();
-      await this.configDb('sys_module_field_source').del();
       await this.configDb('sys_module_field').del();
       await this.configDb('sys_module_entity').del();
       await this.configDb('sys_module').del();
-      console.log('[数据库服务] 数据清空完成');
-
-      console.log('[数据库服务] 开始插入模块配置数据...');
+      console.log('[数据库服务] 配置数据清空完成');
 
       // 1. 插入模块基本信息
       await this.configDb('sys_module').insert([
         {
           id: 1,
-          module_id: 'MOD-SYS-LOG',
-          module_name: '系统操作日志',
-          module_desc: '记录系统内所有的用户操作轨迹与流水',
-          primary_entity: 'sys_operation_log',
-          primary_entity_desc: '系统操作日志表，纯单表流水记录，无任何物理连表关系',
-          record_count: 0,
-          is_active: 0,
+          module_id: 'MOD-CLASS-SIMPLE',
+          module_name: '班级简单信息',
+          module_desc: '班级简单信息 - 只有主实体',
+          primary_entity: 'class',
+          primary_entity_desc: '班级主表',
+          record_count: 3,
+          is_active: 1,
           sort_order: 1,
         },
         {
           id: 2,
-          module_id: 'MOD-HR-ORG',
-          module_name: '组织架构管理',
-          module_desc: '管理企业组织树、部门编制及汇报线关系',
-          primary_entity: 'hr_organization',
-          primary_entity_desc: '组织单元主表，存储公司、部门、组的层级与基础信息',
-          record_count: 4,
+          module_id: 'MOD-STUDENT-BASIC',
+          module_name: '学生基本信息',
+          module_desc: '学生基本信息 - 1:1 关联实体（学生 N:1 班级）',
+          primary_entity: 'student',
+          primary_entity_desc: '学生主表',
+          record_count: 10,
           is_active: 1,
           sort_order: 2,
         },
         {
           id: 3,
-          module_id: 'MOD-HR-EMP',
-          module_name: '员工核心档案',
-          module_desc: '维护员工基础信息、教育经历及生命周期',
-          primary_entity: 'hr_employee_base',
-          primary_entity_desc: '员工主表，包含不可变的基础身份与生命周期状态',
-          record_count: 8,
+          module_id: 'MOD-CLASS-STUDENTS',
+          module_name: '班级学生列表',
+          module_desc: '班级学生列表 - 1:N 关联实体（班级 1:N 学生）',
+          primary_entity: 'class',
+          primary_entity_desc: '班级主表',
+          record_count: 3,
           is_active: 1,
           sort_order: 3,
         },
         {
           id: 4,
-          module_id: 'MOD-HR-PAY',
-          module_name: '薪酬核算中心',
-          module_desc: '处理薪金、社保公积金及个税等复杂计算',
-          primary_entity: 'hr_payroll_result',
-          primary_entity_desc: '员工个人的核算期薪资发放结果明细',
-          record_count: 12,
+          module_id: 'MOD-SCORE-DETAIL',
+          module_name: '成绩详情',
+          module_desc: '成绩详情 - N:1 关联实体（成绩 N:1 学生、课程）',
+          primary_entity: 'score',
+          primary_entity_desc: '成绩主表',
+          record_count: 30,
           is_active: 1,
           sort_order: 4,
+        },
+        {
+          id: 5,
+          module_id: 'MOD-STUDENT-FULL',
+          module_name: '学生完整信息',
+          module_desc: '学生完整信息 - 混合 1:1、1:N、N:1 关联',
+          primary_entity: 'student',
+          primary_entity_desc: '学生主表',
+          record_count: 10,
+          is_active: 1,
+          sort_order: 5,
         },
       ]);
       console.log('[数据库服务] 模块基本信息插入完成');
 
       // 2. 插入模块关联表信息
-      console.log('[数据库服务] 开始插入模块关联表信息...');
-      const entityData = [
-        // MOD-SYS-LOG 没有关联表
-        
-        // MOD-HR-ORG 的关联表
+      await this.configDb('sys_module_entity').insert([
+        // MOD-STUDENT-BASIC 的关联表
         {
           id: 1,
-          module_id: 'MOD-HR-ORG',
+          module_id: 'MOD-STUDENT-BASIC',
           entity_id: '1',
-          entity_name: 'hr_org_hierarchy',
-          entity_desc: '组织树状层级关系 (Closure Table)',
-          join_left_field: 'org_code',
-          join_right_field: 'ancestor_code',
+          entity_name: 'class',
+          entity_desc: '班级信息',
+          join_left_field: 'id',
+          join_right_field: 'class_id',
+          entity_status: '正常',
+          relation_type: 'N:1',
+          sort_order: 1,
+        },
+        // MOD-CLASS-STUDENTS 的关联表
+        {
+          id: 2,
+          module_id: 'MOD-CLASS-STUDENTS',
+          entity_id: '2',
+          entity_name: 'student',
+          entity_desc: '学生列表',
+          join_left_field: 'class_id',
+          join_right_field: 'id',
           entity_status: '正常',
           relation_type: '1:N',
           sort_order: 1,
         },
-        {
-          id: 2,
-          module_id: 'MOD-HR-ORG',
-          entity_id: '2',
-          entity_name: 'hr_position',
-          entity_desc: '标准岗位编制池',
-          join_left_field: 'org_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:N',
-          sort_order: 2,
-        },
+        // MOD-SCORE-DETAIL 的关联表
         {
           id: 3,
-          module_id: 'MOD-HR-ORG',
+          module_id: 'MOD-SCORE-DETAIL',
           entity_id: '3',
-          entity_name: 'sys_user',
-          entity_desc: '组织负责人账户引用',
+          entity_name: 'student',
+          entity_desc: '学生信息',
           join_left_field: 'id',
-          join_right_field: 'manager_id',
+          join_right_field: 'student_id',
           entity_status: '正常',
           relation_type: 'N:1',
-          sort_order: 3,
+          sort_order: 1,
         },
         {
           id: 4,
-          module_id: 'MOD-HR-ORG',
+          module_id: 'MOD-SCORE-DETAIL',
           entity_id: '4',
-          entity_name: 'hr_cost_center',
-          entity_desc: '财务成本中心关联',
-          join_left_field: 'cost_center_id',
-          join_right_field: 'id',
+          entity_name: 'course',
+          entity_desc: '课程信息',
+          join_left_field: 'id',
+          join_right_field: 'course_id',
           entity_status: '正常',
-          relation_type: '1:1',
-          sort_order: 4,
-        },
-
-        // MOD-HR-EMP 的关联表
-        {
-          id: 5,
-          module_id: 'MOD-HR-EMP',
-          entity_id: '1',
-          entity_name: 'hr_emp_job',
-          entity_desc: '员工任职信息 (关联岗位、职级、部门)',
-          join_left_field: 'emp_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:1',
-          sort_order: 1,
-        },
-        {
-          id: 6,
-          module_id: 'MOD-HR-EMP',
-          entity_id: '2',
-          entity_name: 'hr_emp_personal',
-          entity_desc: '隐私信息 (身份证、银行卡等加密字段)',
-          join_left_field: 'emp_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:1',
+          relation_type: 'N:1',
           sort_order: 2,
         },
+        // MOD-STUDENT-FULL 的关联表
         {
-          id: 7,
-          module_id: 'MOD-HR-EMP',
-          entity_id: '3',
-          entity_name: 'hr_emp_contract',
-          entity_desc: '劳动合同及试用期流转历程',
-          join_left_field: 'emp_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:N',
-          sort_order: 3,
-        },
-        {
-          id: 8,
-          module_id: 'MOD-HR-EMP',
-          entity_id: '4',
-          entity_name: 'hr_emp_education',
-          entity_desc: '教育经历与学历证书',
-          join_left_field: 'emp_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:N',
-          sort_order: 4,
-        },
-        {
-          id: 9,
-          module_id: 'MOD-HR-EMP',
+          id: 5,
+          module_id: 'MOD-STUDENT-FULL',
           entity_id: '5',
-          entity_name: 'hr_organization',
-          entity_desc: '关联部门基础信息',
+          entity_name: 'class',
+          entity_desc: '班级信息',
           join_left_field: 'id',
-          join_right_field: 'dept_id',
-          entity_status: '正常',
-          relation_type: 'N:1',
-          sort_order: 5,
-        },
-
-        // MOD-HR-PAY 的关联表
-        {
-          id: 10,
-          module_id: 'MOD-HR-PAY',
-          entity_id: '1',
-          entity_name: 'hr_salary_structure',
-          entity_desc: '应用薪资套账与结构化规则',
-          join_left_field: 'id',
-          join_right_field: 'structure_id',
+          join_right_field: 'class_id',
           entity_status: '正常',
           relation_type: 'N:1',
           sort_order: 1,
         },
         {
-          id: 11,
-          module_id: 'MOD-HR-PAY',
-          entity_id: '2',
-          entity_name: 'hr_payroll_element',
-          entity_desc: '单项薪资条目 (基本工资, 绩效, 奖金等)',
-          join_left_field: 'result_id',
+          id: 7,
+          module_id: 'MOD-STUDENT-FULL',
+          entity_id: '7',
+          entity_name: 'score',
+          entity_desc: '成绩记录',
+          join_left_field: 'student_id',
           join_right_field: 'id',
           entity_status: '正常',
           relation_type: '1:N',
           sort_order: 2,
         },
-        {
-          id: 12,
-          module_id: 'MOD-HR-PAY',
-          entity_id: '3',
-          entity_name: 'hr_social_security_record',
-          entity_desc: '当期五险一金扣缴明细及基数快照',
-          join_left_field: 'result_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:1',
-          sort_order: 3,
-        },
-        {
-          id: 13,
-          module_id: 'MOD-HR-PAY',
-          entity_id: '4',
-          entity_name: 'hr_tax_record',
-          entity_desc: '当期个税专项附加扣除与应纳税明细',
-          join_left_field: 'result_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:1',
-          sort_order: 4,
-        },
-      ];
-      console.log('[数据库服务] 准备插入关联表数据:', entityData.length, '条');
-      await this.configDb('sys_module_entity').insert(entityData);
+      ]);
       console.log('[数据库服务] 模块关联表信息插入完成');
-      
-      // 验证关联表数据
-      const orgEntities = await this.configDb('sys_module_entity').where('module_id', 'MOD-HR-ORG');
-      console.log('[数据库服务] 验证 MOD-HR-ORG 关联表数:', orgEntities.length, '条');
-      console.log('[数据库服务] MOD-HR-ORG 关联表数据:', orgEntities.map(e => ({ id: e.entity_id, name: e.entity_name })));
 
-      // 3. 插入模块字段配置
+      // 3. 插入模块字段配置 - 包含物理字段映射（JSON 格式）
       await this.configDb('sys_module_field').insert([
-        // MOD-SYS-LOG 字段
-        {
-          id: 1,
-          module_id: 'MOD-SYS-LOG',
-          field_id: 'SYS_LOG_001',
-          display_name: '操作人',
-          logical_field: 'operator',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'person',
-          render_type: 'Text',
-          sort_order: 1,
-          is_visible: 1,
-        },
-        {
-          id: 2,
-          module_id: 'MOD-SYS-LOG',
-          field_id: 'SYS_LOG_002',
-          display_name: '操作类型',
-          logical_field: 'actionType',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'touch_app',
-          render_type: 'Tag',
-          sort_order: 2,
-          is_visible: 1,
-        },
-        {
-          id: 3,
-          module_id: 'MOD-SYS-LOG',
-          field_id: 'SYS_LOG_003',
-          display_name: '操作时间',
-          logical_field: 'createdAt',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'schedule',
-          render_type: 'Text',
-          sort_order: 3,
-          is_visible: 1,
-        },
+        // ========== MOD-CLASS-SIMPLE 字段（模块1：只有主实体）==========
+        { id: 1, module_id: 'MOD-CLASS-SIMPLE', field_id: 'F001', display_name: '班级编号', logical_field: 'classCode', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_code', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
+        { id: 2, module_id: 'MOD-CLASS-SIMPLE', field_id: 'F002', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 2, is_visible: 1 },
+        { id: 3, module_id: 'MOD-CLASS-SIMPLE', field_id: 'F003', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 3, is_visible: 1 },
+        { id: 4, module_id: 'MOD-CLASS-SIMPLE', field_id: 'F004', display_name: '学生人数', logical_field: 'studentCount', source_mapping: JSON.stringify([{ entity: 'class', field: 'student_count', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-users', render_type: 'number', sort_order: 4, is_visible: 1 },
 
-        // MOD-HR-ORG 字段
-        {
-          id: 4,
-          module_id: 'MOD-HR-ORG',
-          field_id: 'ORG_001',
-          display_name: '组织编码',
-          logical_field: 'orgCode',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'tag',
-          render_type: 'Text',
-          sort_order: 1,
-          is_visible: 1,
-        },
-        {
-          id: 5,
-          module_id: 'MOD-HR-ORG',
-          field_id: 'ORG_002',
-          display_name: '组织名称',
-          logical_field: 'orgName',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'corporate_fare',
-          render_type: 'Text',
-          sort_order: 2,
-          is_visible: 1,
-        },
-        {
-          id: 6,
-          module_id: 'MOD-HR-ORG',
-          field_id: 'ORG_003',
-          display_name: '组织类型',
-          logical_field: 'orgType',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'account_tree',
-          render_type: 'Tag',
-          sort_order: 3,
-          is_visible: 1,
-        },
-        {
-          id: 7,
-          module_id: 'MOD-HR-ORG',
-          field_id: 'ORG_004',
-          display_name: '负责人标识',
-          logical_field: 'managerDesc',
-          transformer: "CONCAT(${real_name}, ' (', ${emp_no}, ')')",
-          transformer_env: 'backend',
-          render_icon: 'person',
-          render_type: 'Link',
-          sort_order: 4,
-          is_visible: 1,
-        },
-        {
-          id: 8,
-          module_id: 'MOD-HR-ORG',
-          field_id: 'ORG_005',
-          display_name: '编制情况',
-          logical_field: 'headcountStatus',
-          transformer: 'ASSEMBLE_FRACTION(${headcount}, ${max_headcount})',
-          transformer_env: 'frontend',
-          render_icon: 'groups',
-          render_type: 'Badge',
-          sort_order: 5,
-          is_visible: 1,
-        },
-        {
-          id: 9,
-          module_id: 'MOD-HR-ORG',
-          field_id: 'ORG_006',
-          display_name: '生效日期',
-          logical_field: 'effectiveDate',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'calendar_today',
-          render_type: 'Text',
-          sort_order: 6,
-          is_visible: 1,
-        },
+        // ========== MOD-STUDENT-BASIC 字段（模块2：1:1关联）==========
+        { id: 5, module_id: 'MOD-STUDENT-BASIC', field_id: 'F005', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
+        { id: 6, module_id: 'MOD-STUDENT-BASIC', field_id: 'F006', display_name: '姓名', logical_field: 'fullName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 2, is_visible: 1 },
+        { id: 7, module_id: 'MOD-STUDENT-BASIC', field_id: 'F007', display_name: '性别', logical_field: 'genderText', source_mapping: JSON.stringify([{ entity: 'student', field: 'gender', sort_order: 1 }]), transformer: 'DICT_MAP("GENDER", ${gender})', transformer_env: 'frontend', render_icon: 'icon-gender', render_type: 'text', sort_order: 3, is_visible: 1 },
+        { id: 8, module_id: 'MOD-STUDENT-BASIC', field_id: 'F008', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 4, is_visible: 1 },
+        { id: 9, module_id: 'MOD-STUDENT-BASIC', field_id: 'F009', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 5, is_visible: 1 },
 
-        // MOD-HR-EMP 字段
-        {
-          id: 10,
-          module_id: 'MOD-HR-EMP',
-          field_id: 'EMP_001',
-          display_name: '工号',
-          logical_field: 'empNo',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'badge',
-          render_type: 'Text',
-          sort_order: 1,
-          is_visible: 1,
-        },
-        {
-          id: 11,
-          module_id: 'MOD-HR-EMP',
-          field_id: 'EMP_002',
-          display_name: '英文全名',
-          logical_field: 'fullNameEng',
-          transformer: "CONCAT(${first_name}, ' ', ${last_name})",
-          transformer_env: 'backend',
-          render_icon: 'person',
-          render_type: 'Text',
-          sort_order: 2,
-          is_visible: 1,
-        },
-        {
-          id: 12,
-          module_id: 'MOD-HR-EMP',
-          field_id: 'EMP_003',
-          display_name: '证件号码',
-          logical_field: 'idNumber',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'pin',
-          render_type: 'Text',
-          sort_order: 3,
-          is_visible: 1,
-        },
-        {
-          id: 13,
-          module_id: 'MOD-HR-EMP',
-          field_id: 'EMP_004',
-          display_name: '员工类型',
-          logical_field: 'empType',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'work',
-          render_type: 'Tag',
-          sort_order: 4,
-          is_visible: 1,
-        },
-        {
-          id: 14,
-          module_id: 'MOD-HR-EMP',
-          field_id: 'EMP_005',
-          display_name: '任职部门',
-          logical_field: 'deptName',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'corporate_fare',
-          render_type: 'Link',
-          sort_order: 5,
-          is_visible: 1,
-        },
-        {
-          id: 15,
-          module_id: 'MOD-HR-EMP',
-          field_id: 'EMP_006',
-          display_name: '在职状态',
-          logical_field: 'empStatus',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'fiber_manual_record',
-          render_type: 'Status',
-          sort_order: 6,
-          is_visible: 1,
-        },
+        // ========== MOD-CLASS-STUDENTS 字段（模块3：1:N关联）==========
+        { id: 10, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F010', display_name: '班级编号', logical_field: 'classCode', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_code', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
+        { id: 11, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F011', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 2, is_visible: 1 },
+        { id: 12, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F012', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 3, is_visible: 1 },
+        { id: 13, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F013', display_name: '学生人数', logical_field: 'studentCount', source_mapping: JSON.stringify([{ entity: 'class', field: 'student_count', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-users', render_type: 'number', sort_order: 4, is_visible: 1 },
+        // 1:N 嵌套字段（属于 student 实体）
+        { id: 14, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F014', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 5, is_visible: 1 },
+        { id: 15, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F015', display_name: '学生姓名', logical_field: 'fullName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 6, is_visible: 1 },
+        { id: 16, module_id: 'MOD-CLASS-STUDENTS', field_id: 'F016', display_name: '学生性别', logical_field: 'genderText', source_mapping: JSON.stringify([{ entity: 'student', field: 'gender', sort_order: 1 }]), transformer: 'DICT_MAP("GENDER", ${gender})', transformer_env: 'frontend', render_icon: 'icon-gender', render_type: 'text', sort_order: 7, is_visible: 1 },
 
-        // MOD-HR-PAY 字段
-        {
-          id: 16,
-          module_id: 'MOD-HR-PAY',
-          field_id: 'PAY_001',
-          display_name: '计薪周期',
-          logical_field: 'period',
-          transformer: "CONCAT(${payroll_year}, '-', ${payroll_month})",
-          transformer_env: 'backend',
-          render_icon: 'calendar_month',
-          render_type: 'Text',
-          sort_order: 1,
-          is_visible: 1,
-        },
-        {
-          id: 17,
-          module_id: 'MOD-HR-PAY',
-          field_id: 'PAY_002',
-          display_name: '应发合计',
-          logical_field: 'grossPay',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'account_balance_wallet',
-          render_type: 'Text',
-          sort_order: 2,
-          is_visible: 1,
-        },
-        {
-          id: 18,
-          module_id: 'MOD-HR-PAY',
-          field_id: 'PAY_003',
-          display_name: '社保代扣',
-          logical_field: 'socialDeduction',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'health_and_safety',
-          render_type: 'Text',
-          sort_order: 3,
-          is_visible: 1,
-        },
-        {
-          id: 19,
-          module_id: 'MOD-HR-PAY',
-          field_id: 'PAY_004',
-          display_name: '个税代扣',
-          logical_field: 'taxDeduction',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'receipt_long',
-          render_type: 'Text',
-          sort_order: 4,
-          is_visible: 1,
-        },
-        {
-          id: 20,
-          module_id: 'MOD-HR-PAY',
-          field_id: 'PAY_005',
-          display_name: '实发薪资',
-          logical_field: 'netPay',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'payments',
-          render_type: 'Badge',
-          sort_order: 5,
-          is_visible: 1,
-        },
-        {
-          id: 21,
-          module_id: 'MOD-HR-PAY',
-          field_id: 'PAY_006',
-          display_name: '发放状态',
-          logical_field: 'status',
-          transformer: null,
-          transformer_env: 'none',
-          render_icon: 'fiber_manual_record',
-          render_type: 'Status',
-          sort_order: 6,
-          is_visible: 1,
-        },
+        // ========== MOD-SCORE-DETAIL 字段（模块4：N:1关联）==========
+        { id: 17, module_id: 'MOD-SCORE-DETAIL', field_id: 'F017', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
+        { id: 18, module_id: 'MOD-SCORE-DETAIL', field_id: 'F018', display_name: '学生姓名', logical_field: 'studentName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 2, is_visible: 1 },
+        { id: 19, module_id: 'MOD-SCORE-DETAIL', field_id: 'F019', display_name: '课程名称', logical_field: 'courseName', source_mapping: JSON.stringify([{ entity: 'course', field: 'course_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-book', render_type: 'text', sort_order: 3, is_visible: 1 },
+        { id: 20, module_id: 'MOD-SCORE-DETAIL', field_id: 'F020', display_name: '学分', logical_field: 'credits', source_mapping: JSON.stringify([{ entity: 'course', field: 'credits', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-star', render_type: 'number', sort_order: 4, is_visible: 1 },
+        { id: 21, module_id: 'MOD-SCORE-DETAIL', field_id: 'F021', display_name: '学期', logical_field: 'semester', source_mapping: JSON.stringify([{ entity: 'score', field: 'semester', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-calendar', render_type: 'text', sort_order: 5, is_visible: 1 },
+        { id: 22, module_id: 'MOD-SCORE-DETAIL', field_id: 'F022', display_name: '分数', logical_field: 'scoreValue', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-score', render_type: 'number', sort_order: 6, is_visible: 1 },
+        { id: 23, module_id: 'MOD-SCORE-DETAIL', field_id: 'F023', display_name: '等级', logical_field: 'scoreGrade', source_mapping: JSON.stringify([{ entity: 'score', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 7, is_visible: 1 },
+        { id: 24, module_id: 'MOD-SCORE-DETAIL', field_id: 'F024', display_name: '成绩显示', logical_field: 'scoreDisplay', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }, { entity: 'score', field: 'grade_level', sort_order: 2 }]), transformer: 'CONCAT(${score}, "分 (", ${grade_level}, ")")', transformer_env: 'frontend', render_icon: 'icon-score', render_type: 'text', sort_order: 8, is_visible: 1 },
+        { id: 25, module_id: 'MOD-SCORE-DETAIL', field_id: 'F025', display_name: '考试日期', logical_field: 'examDate', source_mapping: JSON.stringify([{ entity: 'score', field: 'exam_date', sort_order: 1 }]), transformer: 'DATE_FORMAT(exam_date, "%Y-%m-%d")', transformer_env: 'database', render_icon: 'icon-calendar', render_type: 'date', sort_order: 9, is_visible: 1 },
+
+        // ========== MOD-STUDENT-FULL 字段（模块5：混合关联）==========
+        { id: 26, module_id: 'MOD-STUDENT-FULL', field_id: 'F026', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
+        { id: 27, module_id: 'MOD-STUDENT-FULL', field_id: 'F027', display_name: '姓名', logical_field: 'fullName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 2, is_visible: 1 },
+        { id: 28, module_id: 'MOD-STUDENT-FULL', field_id: 'F028', display_name: '性别', logical_field: 'genderText', source_mapping: JSON.stringify([{ entity: 'student', field: 'gender', sort_order: 1 }]), transformer: 'DICT_MAP("GENDER", ${gender})', transformer_env: 'frontend', render_icon: 'icon-gender', render_type: 'text', sort_order: 3, is_visible: 1 },
+        { id: 29, module_id: 'MOD-STUDENT-FULL', field_id: 'F029', display_name: '出生日期', logical_field: 'birthDate', source_mapping: JSON.stringify([{ entity: 'student', field: 'birth_date', sort_order: 1 }]), transformer: 'DATE_FORMAT(birth_date, "%Y年%m月%d日")', transformer_env: 'database', render_icon: 'icon-calendar', render_type: 'date', sort_order: 4, is_visible: 1 },
+        { id: 30, module_id: 'MOD-STUDENT-FULL', field_id: 'F030', display_name: '年龄', logical_field: 'age', source_mapping: JSON.stringify([{ entity: 'student', field: 'birth_date', sort_order: 1 }]), transformer: 'TIMESTAMPDIFF(YEAR, birth_date, NOW())', transformer_env: 'database', render_icon: 'icon-age', render_type: 'number', sort_order: 5, is_visible: 1 },
+        { id: 31, module_id: 'MOD-STUDENT-FULL', field_id: 'F031', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 6, is_visible: 1 },
+        { id: 32, module_id: 'MOD-STUDENT-FULL', field_id: 'F032', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 7, is_visible: 1 },
+        // 1:N 嵌套字段（属于 score 实体）
+        { id: 37, module_id: 'MOD-STUDENT-FULL', field_id: 'F037', display_name: '学期', logical_field: 'semester', source_mapping: JSON.stringify([{ entity: 'score', field: 'semester', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-calendar', render_type: 'text', sort_order: 8, is_visible: 1 },
+        { id: 38, module_id: 'MOD-STUDENT-FULL', field_id: 'F038', display_name: '分数', logical_field: 'scoreValue', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-score', render_type: 'number', sort_order: 9, is_visible: 1 },
+        { id: 39, module_id: 'MOD-STUDENT-FULL', field_id: 'F039', display_name: '等级', logical_field: 'scoreGrade', source_mapping: JSON.stringify([{ entity: 'score', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 10, is_visible: 1 },
+        { id: 40, module_id: 'MOD-STUDENT-FULL', field_id: 'F040', display_name: '成绩显示', logical_field: 'scoreDisplay', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }, { entity: 'score', field: 'grade_level', sort_order: 2 }]), transformer: 'CONCAT(${score}, "分 (", ${grade_level}, ")")', transformer_env: 'frontend', render_icon: 'icon-score', render_type: 'text', sort_order: 11, is_visible: 1 },
+        { id: 41, module_id: 'MOD-STUDENT-FULL', field_id: 'F041', display_name: '考试日期', logical_field: 'examDate', source_mapping: JSON.stringify([{ entity: 'score', field: 'exam_date', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-calendar', render_type: 'date', sort_order: 12, is_visible: 1 },
       ]);
       console.log('[数据库服务] 模块字段配置插入完成');
 
-      // 4. 插入字段物理源映射
-      await this.configDb('sys_module_field_source').insert([
-        // MOD-SYS-LOG 字段源
-        { id: 1, module_id: 'MOD-SYS-LOG', logical_field: 'operator', source_entity: 'sys_operation_log', source_field: 'operator_name', sort_order: 1 },
-        { id: 2, module_id: 'MOD-SYS-LOG', logical_field: 'actionType', source_entity: 'sys_operation_log', source_field: 'action_type', sort_order: 1 },
-        { id: 3, module_id: 'MOD-SYS-LOG', logical_field: 'createdAt', source_entity: 'sys_operation_log', source_field: 'created_at', sort_order: 1 },
-
-        // MOD-HR-ORG 字段源
-        { id: 4, module_id: 'MOD-HR-ORG', logical_field: 'orgCode', source_entity: 'hr_organization', source_field: 'org_code', sort_order: 1 },
-        { id: 5, module_id: 'MOD-HR-ORG', logical_field: 'orgName', source_entity: 'hr_organization', source_field: 'org_name', sort_order: 1 },
-        { id: 6, module_id: 'MOD-HR-ORG', logical_field: 'orgType', source_entity: 'hr_organization', source_field: 'org_type', sort_order: 1 },
-        { id: 7, module_id: 'MOD-HR-ORG', logical_field: 'managerDesc', source_entity: 'sys_user', source_field: 'real_name', sort_order: 1 },
-        { id: 8, module_id: 'MOD-HR-ORG', logical_field: 'managerDesc', source_entity: 'sys_user', source_field: 'emp_no', sort_order: 2 },
-        { id: 9, module_id: 'MOD-HR-ORG', logical_field: 'headcountStatus', source_entity: 'hr_organization', source_field: 'headcount', sort_order: 1 },
-        { id: 10, module_id: 'MOD-HR-ORG', logical_field: 'headcountStatus', source_entity: 'hr_organization', source_field: 'max_headcount', sort_order: 2 },
-        { id: 11, module_id: 'MOD-HR-ORG', logical_field: 'effectiveDate', source_entity: 'hr_organization', source_field: 'effective_date', sort_order: 1 },
-
-        // MOD-HR-EMP 字段源
-        { id: 12, module_id: 'MOD-HR-EMP', logical_field: 'empNo', source_entity: 'hr_employee_base', source_field: 'emp_no', sort_order: 1 },
-        { id: 13, module_id: 'MOD-HR-EMP', logical_field: 'fullNameEng', source_entity: 'hr_employee_base', source_field: 'first_name', sort_order: 1 },
-        { id: 14, module_id: 'MOD-HR-EMP', logical_field: 'fullNameEng', source_entity: 'hr_employee_base', source_field: 'last_name', sort_order: 2 },
-        { id: 15, module_id: 'MOD-HR-EMP', logical_field: 'idNumber', source_entity: 'hr_emp_personal', source_field: 'id_card_no', sort_order: 1 },
-        { id: 16, module_id: 'MOD-HR-EMP', logical_field: 'empType', source_entity: 'hr_emp_job', source_field: 'emp_type', sort_order: 1 },
-        { id: 17, module_id: 'MOD-HR-EMP', logical_field: 'deptName', source_entity: 'hr_organization', source_field: 'org_name', sort_order: 1 },
-        { id: 18, module_id: 'MOD-HR-EMP', logical_field: 'empStatus', source_entity: 'hr_employee_base', source_field: 'status', sort_order: 1 },
-
-        // MOD-HR-PAY 字段源
-        { id: 19, module_id: 'MOD-HR-PAY', logical_field: 'period', source_entity: 'hr_payroll_result', source_field: 'payroll_year', sort_order: 1 },
-        { id: 20, module_id: 'MOD-HR-PAY', logical_field: 'period', source_entity: 'hr_payroll_result', source_field: 'payroll_month', sort_order: 2 },
-        { id: 21, module_id: 'MOD-HR-PAY', logical_field: 'grossPay', source_entity: 'hr_payroll_result', source_field: 'gross_amount', sort_order: 1 },
-        { id: 22, module_id: 'MOD-HR-PAY', logical_field: 'socialDeduction', source_entity: 'hr_social_security_record', source_field: 'total_personal_deduct', sort_order: 1 },
-        { id: 23, module_id: 'MOD-HR-PAY', logical_field: 'taxDeduction', source_entity: 'hr_tax_record', source_field: 'tax_amount', sort_order: 1 },
-        { id: 24, module_id: 'MOD-HR-PAY', logical_field: 'netPay', source_entity: 'hr_payroll_result', source_field: 'net_amount', sort_order: 1 },
-        { id: 25, module_id: 'MOD-HR-PAY', logical_field: 'status', source_entity: 'hr_payroll_result', source_field: 'payment_status', sort_order: 1 },
-      ]);
-      console.log('[数据库服务] 字段物理源映射插入完成');
-
-      // 5. 插入权限配置数据 (基于sys_module_field_source生成)
-      console.log('[数据库服务] 开始生成并插入权限配置数据...');
-      
-      // 从sys_module_field_source查询所有物理字段映射
-      const fieldSources = await this.configDb('sys_module_field_source').select('*');
-      console.log(`[数据库服务] 查询到 ${fieldSources.length} 条字段物理源映射`);
-
-      // 生成权限节点：每个物理字段 × 3种操作类型 (READ, CREATE, UPDATE)
+      // 4. 生成权限配置 - 基于物理实体和物理字段生成权限节点
+      // 权限节点格式简洁：entity.field.operation_type
+      // 但需要为每个 module 保存一条记录，以便区分不同 module 下的权限
+      const fields = await this.configDb('sys_module_field').select('*');
       const operationTypes = ['READ', 'CREATE', 'UPDATE'];
       const uniquePermissions = new Map<string, any>();
+      const permissionsByModule = new Map<string, any[]>(); // 按 module 分组
       let permissionId = 1;
       
-      fieldSources.forEach((source) => {
-        operationTypes.forEach((opType) => {
-          const permissionNode = `${source.source_entity}.${source.source_field}.${opType}`;
-          
-          // 使用Map去重，确保每个权限节点只插入一次
-          if (!uniquePermissions.has(permissionNode)) {
-            uniquePermissions.set(permissionNode, {
-              id: permissionId++,
-              permission_node: permissionNode,
-              entity: source.source_entity,
-              field_name: source.source_field,
-              operation_type: opType,
-              enabled: true,
-              module_id: source.module_id,
-              logical_field: source.logical_field,
-              description: `${source.source_entity}.${source.source_field} - ${opType} 操作权限`,
+      fields.forEach((field) => {
+        if (field.source_mapping) {
+          const sources = JSON.parse(field.source_mapping);
+          sources.forEach((source: any) => {
+            operationTypes.forEach((opType) => {
+              // 权限节点格式：entity.field.operation_type（简洁格式）
+              const permissionNode = `${source.entity}.${source.field}.${opType}`;
+              
+              // 为每个 module 保存一条权限记录
+              const moduleKey = `${field.module_id}`;
+              if (!permissionsByModule.has(moduleKey)) {
+                permissionsByModule.set(moduleKey, []);
+              }
+              
+              // 检查该 module 是否已经有这个权限节点
+              const modulePermissions = permissionsByModule.get(moduleKey)!;
+              const existingPermission = modulePermissions.find(p => p.permission_node === permissionNode);
+              
+              if (!existingPermission) {
+                const permission = {
+                  id: permissionId++,
+                  permission_node: permissionNode,
+                  entity: source.entity,
+                  field_name: source.field,
+                  operation_type: opType,
+                  enabled: true,
+                  module_id: field.module_id,
+                  logical_field: field.logical_field,
+                  description: `${source.entity}.${source.field} - ${opType}`,
+                };
+                modulePermissions.push(permission);
+                uniquePermissions.set(`${moduleKey}.${permissionNode}`, permission);
+              }
             });
-          }
-        });
+          });
+        }
       });
 
       const permissionData = Array.from(uniquePermissions.values());
-      console.log(`[数据库服务] 生成权限节点数: ${permissionData.length}`);
-      
       if (permissionData.length > 0) {
         await this.configDb('sys_permission_config').insert(permissionData);
         console.log('[数据库服务] 权限配置数据插入完成，共', permissionData.length, '条记录');
       }
 
-      // 验证权限配置数据
-      const permissionCount = await this.configDb('sys_permission_config').count('* as count').first();
-      console.log('[数据库服务] 权限配置表记录数:', permissionCount?.count || 0);
-      const samplePermissions = await this.configDb('sys_permission_config').limit(5);
-      console.log('[数据库服务] 权限配置样本:', samplePermissions.map(p => ({ node: p.permission_node, entity: p.entity, field: p.field_name, module: p.module_id })));
-
       console.log('[数据库服务] 配置数据插入完成');
-      const finalCount = await this.configDb('sys_module').count('* as count').first();
-      console.log('[数据库服务] 最终模块数:', finalCount?.count || 0);
-      
-      // 验证数据是否真的被插入了
-      const allModules = await this.configDb('sys_module').select('*');
-      console.log('[数据库服务] 验证插入的模块:', allModules.map(m => ({ id: m.module_id, name: m.module_name })));
     } catch (error) {
       console.error('[数据库服务] 配置数据插入失败:', error);
       throw error;
@@ -918,18 +559,12 @@ export class DatabaseService {
   /**
    * 插入业务数据库样本数据
    * 
-   * 每次启动都会清空并重新插入数据（in-memory 模式）
-   * 
-   * 插入数据：
-   * - hr_organization: 4 个组织单元
-   * - sys_user: 4 个用户
-   * - hr_employee_base: 8 个员工
-   * - hr_emp_job: 8 条任职记录
-   * - hr_emp_personal: 8 条隐私信息
-   * - hr_salary_structure: 3 个薪资结构
-   * - hr_payroll_result: 12 条薪酬结果
-   * - hr_social_security_record: 12 条社保记录
-   * - hr_tax_record: 12 条个税记录
+   * 学生管理系统数据：
+   * - teacher: 3 个教师
+   * - class: 3 个班级
+   * - student: 10 个学生
+   * - course: 5 门课程
+   * - score: 30 条成绩记录
    */
   private async seedBusinessData() {
     try {
@@ -937,211 +572,94 @@ export class DatabaseService {
 
       // 清空所有业务表
       console.log('[数据库服务] 清空现有业务数据...');
-      await this.businessDb('hr_tax_record').del();
-      await this.businessDb('hr_social_security_record').del();
-      await this.businessDb('hr_payroll_result').del();
-      await this.businessDb('hr_salary_structure').del();
-      await this.businessDb('hr_emp_personal').del();
-      await this.businessDb('hr_emp_job').del();
-      await this.businessDb('hr_employee_base').del();
-      await this.businessDb('sys_user').del();
-      await this.businessDb('hr_organization').del();
-      await this.businessDb('sys_operation_log').del();
+      await this.businessDb('score').del();
+      await this.businessDb('course').del();
+      await this.businessDb('student').del();
+      await this.businessDb('teacher').del();
+      await this.businessDb('class').del();
       console.log('[数据库服务] 业务数据清空完成');
 
       console.log('[数据库服务] 插入业务数据...');
 
-      await this.businessDb('hr_organization').insert([
-        {
-          id: 1,
-          org_code: 'ORG-001',
-          org_name: '总公司',
-          org_type: 'CORP',
-          headcount: 50,
-          max_headcount: 100,
-          effective_date: new Date('2024-01-01'),
-          ancestor_code: null,
-          manager_id: 1,
-        },
-        {
-          id: 2,
-          org_code: 'ORG-002',
-          org_name: '人力资源部',
-          org_type: 'DEPT',
-          headcount: 10,
-          max_headcount: 20,
-          effective_date: new Date('2024-01-01'),
-          ancestor_code: 'ORG-001',
-          manager_id: 2,
-        },
-        {
-          id: 3,
-          org_code: 'ORG-003',
-          org_name: '财务部',
-          org_type: 'DEPT',
-          headcount: 8,
-          max_headcount: 15,
-          effective_date: new Date('2024-01-01'),
-          ancestor_code: 'ORG-001',
-          manager_id: 3,
-        },
+      // 插入教师
+      await this.businessDb('teacher').insert([
+        { id: 1, teacher_code: 'T001', first_name: '明', last_name: '王', subject: '数学', phone: '13800001111', email: 'wang.ming@school.edu', hire_date: '2020-09-01' },
+        { id: 2, teacher_code: 'T002', first_name: '芳', last_name: '李', subject: '语文', phone: '13800002222', email: 'li.fang@school.edu', hire_date: '2020-09-01' },
+        { id: 3, teacher_code: 'T003', first_name: '强', last_name: '张', subject: '英语', phone: '13800003333', email: 'zhang.qiang@school.edu', hire_date: '2021-09-01' },
       ]);
 
-      await this.businessDb('sys_user').insert([
-        {
-          id: 1,
-          username: 'admin',
-          real_name: '管理员',
-          emp_no: 'EMP-0001',
-          dept_id: 1,
-          status: '1',
-        },
-        {
-          id: 2,
-          username: 'hr_manager',
-          real_name: '李经理',
-          emp_no: 'EMP-0002',
-          dept_id: 2,
-          status: '1',
-        },
-        {
-          id: 3,
-          username: 'finance_manager',
-          real_name: '王经理',
-          emp_no: 'EMP-0003',
-          dept_id: 3,
-          status: '1',
-        },
+      // 插入班级
+      await this.businessDb('class').insert([
+        { id: 1, class_code: '2024-01', class_name: '高一(1)班', grade_level: '高一', head_teacher_id: 1, student_count: 5 },
+        { id: 2, class_code: '2024-02', class_name: '高一(2)班', grade_level: '高一', head_teacher_id: 2, student_count: 3 },
+        { id: 3, class_code: '2023-01', class_name: '高二(1)班', grade_level: '高二', head_teacher_id: 3, student_count: 2 },
       ]);
 
-      await this.businessDb('hr_employee_base').insert([
-        {
-          id: 1,
-          emp_no: 'EMP-0001',
-          first_name: 'John',
-          last_name: 'Doe',
-          full_name: 'John Doe',
-          dept_id: 1,
-          status: '1',
-        },
-        {
-          id: 2,
-          emp_no: 'EMP-0002',
-          first_name: 'Jane',
-          last_name: 'Smith',
-          full_name: 'Jane Smith',
-          dept_id: 2,
-          status: '1',
-        },
-        {
-          id: 3,
-          emp_no: 'EMP-0003',
-          first_name: 'Bob',
-          last_name: 'Johnson',
-          full_name: 'Bob Johnson',
-          dept_id: 3,
-          status: '1',
-        },
-        {
-          id: 4,
-          emp_no: 'EMP-0004',
-          first_name: 'Alice',
-          last_name: 'Williams',
-          full_name: 'Alice Williams',
-          dept_id: 2,
-          status: '1',
-        },
+      // 插入学生
+      await this.businessDb('student').insert([
+        { id: 1, student_no: '2024001', first_name: '伟', last_name: '张', gender: 1, birth_date: '2008-03-15', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13812345678' },
+        { id: 2, student_no: '2024002', first_name: '丽', last_name: '李', gender: 2, birth_date: '2008-05-20', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13887654321' },
+        { id: 3, student_no: '2024003', first_name: '明', last_name: '王', gender: 1, birth_date: '2008-04-10', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13898765432' },
+        { id: 4, student_no: '2024004', first_name: '芳', last_name: '刘', gender: 2, birth_date: '2008-06-25', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13876543210' },
+        { id: 5, student_no: '2024005', first_name: '强', last_name: '陈', gender: 1, birth_date: '2008-07-30', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13865432109' },
+        { id: 6, student_no: '2024006', first_name: '娟', last_name: '杨', gender: 2, birth_date: '2008-08-15', enrollment_date: '2024-09-01', status: 1, class_id: 2, contact_phone: '13854321098' },
+        { id: 7, student_no: '2024007', first_name: '涛', last_name: '黄', gender: 1, birth_date: '2008-09-20', enrollment_date: '2024-09-01', status: 1, class_id: 2, contact_phone: '13843210987' },
+        { id: 8, student_no: '2024008', first_name: '红', last_name: '周', gender: 2, birth_date: '2008-10-05', enrollment_date: '2024-09-01', status: 1, class_id: 2, contact_phone: '13832109876' },
+        { id: 9, student_no: '2023001', first_name: '军', last_name: '吴', gender: 1, birth_date: '2007-03-15', enrollment_date: '2023-09-01', status: 1, class_id: 3, contact_phone: '13821098765' },
+        { id: 10, student_no: '2023002', first_name: '敏', last_name: '郑', gender: 2, birth_date: '2007-05-20', enrollment_date: '2023-09-01', status: 1, class_id: 3, contact_phone: '13810987654' },
       ]);
 
-      await this.businessDb('hr_emp_job').insert([
-        { id: 1, emp_id: 1, dept_id: 1, job_title: 'CEO', emp_type: 'FULL_TIME' },
-        { id: 2, emp_id: 2, dept_id: 2, job_title: 'HR Manager', emp_type: 'FULL_TIME' },
-        { id: 3, emp_id: 3, dept_id: 3, job_title: 'Finance Manager', emp_type: 'FULL_TIME' },
-        { id: 4, emp_id: 4, dept_id: 2, job_title: 'HR Specialist', emp_type: 'FULL_TIME' },
+      // 插入课程
+      await this.businessDb('course').insert([
+        { id: 1, course_code: 'C001', course_name: '数学', credits: 4.0 },
+        { id: 2, course_code: 'C002', course_name: '语文', credits: 4.0 },
+        { id: 3, course_code: 'C003', course_name: '英语', credits: 4.0 },
+        { id: 4, course_code: 'C004', course_name: '物理', credits: 3.0 },
+        { id: 5, course_code: 'C005', course_name: '化学', credits: 3.0 },
       ]);
 
-      await this.businessDb('hr_emp_personal').insert([
-        { id: 1, emp_id: 1, id_card_no: '110101199001011234', bank_account: '6222021234567890' },
-        { id: 2, emp_id: 2, id_card_no: '110101199101021234', bank_account: '6222021234567891' },
-        { id: 3, emp_id: 3, id_card_no: '110101199201031234', bank_account: '6222021234567892' },
-        { id: 4, emp_id: 4, id_card_no: '110101199301041234', bank_account: '6222021234567893' },
-      ]);
-
-      await this.businessDb('hr_salary_structure').insert([
-        { id: 1, structure_code: 'STR-001', base_salary: 15000, allowance: 2000 },
-        { id: 2, structure_code: 'STR-002', base_salary: 12000, allowance: 1500 },
-      ]);
-
-      await this.businessDb('hr_payroll_result').insert([
-        {
-          id: 1,
-          emp_id: 1,
-          payroll_year: 2024,
-          payroll_month: 1,
-          gross_amount: 17000,
-          net_amount: 14500,
-          payment_status: '1',
-          structure_id: 1,
-        },
-        {
-          id: 2,
-          emp_id: 2,
-          payroll_year: 2024,
-          payroll_month: 1,
-          gross_amount: 13500,
-          net_amount: 11500,
-          payment_status: '1',
-          structure_id: 2,
-        },
-        {
-          id: 3,
-          emp_id: 3,
-          payroll_year: 2024,
-          payroll_month: 1,
-          gross_amount: 13500,
-          net_amount: 11500,
-          payment_status: '1',
-          structure_id: 2,
-        },
-        {
-          id: 4,
-          emp_id: 4,
-          payroll_year: 2024,
-          payroll_month: 1,
-          gross_amount: 13500,
-          net_amount: 11500,
-          payment_status: '0',
-          structure_id: 2,
-        },
-      ]);
-
-      await this.businessDb('hr_social_security_record').insert([
-        { id: 1, result_id: 1, total_personal_deduct: 1500, total_company_deduct: 2000 },
-        { id: 2, result_id: 2, total_personal_deduct: 1200, total_company_deduct: 1600 },
-        { id: 3, result_id: 3, total_personal_deduct: 1200, total_company_deduct: 1600 },
-        { id: 4, result_id: 4, total_personal_deduct: 1200, total_company_deduct: 1600 },
-      ]);
-
-      await this.businessDb('hr_tax_record').insert([
-        { id: 1, result_id: 1, tax_amount: 1000, taxable_income: 15500 },
-        { id: 2, result_id: 2, tax_amount: 800, taxable_income: 12300 },
-        { id: 3, result_id: 3, tax_amount: 800, taxable_income: 12300 },
-        { id: 4, result_id: 4, tax_amount: 800, taxable_income: 12300 },
-      ]);
-
-      await this.businessDb('sys_operation_log').insert([
-        {
-          id: 1,
-          operator_name: 'admin',
-          action_type: 'LOGIN',
-          ip_address: '192.168.1.1',
-        },
-        {
-          id: 2,
-          operator_name: 'hr_manager',
-          action_type: 'VIEW_PAYROLL',
-          ip_address: '192.168.1.2',
-        },
+      // 插入成绩
+      await this.businessDb('score').insert([
+        // 学生 1 的成绩
+        { id: 1, student_id: 1, course_id: 1, semester: '2024-1', score: 95.5, grade_level: 'A', exam_date: '2024-11-15' },
+        { id: 2, student_id: 1, course_id: 2, semester: '2024-1', score: 88.0, grade_level: 'B', exam_date: '2024-11-16' },
+        { id: 3, student_id: 1, course_id: 3, semester: '2024-1', score: 92.0, grade_level: 'A', exam_date: '2024-11-17' },
+        // 学生 2 的成绩
+        { id: 4, student_id: 2, course_id: 1, semester: '2024-1', score: 87.5, grade_level: 'B', exam_date: '2024-11-15' },
+        { id: 5, student_id: 2, course_id: 2, semester: '2024-1', score: 91.0, grade_level: 'A', exam_date: '2024-11-16' },
+        { id: 6, student_id: 2, course_id: 3, semester: '2024-1', score: 85.5, grade_level: 'B', exam_date: '2024-11-17' },
+        // 学生 3 的成绩
+        { id: 7, student_id: 3, course_id: 1, semester: '2024-1', score: 78.0, grade_level: 'C', exam_date: '2024-11-15' },
+        { id: 8, student_id: 3, course_id: 2, semester: '2024-1', score: 82.5, grade_level: 'B', exam_date: '2024-11-16' },
+        { id: 9, student_id: 3, course_id: 3, semester: '2024-1', score: 80.0, grade_level: 'B', exam_date: '2024-11-17' },
+        // 学生 4 的成绩
+        { id: 10, student_id: 4, course_id: 1, semester: '2024-1', score: 93.0, grade_level: 'A', exam_date: '2024-11-15' },
+        { id: 11, student_id: 4, course_id: 2, semester: '2024-1', score: 89.5, grade_level: 'B', exam_date: '2024-11-16' },
+        { id: 12, student_id: 4, course_id: 3, semester: '2024-1', score: 94.0, grade_level: 'A', exam_date: '2024-11-17' },
+        // 学生 5 的成绩
+        { id: 13, student_id: 5, course_id: 1, semester: '2024-1', score: 76.5, grade_level: 'C', exam_date: '2024-11-15' },
+        { id: 14, student_id: 5, course_id: 2, semester: '2024-1', score: 79.0, grade_level: 'C', exam_date: '2024-11-16' },
+        { id: 15, student_id: 5, course_id: 3, semester: '2024-1', score: 81.5, grade_level: 'B', exam_date: '2024-11-17' },
+        // 学生 6 的成绩
+        { id: 16, student_id: 6, course_id: 1, semester: '2024-1', score: 88.5, grade_level: 'B', exam_date: '2024-11-15' },
+        { id: 17, student_id: 6, course_id: 2, semester: '2024-1', score: 90.0, grade_level: 'A', exam_date: '2024-11-16' },
+        { id: 18, student_id: 6, course_id: 3, semester: '2024-1', score: 86.5, grade_level: 'B', exam_date: '2024-11-17' },
+        // 学生 7 的成绩
+        { id: 19, student_id: 7, course_id: 1, semester: '2024-1', score: 91.0, grade_level: 'A', exam_date: '2024-11-15' },
+        { id: 20, student_id: 7, course_id: 2, semester: '2024-1', score: 87.5, grade_level: 'B', exam_date: '2024-11-16' },
+        { id: 21, student_id: 7, course_id: 3, semester: '2024-1', score: 89.0, grade_level: 'B', exam_date: '2024-11-17' },
+        // 学生 8 的成绩
+        { id: 22, student_id: 8, course_id: 1, semester: '2024-1', score: 84.0, grade_level: 'B', exam_date: '2024-11-15' },
+        { id: 23, student_id: 8, course_id: 2, semester: '2024-1', score: 86.5, grade_level: 'B', exam_date: '2024-11-16' },
+        { id: 24, student_id: 8, course_id: 3, semester: '2024-1', score: 88.0, grade_level: 'B', exam_date: '2024-11-17' },
+        // 学生 9 的成绩
+        { id: 25, student_id: 9, course_id: 1, semester: '2024-1', score: 92.5, grade_level: 'A', exam_date: '2024-11-15' },
+        { id: 26, student_id: 9, course_id: 2, semester: '2024-1', score: 90.0, grade_level: 'A', exam_date: '2024-11-16' },
+        { id: 27, student_id: 9, course_id: 3, semester: '2024-1', score: 93.5, grade_level: 'A', exam_date: '2024-11-17' },
+        // 学生 10 的成绩
+        { id: 28, student_id: 10, course_id: 1, semester: '2024-1', score: 85.5, grade_level: 'B', exam_date: '2024-11-15' },
+        { id: 29, student_id: 10, course_id: 2, semester: '2024-1', score: 88.0, grade_level: 'B', exam_date: '2024-11-16' },
+        { id: 30, student_id: 10, course_id: 3, semester: '2024-1', score: 87.0, grade_level: 'B', exam_date: '2024-11-17' },
       ]);
 
       console.log('[数据库服务] 业务数据插入完成');

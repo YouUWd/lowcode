@@ -37,7 +37,7 @@ const businessKnex = knex({
  * 1. **配置数据库 (config.db)**
  *    - 通过 'CONFIG_DB' token 注入，使用 @Inject('CONFIG_DB') 访问
  *    - 存储：模块配置、字段映射、权限配置等系统配置数据
- *    - 表：sys_module, sys_module_entity, sys_module_field, sys_module_field_source, sys_permission_config
+ *    - 表：sys_module, sys_module_entity, sys_module_field, sys_permission_config
  * 
  * 2. **业务数据库 (business.db)**
  *    - 通过 'BUSINESS_DB' token 注入，使用 @Inject('BUSINESS_DB') 访问
