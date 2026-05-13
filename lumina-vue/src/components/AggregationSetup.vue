@@ -154,17 +154,22 @@ const primaryEntity = computed(() => currentConfig.value.primaryEntity);
 const entities = computed(() => currentConfig.value.entities);
 
 // Computed properties for dropdowns
-const availableTables = computed(() => Object.keys(mockDbSchema).map(key => ({
-  name: key,
-  desc: mockDbSchema[key].desc
-})));
+const availableTables = computed(() => {
+  const schema = mockDbSchema.value || {};
+  return Object.keys(schema).map(key => ({
+    name: key,
+    desc: schema[key].desc
+  }));
+});
 
 const primaryFields = computed(() => {
-  return mockDbSchema[primaryEntity.value.name]?.fields || ['id'];
+  if (!primaryEntity.value?.name) return ['id'];
+  return mockDbSchema.value[primaryEntity.value.name]?.fields || ['id'];
 });
 
 const associatedFields = computed(() => {
-  return mockDbSchema[newEntity.name]?.fields || ['id'];
+  if (!newEntity.name) return ['id'];
+  return mockDbSchema.value[newEntity.name]?.fields || ['id'];
 });
 
 const showAddModal = ref(false);
@@ -185,9 +190,9 @@ const cardinalityHint = computed(() => {
 
 // Auto-fill desc and select default associated field when physical table changes
 watch(() => newEntity.name, (newVal) => {
-  if (newVal && mockDbSchema[newVal]) {
-    newEntity.desc = mockDbSchema[newVal].desc;
-    newEntity.right = mockDbSchema[newVal].fields[0] || 'id';
+  if (newVal && mockDbSchema.value[newVal]) {
+    newEntity.desc = mockDbSchema.value[newVal].desc;
+    newEntity.right = mockDbSchema.value[newVal].fields[0] || 'id';
     
     // 智能推断关系：如果是 hr_emp_job 等表通常是 1:1，如果是 education 通常是 1:N
     if (newVal.includes('education') || newVal.includes('payroll') || newVal.includes('record')) {
@@ -198,18 +203,14 @@ watch(() => newEntity.name, (newVal) => {
   }
 });
 
-const addEntity = () => {
+const addEntity = async () => {
   if (!newEntity.name || !newEntity.left || !newEntity.right) return;
-  addEntityToCurrentConfig({
-    id: Date.now().toString(),
+  await addEntityToCurrentConfig({
     name: newEntity.name,
     desc: newEntity.desc || '新增拓展关联实体',
-    status: '正常',
-    relationType: newEntity.cardinality,
-    joinCondition: {
-      left: newEntity.left,
-      right: newEntity.right
-    }
+    cardinality: newEntity.cardinality,
+    left: newEntity.left,
+    right: newEntity.right
   });
   newEntity.name = '';
   newEntity.desc = '';
@@ -219,10 +220,8 @@ const addEntity = () => {
   showAddModal.value = false;
 };
 
-const removeEntity = (entityId) => {
-  if (confirm('确定要移除此关联实体吗？')) {
-    removeEntityFromCurrentConfig(entityId);
-  }
+const removeEntity = async (entityId) => {
+  await removeEntityFromCurrentConfig(entityId);
 };
 </script>
 

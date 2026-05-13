@@ -106,7 +106,7 @@ export class ModulesService {
               const sources = JSON.parse(field.source_mapping);
               physicalFields = sources.map((s: any) => ({
                 entity: s.entity,
-                name: s.field,
+                field: s.field,
               }));
             } catch (e) {
               console.warn(`[模块服务] 解析 source_mapping 失败: ${field.logical_field}`, e);
@@ -190,5 +190,99 @@ export class ModulesService {
    */
   async deleteModule(id: string): Promise<void> {
     await this.knex('sys_module').where('module_id', id).delete();
+  }
+
+  /**
+   * 添加模块关联表
+   */
+  async addModuleEntity(moduleId: string, entityData: any): Promise<void> {
+    await this.knex('sys_module_entity').insert({
+      entity_id: entityData.id,
+      module_id: moduleId,
+      entity_name: entityData.name,
+      entity_desc: entityData.desc,
+      entity_status: entityData.status || 'active',
+      relation_type: entityData.relationType || '1:1',
+      join_left_field: entityData.joinCondition?.left,
+      join_right_field: entityData.joinCondition?.right,
+      sort_order: entityData.sortOrder || 0,
+    });
+  }
+
+  /**
+   * 更新模块关联表
+   */
+  async updateModuleEntity(moduleId: string, entityId: string, entityData: any): Promise<void> {
+    await this.knex('sys_module_entity')
+      .where('module_id', moduleId)
+      .where('entity_id', entityId)
+      .update({
+        entity_name: entityData.name,
+        entity_desc: entityData.desc,
+        entity_status: entityData.status,
+        relation_type: entityData.relationType,
+        join_left_field: entityData.joinCondition?.left,
+        join_right_field: entityData.joinCondition?.right,
+        sort_order: entityData.sortOrder,
+        updated_at: new Date(),
+      });
+  }
+
+  /**
+   * 删除模块关联表
+   */
+  async deleteModuleEntity(moduleId: string, entityId: string): Promise<void> {
+    await this.knex('sys_module_entity')
+      .where('module_id', moduleId)
+      .where('entity_id', entityId)
+      .delete();
+  }
+
+  /**
+   * 添加模块字段配置
+   */
+  async addModuleField(moduleId: string, fieldData: any): Promise<void> {
+    await this.knex('sys_module_field').insert({
+      module_id: moduleId,
+      logical_field: fieldData.logicalField,
+      display_name: fieldData.displayName,
+      source_mapping: JSON.stringify(fieldData.physicalFields),
+      transformer: fieldData.transformer || null,
+      transformer_env: fieldData.transformerEnv || 'none',
+      render_icon: fieldData.renderIcon || '',
+      render_type: fieldData.renderType || 'text',
+      is_visible: fieldData.isVisible !== false,
+      sort_order: fieldData.sortOrder || 0,
+    });
+  }
+
+  /**
+   * 更新模块字段配置
+   */
+  async updateModuleField(moduleId: string, logicalField: string, fieldData: any): Promise<void> {
+    await this.knex('sys_module_field')
+      .where('module_id', moduleId)
+      .where('logical_field', logicalField)
+      .update({
+        display_name: fieldData.displayName,
+        source_mapping: JSON.stringify(fieldData.physicalFields),
+        transformer: fieldData.transformer,
+        transformer_env: fieldData.transformerEnv,
+        render_icon: fieldData.renderIcon,
+        render_type: fieldData.renderType,
+        is_visible: fieldData.isVisible,
+        sort_order: fieldData.sortOrder,
+        updated_at: new Date(),
+      });
+  }
+
+  /**
+   * 删除模块字段配置
+   */
+  async deleteModuleField(moduleId: string, logicalField: string): Promise<void> {
+    await this.knex('sys_module_field')
+      .where('module_id', moduleId)
+      .where('logical_field', logicalField)
+      .delete();
   }
 }

@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 import { EngineModule } from './engine/engine.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ModulesModule } from './modules/modules.module';
+import { MetadataModule } from './metadata/metadata.module';
 import { DatabaseService } from './database/database.service';
 
 @Module({
@@ -13,6 +14,7 @@ import { DatabaseService } from './database/database.service';
     EngineModule,
     PermissionsModule,
     ModulesModule,
+    MetadataModule,
   ],
   controllers: [AppController],
   providers: [AppService],

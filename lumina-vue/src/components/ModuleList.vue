@@ -95,16 +95,16 @@
               <td class="px-6 py-5 text-right">
                 <div class="flex justify-end gap-2">
                   <button @click.stop="goToConfig(mod)" class="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-on-surface-variant" title="配置">
-                    <span class="material-symbols-outlined text-[20px]">settings_input_component</span>
+                    <Settings class="w-5 h-5" />
                   </button>
                   <button @click.stop="openPermissionModal(mod)" class="p-2 hover:bg-tertiary/10 hover:text-tertiary rounded-lg transition-colors text-on-surface-variant" title="权限节点定义">
-                    <span class="material-symbols-outlined text-[20px]">security</span>
+                    <ShieldCheck class="w-5 h-5" />
                   </button>
                   <button @click.stop class="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-on-surface-variant" title="编辑">
-                    <span class="material-symbols-outlined text-[20px]">edit</span>
+                    <Edit class="w-5 h-5" />
                   </button>
-                  <button @click.stop class="p-2 hover:bg-error/10 hover:text-error rounded-lg transition-colors text-on-surface-variant" title="删除">
-                    <span class="material-symbols-outlined text-[20px]">delete</span>
+                  <button @click.stop="deleteModule(mod.id)" class="p-2 hover:bg-error/10 hover:text-error rounded-lg transition-colors text-on-surface-variant" title="删除模块">
+                    <Trash2 class="w-5 h-5" />
                   </button>
                 </div>
               </td>
@@ -190,8 +190,13 @@
               <div class="space-y-1.5">
                 <label class="text-sm font-semibold text-on-surface-variant">绑定的主实体表 <span class="text-error">*</span></label>
                 <div class="relative">
-                  <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">table_chart</span>
-                  <input v-model="newModule.entity" type="text" class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant/50 rounded-lg text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" placeholder="例如：hr_employee_base" />
+                  <TableChart class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4" />
+                  <select v-model="newModule.entity" class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant/50 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow appearance-none">
+                    <option disabled value="">请选择物理表</option>
+                    <option v-for="table in availableTables" :key="table.name" :value="table.name">
+                      {{ table.name }} ({{ table.desc }})
+                    </option>
+                  </select>
                 </div>
               </div>
 
@@ -219,8 +224,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { state, updateView, addModule, fetchModules } from '../store/mockStore';
+import { ref, computed } from 'vue';
+import { Trash2, Settings, ShieldCheck, PlusCircle, RefreshCw, Edit, TableProperties as TableChart } from 'lucide-vue-next';
+import { state, updateView, addModule, deleteModule, fetchModules, mockDbSchema } from '../store/mockStore';
 
 const goToConfig = (mod) => {
   updateView('config', mod);
@@ -230,28 +236,38 @@ const openPermissionModal = (mod) => {
   updateView('permissions', mod);
 };
 
+const availableTables = computed(() => {
+  const schema = mockDbSchema.value || {};
+  return Object.keys(schema).map(key => ({
+    name: key,
+    desc: schema[key].desc
+  }));
+});
+
 const isAddModalOpen = ref(false);
 
 const newModule = ref({
-  id: 'MOD-HR-003',
-  name: '考勤与排班中心',
-  entity: 'hr_attendance_record',
-  desc: '管理员工考勤打卡记录、假期额度及复杂倒班规则'
+  id: '',
+  name: '',
+  entity: '',
+  desc: ''
 });
 
-const submitModule = () => {
+const submitModule = async () => {
   if (!newModule.value.name || !newModule.value.id || !newModule.value.entity) return;
   
-  addModule({
+  const success = await addModule({
     id: newModule.value.id,
     name: newModule.value.name,
     desc: newModule.value.desc,
     entity: newModule.value.entity
   });
   
-  isAddModalOpen.value = false;
-  // Reset for next time
-  newModule.value = { id: '', name: '', entity: '', desc: '' };
+  if (success) {
+    isAddModalOpen.value = false;
+    // Reset for next time
+    newModule.value = { id: '', name: '', entity: '', desc: '' };
+  }
 };
 </script>
 

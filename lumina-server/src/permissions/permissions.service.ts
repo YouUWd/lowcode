@@ -297,20 +297,20 @@ export class PermissionsService {
       // 检查该映射的所有物理字段是否有READ权限
       const hasSelectPermission = mapping.physicalFields?.every((pf: any) => {
         // 权限节点格式: {entity}.{field}.READ
-        const permissionNode = `${pf.entity}.${pf.name}.READ`;
+        const permissionNode = `${pf.entity}.${pf.field}.READ`;
         const hasPermission = globalPermissions.has(permissionNode);
 
         if (!hasPermission) {
           console.log(`${logPrefix} ✗ 无权限: ${permissionNode}`);
           console.log(`${logPrefix}   逻辑字段: ${mapping.logicalField}`);
-          console.log(`${logPrefix}   物理字段: ${pf.entity}.${pf.name}`);
+          console.log(`${logPrefix}   物理字段: ${pf.entity}.${pf.field}`);
         }
 
         return hasPermission;
       });
 
       if (hasSelectPermission) {
-        console.log(`${logPrefix} ✓ 有权限: ${mapping.logicalField} (${mapping.physicalFields?.map((pf: any) => `${pf.entity}.${pf.name}`).join(', ')})`);
+        console.log(`${logPrefix} ✓ 有权限: ${mapping.logicalField} (${mapping.physicalFields?.map((pf: any) => `${pf.entity}.${pf.field}`).join(', ')})`);
       }
 
       return hasSelectPermission;
@@ -337,7 +337,7 @@ export class PermissionsService {
 
       // 检查是否有READ权限
       const hasSelectPermission = mapping.physicalFields?.every((pf: any) => {
-        const permissionNode = `${pf.entity}.${pf.name}.READ`;
+        const permissionNode = `${pf.entity}.${pf.field}.READ`;
         return globalPermissions.has(permissionNode);
       });
 

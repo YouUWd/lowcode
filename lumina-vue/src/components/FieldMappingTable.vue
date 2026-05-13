@@ -36,8 +36,8 @@
             </td>
             <td class="p-5">
               <div class="flex flex-col space-y-2">
-                <span v-for="pf in row.physicalFields" :key="pf.name" class="flex items-center text-xs">
-                  <span class="font-mono text-on-surface-variant">{{ pf.entity }}.{{ pf.name }}</span>
+                <span v-for="pf in row.physicalFields" :key="pf.field" class="flex items-center text-xs">
+                  <span class="font-mono text-on-surface-variant">{{ pf.entity }}.{{ pf.field }}</span>
                 </span>
               </div>
             </td>
@@ -53,7 +53,7 @@
             </td>
             <td class="p-5">
               <span class="px-2 py-1 bg-surface-container text-on-surface rounded text-xs border border-outline-variant/30 inline-flex items-center font-medium">
-                <component :is="row.renderIcon" v-if="row.renderIcon" class="w-3 h-3 mr-1.5" />
+                <component :is="resolveRenderIcon(row.renderIcon)" v-if="row.renderIcon" class="w-3 h-3 mr-1.5" />
                 {{ row.renderType }}
               </span>
             </td>
@@ -61,7 +61,7 @@
               <button class="text-primary hover:text-primary-container p-2 rounded-lg hover:bg-primary-fixed transition-colors">
                 <Edit2 class="w-4 h-4" />
               </button>
-              <button @click="deleteRow(index)" class="text-error hover:text-on-error-container p-2 rounded-lg hover:bg-error-container transition-colors">
+              <button @click="deleteRow(row.logicalField)" class="text-error hover:text-on-error-container p-2 rounded-lg hover:bg-error-container transition-colors">
                 <Trash2 class="w-4 h-4" />
               </button>
             </td>
@@ -123,7 +123,7 @@
                   </div>
                   <LinkIcon class="w-4 h-4 text-outline" />
                   <div class="flex-[2] space-y-1">
-                    <input v-model="pf.name" type="text" class="w-full text-sm rounded-lg border-outline-variant/40 bg-surface focus:ring-primary focus:border-primary font-mono transition-colors" placeholder="表字段名 (如: email_address)" />
+                    <input v-model="pf.field" type="text" class="w-full text-sm rounded-lg border-outline-variant/40 bg-surface focus:ring-primary focus:border-primary font-mono transition-colors" placeholder="表字段名 (如: email_address)" />
                   </div>
                   <button v-if="newRow.physFields.length > 1" @click="removePhysField(idx)" type="button" class="text-error hover:bg-error/10 p-1 rounded-full transition-colors flex items-center justify-center">
                     <X class="w-4 h-4" />
@@ -232,8 +232,41 @@ import { ref, reactive, computed, markRaw } from 'vue';
 import { 
   Columns, Code, GripVertical, Cpu, SquareFunction, 
   Edit2, Trash2, Plus, PlusCircle, X, Link as LinkIcon, 
-  Database, Info, Terminal, Copy, Type, Tag, Hash, Circle 
+  Database, Info, Terminal, Copy, Type, Tag, Hash, Circle,
+  Fingerprint, GraduationCap, Users, BookOpen, Calendar, 
+  Mail, Phone, MapPin, ShieldCheck, User, School, Star
 } from 'lucide-vue-next';
+
+/**
+ * 解析渲染图标
+ * 将后端返回的字符串标识符映射为 Lucide 组件
+ */
+const resolveRenderIcon = (iconName) => {
+  if (!iconName) return Type;
+  if (typeof iconName !== 'string') return iconName; // 如果已经是组件引用，直接返回
+
+  const iconMap = {
+    'icon-id': Fingerprint,
+    'icon-user': User,
+    'icon-users': Users,
+    'icon-class': School,
+    'icon-grade': GraduationCap,
+    'icon-star': Star,
+    'icon-book': BookOpen,
+    'icon-calendar': Calendar,
+    'icon-mail': Mail,
+    'icon-phone': Phone,
+    'icon-location': MapPin,
+    'icon-shield': ShieldCheck,
+    'icon-tag': Tag,
+    'icon-hash': Hash,
+    'icon-link': LinkIcon,
+    'icon-text': Type,
+    'icon-circle': Circle
+  };
+
+  return iconMap[iconName] || Type;
+};
 import { currentConfig, addMappingToCurrentConfig, deleteMappingFromCurrentConfig } from '../store/mockStore';
 
 const rows = computed(() => currentConfig.value.mappings || []);
@@ -262,7 +295,7 @@ const generatedSql = computed(() => {
       frontendTransforms.push(`-- [BFF / 前端计算引擎] ${row.logicalField} (${row.displayName}) -> ${row.transformer}`);
       
       row.physicalFields?.forEach(pf => {
-        const expression = `${pf.entity}.${pf.name}`;
+        const expression = `${pf.entity}.${pf.field}`;
         if (!sqlSelectMap.has(expression)) sqlSelectMap.set(expression, new Set());
         sqlSelectMap.get(expression).add(`依赖: ${row.logicalField}`);
       });
@@ -270,13 +303,13 @@ const generatedSql = computed(() => {
       let expression = '';
       if (row.transformer) {
         let computedExpr = row.transformer.replace(/\$\{([^}]+)\}/g, (match, p1) => {
-          const physField = row.physicalFields?.find(f => f.name === p1);
-          return physField ? `${physField.entity}.${physField.name}` : match;
+          const physField = row.physicalFields?.find(f => f.field === p1);
+          return physField ? `${physField.entity}.${physField.field}` : match;
         });
         expression = `${computedExpr} AS ${row.logicalField}`;
       } else {
         const physField = row.physicalFields?.[0];
-        expression = physField ? `${physField.entity}.${physField.name} AS ${row.logicalField}` : `UNKNOWN_FIELD AS ${row.logicalField}`;
+        expression = physField ? `${physField.entity}.${physField.field} AS ${row.logicalField}` : `UNKNOWN_FIELD AS ${row.logicalField}`;
       }
       
       if (!sqlSelectMap.has(expression)) sqlSelectMap.set(expression, new Set());
@@ -331,14 +364,14 @@ const copySql = async () => {
 const newRow = reactive({
   displayName: '',
   logicalField: '',
-  physFields: [{ entity: '', name: '' }],
+  physFields: [{ entity: '', field: '' }],
   transformer: '',
   transformerEnv: 'none',
   renderType: 'Text'
 });
 
 const addPhysField = () => {
-  newRow.physFields.push({ entity: '', name: '' });
+  newRow.physFields.push({ entity: '', field: '' });
   if (newRow.physFields.length > 1 && newRow.transformerEnv === 'none') {
     newRow.transformerEnv = 'backend';
   }
@@ -374,24 +407,23 @@ const getBadgeClassForEntity = (entityName) => {
   return 'bg-primary-fixed/30 text-on-primary-fixed';
 };
 
-const addRow = () => {
+const addRow = async () => {
   if (!newRow.displayName || !newRow.logicalField) return;
 
   const validPhysFields = newRow.physFields
-    .filter(pf => pf.name)
+    .filter(pf => pf.field)
     .map(pf => ({
       entity: pf.entity || '未知',
-      name: pf.name,
-      badgeClass: getBadgeClassForEntity(pf.entity)
+      field: pf.field
     }));
 
-  addMappingToCurrentConfig({
+  await addMappingToCurrentConfig({
     displayName: newRow.displayName,
     logicalField: newRow.logicalField,
     physicalFields: validPhysFields,
     transformer: newRow.transformerEnv !== 'none' && newRow.transformer ? newRow.transformer : null,
     transformerEnv: newRow.transformerEnv !== 'none' && newRow.transformer ? newRow.transformerEnv : null,
-    renderIcon: markRaw(getIconForRenderType(newRow.renderType)),
+    renderIcon: 'icon-text', // 默认图标标识符
     renderType: newRow.renderType
   });
 
@@ -405,8 +437,8 @@ const addRow = () => {
   showAddModal.value = false;
 };
 
-const deleteRow = (index) => {
-  deleteMappingFromCurrentConfig(index);
+const deleteRow = async (logicalField) => {
+  await deleteMappingFromCurrentConfig(logicalField);
 };
 </script>
 

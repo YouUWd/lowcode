@@ -90,7 +90,7 @@ export class EngineService {
       simpleMappings.forEach((mapping) => {
         const pf = mapping.physicalFields?.[0];
         if (pf) {
-          const fieldAlias = `${pf.entity}_${pf.name}`;
+          const fieldAlias = `${pf.entity}_${pf.field}`;
           result[mapping.logicalField] = row[fieldAlias];
         }
       });
@@ -168,8 +168,8 @@ export class EngineService {
         let rawSql = mapping.transformer.replace(
           /\$\{([^}]+)\}/g, 
           (match: string, p1: string) => {
-            const pf = mapping.physicalFields?.find((f: any) => f.name === p1);
-            return pf ? `${pf.entity}.${pf.name}` : match;
+            const pf = mapping.physicalFields?.find((f: any) => f.field === p1);
+            return pf ? `${pf.entity}.${pf.field}` : match;
           }
         );
         
@@ -214,9 +214,9 @@ export class EngineService {
       } else {
         // 前端转换和简单映射：统一选择物理字段（使用 entity_field 格式）
         mapping.physicalFields?.forEach((pf: any) => {
-          const fieldAlias = `${pf.entity}_${pf.name}`;
+          const fieldAlias = `${pf.entity}_${pf.field}`;
           if (!selectedFields.has(fieldAlias)) {
-            query.select(`${pf.entity}.${pf.name} AS ${fieldAlias}`);
+            query.select(`${pf.entity}.${pf.field} AS ${fieldAlias}`);
             selectedFields.add(fieldAlias);
           }
         });
@@ -335,19 +335,22 @@ export class EngineService {
       
       if (mapping.transformer && mapping.transformerEnv === 'database') {
         // 后端转换（数据库级别）：在数据库级别计算，使用逻辑字段名
-        const rawSql = mapping.transformer.replace(
+        let rawSql = mapping.transformer.replace(
           /\$\{([^}]+)\}/g,
-          (match: string, p1: string) => `${entity.name}.${p1}`
+          (match: string, p1: string) => {
+            const pf = mapping.physicalFields?.find((f: any) => f.field === p1);
+            return pf ? `${pf.entity}.${pf.field}` : match;
+          }
         );
         query.select(this.knex.raw(`${rawSql} AS ${mapping.logicalField}`));
         console.log(`    后端转换: ${rawSql} AS ${mapping.logicalField}`);
       } else {
         // 前端转换和简单映射：统一选择物理字段（使用 entity_field 格式）
         mapping.physicalFields?.forEach((pf: any) => {
-          const fieldAlias = `${pf.entity}_${pf.name}`;
-          const fieldKey = `${pf.entity}.${pf.name}`;
+          const fieldAlias = `${pf.entity}_${pf.field}`;
+          const fieldKey = `${pf.entity}.${pf.field}`;
           if (!selectedFields.has(fieldKey)) {
-            query.select(`${pf.entity}.${pf.name} AS ${fieldAlias}`);
+            query.select(`${pf.entity}.${pf.field} AS ${fieldAlias}`);
             selectedFields.add(fieldKey);
             console.log(`    物理字段: ${fieldKey} AS ${fieldAlias}`);
           }
@@ -404,7 +407,7 @@ export class EngineService {
     // 构建映射（从 source_mapping JSON 解析）
     const mappings = fields
       .map((field: any) => {
-        let physicalFields: Array<{ entity: string; name: string }> = [];
+        let physicalFields: Array<{ entity: string; field: string }> = [];
         
         if (field.source_mapping) {
           try {
@@ -414,7 +417,7 @@ export class EngineService {
               .filter((s: any) => accessibleEntities.has(s.entity))
               .map((s: any) => ({
                 entity: s.entity,
-                name: s.field,
+                field: s.field,
               }));
           } catch (e) {
             console.warn(`[引擎服务] 解析 source_mapping 失败: ${field.logical_field}`, e);
@@ -459,12 +462,12 @@ export class EngineService {
 
     physicalFields.forEach((pf) => {
       // 尝试多种字段别名格式，优先使用带实体前缀的格式
-      const fieldAlias = `${pf.entity}_${pf.name}`;
+      const fieldAlias = `${pf.entity}_${pf.field}`;
       let value = row[fieldAlias];
       
       // 如果找不到，尝试不带前缀的字段名
       if (value === undefined || value === null || value === '') {
-        value = row[pf.name];
+        value = row[pf.field];
       }
       
       // 如果还是找不到，设置为空字符串
@@ -476,7 +479,7 @@ export class EngineService {
       const escapedValue = typeof value === 'string' ? `'${value}'` : value;
 
       // 将所有${fieldName}出现替换为实际值
-      expression = expression.replace(new RegExp(`\\$\\{${pf.name}\\}`, 'g'), escapedValue);
+      expression = expression.replace(new RegExp(`\\$\\{${pf.field}\\}`, 'g'), escapedValue);
     });
 
     // 根据函数名称路由到相应的转换函数
