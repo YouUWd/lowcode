@@ -6,6 +6,7 @@
       <ModuleList v-if="state.currentView === 'list'" />
       <ModuleConfig v-else-if="state.currentView === 'config'" />
       <ModulePermissions v-else-if="state.currentView === 'permissions'" />
+      <WorkflowPanel v-else-if="state.currentView === 'workflow'" />
     </Transition>
   </main>
 </template>
@@ -16,6 +17,7 @@ import Header from './components/Header.vue';
 import ModuleList from './components/ModuleList.vue';
 import ModuleConfig from './components/ModuleConfig.vue';
 import ModulePermissions from './components/ModulePermissions.vue';
+import WorkflowPanel from './components/WorkflowPanel.vue';
 import { state } from './store/mockStore';
 </script>
 

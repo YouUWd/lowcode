@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>高阶解耦架构 (并联+靶向回退) - Lumina Workflow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#005daa',
+                        surface: '#f8f9fa',
+                        'surface-container': '#edeeef',
+                        'on-surface': '#191c1d',
+                        'on-surface-variant': '#404753'
+                    },
+                    fontFamily: {
+                        headline: ["Manrope", "sans-serif"],
+                        body: ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .modal-enter { animation: fadeIn 0.2s ease-out forwards; }
+        .modal-leave { animation: fadeOut 0.2s ease-in forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+        
+        .steps-container::-webkit-scrollbar { height: 4px; }
+        .steps-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Branching Tree CSS */
+        .branch-wrapper { position: relative; padding: 0 24px; display: flex; align-items: center; }
+        .branch-wrapper::before, .branch-wrapper::after { content: ''; position: absolute; width: 24px; border-color: inherit; }
+        
+        .branch-top::before { left: 0; top: 50%; bottom: -50%; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 12px; }
+        .branch-top::after { right: 0; top: 50%; bottom: -50%; border-top: 2px solid; border-right: 2px solid; border-top-right-radius: 12px; border-color: var(--join-color, #e5e7eb); }
+        
+        .branch-bottom::before { left: 0; top: -50%; bottom: 50%; border-bottom: 2px solid; border-left: 2px solid; border-bottom-left-radius: 12px; }
+        .branch-bottom::after { right: 0; top: -50%; bottom: 50%; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 12px; border-color: var(--join-color, #e5e7eb); }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface h-screen flex overflow-hidden">
+
+    <!-- Header -->
+    <main class="flex-1 flex flex-col min-w-0">
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 z-10 shadow-sm">
+            <div>
+                <h1 class="font-headline font-bold text-lg text-primary">Lumina 高阶工作流引擎测试</h1>
+                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Fork-Join & Targeted Rollback Prototype</p>
+            </div>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                <span class="text-gray-500">模拟登录身份:</span>
+                <select id="user-selector" onchange="switchUser(this.value)" class="bg-blue-50 border border-blue-200 text-primary font-bold rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-primary/20">
+                    <option value="admin">系统管理员 (全知全能)</option>
+                    <option value="dept_manager">王主管 (业务发起部门)</option>
+                    <option value="it_support">赵专员 (IT 资产部)</option>
+                    <option value="finance">钱会计 (财务部)</option>
+                    <option value="hr_director">孙总监 (HR 终审)</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="p-8 flex-1 overflow-y-auto">
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold font-headline">离职交接与结算申请</h2>
+                </div>
+                <button onclick="mockSubmitNew()" class="bg-primary text-white px-5 py-2 rounded-xl font-bold shadow-md hover:bg-blue-700 transition flex items-center">
+                    <span class="material-symbols-outlined text-sm mr-2">add</span> 发起新离职流程
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-xs text-on-surface-variant uppercase tracking-wider border-b border-gray-200">
+                            <th class="p-4 font-bold">单号</th>
+                            <th class="p-4 font-bold">业务摘要</th>
+                            <th class="p-4 font-bold">主表状态</th>
+                            <th class="p-4 font-bold">引擎待办节点 (DTO)</th>
+                            <th class="p-4 font-bold text-right">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="business-list" class="text-sm divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+            
+            <div class="mt-8 bg-amber-50 rounded-xl p-6 border border-amber-100 flex gap-4">
+                <div class="text-amber-500 mt-1"><span class="material-symbols-outlined">api</span></div>
+                <div class="text-sm text-amber-900 leading-relaxed">
+                    <strong class="block mb-1 text-base">本原型体验重点：</strong>
+                    <ol class="list-decimal pl-4 space-y-1 mt-2 text-amber-800/80">
+                        <li><strong>分叉树审批 (Fork-Join)</strong>：在全景链条中，Step 2 被渲染为一棵分叉树。IT(赵) 和 财务(钱) 必须<strong>都同意</strong>，流程才会交汇进入 Step 3。</li>
+                        <li><strong>靶向回退 (Targeted Rollback)</strong>：当流程进入 Step 3 (HR 终审) 时，你可以点击<strong>"模拟: 业务数据被修改"</strong>。系统会触发事件，<strong>仅将分叉树下方的财务节点回退并作废</strong>，而上方 IT 分支的绿色通过状态被完好保留。</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="approval-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+        <div id="modal-content" class="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden border border-gray-200 modal-enter flex flex-col max-h-[95vh]">
+            <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary">fact_check</span>
+                    <div>
+                        <h3 class="font-headline font-bold text-lg">离职流转单处理台</h3>
+                        <p class="text-xs text-on-surface-variant font-mono mt-0.5" id="modal-biz-no"></p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-800 bg-gray-100 p-2 rounded-full transition"><span class="material-symbols-outlined text-sm">close</span></button>
+            </div>
+            
+            <div class="flex-1 overflow-hidden flex flex-col bg-white">
+                <!-- 全景链条 -->
+                <div class="px-8 py-8 border-b border-gray-100 bg-slate-50/50">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">链条全景 (分叉树)</h4>
+                    <div id="chain-steps" class="flex items-center justify-center px-4"></div>
+                </div>
+
+                <div class="p-8 overflow-y-auto flex-1 grid grid-cols-12 gap-8">
+                    <!-- 左侧：历史轨迹 -->
+                    <div class="col-span-7 space-y-6 border-r border-gray-100 pr-8">
+                        <div>
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex justify-between items-center">
+                                执行追踪日志
+                                <button id="btn-mock-modify" onclick="triggerDataChange()" class="hidden bg-amber-100 text-amber-700 px-3 py-1 rounded text-[10px] hover:bg-amber-200 transition font-bold flex items-center">
+                                    <span class="material-symbols-outlined text-[12px] mr-1">warning</span>模拟: 业务数据被修改
+                                </button>
+                            </h4>
+                            <div id="modal-trace" class="space-y-6 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-gray-200 ml-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：操作区 -->
+                    <div class="col-span-5">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">并联任务调度器</h4>
+                        <div id="current-node-action-area" class="space-y-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // Mock Engine Structure
+        // ==========================================
+        let businessData = [
+            { id: 1, no: 'RES-001', title: '前端工程师李明离职申请', status_value: 1, submitter: '李明', date: '2026-05-14' }
+        ];
+
+        // 高阶配置：支持并行组 (parallel_group)
+        const engineConfig = [
+            { id: 's1', type: 'user_task', name: '直属主管审批', role_target: 'dept_manager', role_name: '主管' },
+            { 
+                id: 's2', type: 'parallel_group', name: '跨部门交接',
+                branches: [
+                    { branch_id: 'b1', name: 'IT 资产回收', role_target: 'it_support', role_name: 'IT' },
+                    { branch_id: 'b2', name: '财务工资结算', role_target: 'finance', role_name: '财务' }
+                ]
+            },
+            { id: 's3', type: 'user_task', name: 'HR 总监核准', role_target: 'hr_director', role_name: 'HR' }
+        ];
+
+        // 运行态实例
+        let engineInstances = {
+            'RES-001': {
+                current_step_idx: 0,
+                // 记录并行任务的完成状态 { 'b1': true, 'b2': false }
+                parallel_status: {},
+                history: [
+                    { action: 'submit', user: '李明', time: '09:00', comment: '提交离职流转单', isSystem: false }
+                ]
+            }
+        };
+
+        let currentUserRole = 'admin'; 
+        let currentModalBizNo = null;
+
+        // ==========================================
+        // View Render
+        // ==========================================
+        function renderList() {
+            const tbody = document.getElementById('business-list');
+            tbody.innerHTML = '';
+
+            businessData.forEach(biz => {
+                let engineStatusText = '<span class="text-gray-400 italic">流程结束</span>';
+                let canApprove = false;
+
+                if (biz.status_value === 1) { 
+                    const instance = engineInstances[biz.no];
+                    if (instance && instance.current_step_idx < engineConfig.length) {
+                        const step = engineConfig[instance.current_step_idx];
+                        
+                        if (step.type === 'user_task') {
+                            engineStatusText = `<span class="px-2 py-1 bg-amber-50 text-amber-700 font-bold text-[10px] rounded border border-amber-100">${step.name}</span>`;
+                            if (currentUserRole === 'admin' || currentUserRole === step.role_target) canApprove = true;
+                        } else {
+                            // 并行组处理
+                            const pendingBranches = step.branches.filter(b => !instance.parallel_status[b.branch_id]);
+                            const names = pendingBranches.map(b => b.name).join(' / ');
+                            engineStatusText = `<span class="px-2 py-1 bg-purple-50 text-purple-700 font-bold text-[10px] rounded border border-purple-100">并联处理中: ${names}</span>`;
+                            
+                            // 检查当前人是否有权限处理尚未完成的分支
+                            if (currentUserRole === 'admin') canApprove = true;
+                            else if (pendingBranches.some(b => b.role_target === currentUserRole)) canApprove = true;
+                        }
+                    }
+                }
+
+                let macroBadge = biz.status_value === 1 ? '<span class="text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-bold text-xs">1 审批中</span>' : (biz.status_value === 99 ? '<span class="text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs">99 已生效</span>' : '<span class="text-red-600 bg-red-50 px-2.5 py-1 rounded-full font-bold text-xs">-99 已作废</span>');
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="p-4 font-mono text-sm font-bold">${biz.no}</td>
+                        <td class="p-4"><div class="font-medium">${biz.title}</div></td>
+                        <td class="p-4">${macroBadge}</td>
+                        <td class="p-4">${engineStatusText}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="openModal('${biz.no}')" class="${canApprove ? 'bg-primary text-white hover:bg-blue-700 shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'} px-4 py-1.5 rounded-lg text-xs font-bold transition">
+                                ${canApprove ? '处理待办' : '查看轨迹'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function switchUser(role) {
+            currentUserRole = role;
+            renderList(); 
+            if(currentModalBizNo && !document.getElementById('approval-modal').classList.contains('hidden')) {
+                openModal(currentModalBizNo); // refresh modal context
+            }
+        }
+
+        function openModal(bizNo) {
+            currentModalBizNo = bizNo;
+            const biz = businessData.find(b => b.no === bizNo);
+            const instance = engineInstances[bizNo];
+            if (!instance) return;
+
+            document.getElementById('modal-biz-no').innerText = bizNo;
+            renderChainSteps(instance.current_step_idx, biz.status_value, instance);
+            renderTraceLog(instance.history);
+            renderActionArea(instance, biz.status_value);
+
+            // 控制修改数据按钮：只有走到 Step 3，才显示修改数据的按钮来模拟回退
+            const btnModify = document.getElementById('btn-mock-modify');
+            if (instance.current_step_idx === 2) { // Step 3
+                btnModify.classList.remove('hidden');
+            } else {
+                btnModify.classList.add('hidden');
+            }
+
+            document.getElementById('approval-modal').classList.remove('hidden');
+            document.getElementById('modal-content').classList.remove('modal-leave');
+            document.getElementById('modal-content').classList.add('modal-enter');
+        }
+
+        function renderChainSteps(currentIdx, statusValue, instance) {
+            const container = document.getElementById('chain-steps');
+            container.innerHTML = '';
+            
+            const getStyle = (isPast, isCurrent, isRejected) => {
+                if (isPast) return { bg: 'bg-emerald-500 text-white shadow-md shadow-emerald-200', icon: 'done', text: '已通过', border: '#10b981' };
+                if (isCurrent) {
+                    if (isRejected) return { bg: 'bg-red-500 text-white shadow-md shadow-red-200', icon: 'undo', text: '已作废', border: '#f43f5e' };
+                    return { bg: 'bg-amber-400 text-white ring-4 ring-amber-100 shadow-md', icon: 'edit_document', text: '待处理', border: '#fbbf24' };
+                }
+                return { bg: 'bg-gray-100 text-gray-400', icon: 'schedule', text: '未到达', border: '#e5e7eb' };
+            };
+
+            container.innerHTML += createStepNode('发起申请', '已完成', 'done', 'bg-emerald-500 text-white shadow-md shadow-emerald-200');
+            let lastLineColor = '#10b981';
+
+            engineConfig.forEach((step, idx) => {
+                let isPast = idx < currentIdx;
+                let isCurrent = idx === currentIdx;
+                let isRejected = statusValue === -99 && isCurrent;
+                if (statusValue === 99) { isPast = true; isCurrent = false; }
+
+                if (step.type === 'user_task') {
+                    const style = getStyle(isPast, isCurrent, isRejected);
+                    container.innerHTML += `<div class="w-12 shrink-0 border-t-2" style="border-color: ${lastLineColor}; transition: all 0.3s;"></div>`;
+                    container.innerHTML += createStepNode(step.name, style.text, style.icon, style.bg, step.role_name);
+                    lastLineColor = style.border;
+                } else if (step.type === 'parallel_group') {
+                    // Fork-Join Branch Rendering (CSS Fork Tree)
+                    let forkColor = isPast || isCurrent ? '#10b981' : '#e5e7eb';
+                    
+                    container.innerHTML += `<div class="w-8 shrink-0 border-t-2" style="border-color: ${lastLineColor}; transition: all 0.3s;"></div>`;
+                    
+                    let groupHtml = `<div class="flex flex-col gap-6 py-2">`;
+                    let allDone = true;
+
+                    step.branches.forEach((b, branchIdx) => {
+                        const isBranchDone = instance?.parallel_status?.[b.branch_id];
+                        const bIsPast = isPast || isBranchDone;
+                        const bIsCurrent = isCurrent && !isBranchDone;
+                        const bStyle = getStyle(bIsPast, bIsCurrent, isRejected);
+                        if (!bIsPast) allDone = false;
+
+                        let branchClass = branchIdx === 0 ? 'branch-top' : 'branch-bottom';
+                        
+                        groupHtml += `
+                            <div class="branch-wrapper ${branchClass}" style="border-color: ${forkColor}; --join-color: ${bStyle.border}; transition: all 0.3s;">
+                                ${createStepNode(b.name, bStyle.text, bStyle.icon, bStyle.bg, b.role_name)}
+                            </div>
+                        `;
+                    });
+                    
+                    groupHtml += `</div>`;
+                    container.innerHTML += groupHtml;
+
+                    // Join Line Base
+                    let joinColor = isPast || (isCurrent && allDone) ? '#10b981' : (isCurrent ? '#fbbf24' : '#e5e7eb');
+                    container.innerHTML += `<div class="w-8 shrink-0 border-t-2" style="border-color: ${joinColor}; transition: all 0.3s;"></div>`;
+                    lastLineColor = joinColor;
+                }
+            });
+            
+            const isFinished = (statusValue === 99);
+            container.innerHTML += `<div class="w-12 shrink-0 border-t-2" style="border-color: ${lastLineColor}; transition: all 0.3s;"></div>`;
+            container.innerHTML += createStepNode('流程归档', isFinished ? '已到达' : '未到达', 'flag', isFinished ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-gray-100 text-gray-400');
+        }
+
+        function createStepNode(title, subtitle, icon, colorClass, roleName = null) {
+            let roleBadge = roleName ? `<span class="mt-2 px-2 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 text-[9px] rounded font-bold uppercase">${roleName}</span>` : '';
+            return `
+                <div class="flex flex-col items-center shrink-0 w-[90px] relative z-10 group">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all duration-300 ${colorClass}">
+                        <span class="material-symbols-outlined text-[18px]">${icon}</span>
+                    </div>
+                    <span class="text-xs font-bold text-gray-800 text-center leading-tight bg-white/80 backdrop-blur-sm px-1 rounded transition-colors group-hover:text-primary">${title}</span>
+                    <span class="text-[10px] text-gray-500 font-medium mt-1">${subtitle}</span>
+                    ${roleBadge}
+                </div>
+            `;
+        }
+
+        function renderTraceLog(history) {
+            const container = document.getElementById('modal-trace');
+            container.innerHTML = '';
+            
+            [...history].reverse().forEach(log => {
+                let icon = 'add_task';
+                let color = 'bg-gray-100 text-gray-500 border-gray-200';
+                if (log.action === 'pass') { icon = 'done'; color = 'bg-emerald-500 text-white border-white'; }
+                if (log.action === 'reject') { icon = 'undo'; color = 'bg-red-500 text-white border-white'; }
+                if (log.isSystem) { icon = 'warning'; color = 'bg-amber-400 text-white border-white'; }
+
+                container.innerHTML += `
+                    <div class="relative pl-8 animate-fadeIn">
+                        <div class="absolute left-[-11px] top-1 w-6 h-6 ${color} rounded-full flex items-center justify-center z-10 border-2">
+                            <span class="material-symbols-outlined text-[12px]">${icon}</span>
+                        </div>
+                        <div class="${log.isSystem ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-100'} p-3 rounded-xl border text-sm shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-gray-700">${log.isSystem ? '系统拦截回退' : (log.action==='pass' ? '审核通过' : (log.action==='submit'?'发起申请':'审核驳回'))}</span>
+                                <span class="text-[10px] opacity-50 font-mono">${log.time}</span>
+                            </div>
+                            ${log.isSystem ? '' : `<p class="text-[10px] text-gray-500 uppercase font-bold mb-2">处理人: <span class="text-primary">${log.user}</span></p>`}
+                            <p class="text-xs italic bg-white/60 p-2 rounded border border-black/5">"${log.comment}"</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderActionArea(instance, statusValue) {
+            const area = document.getElementById('current-node-action-area');
+            area.innerHTML = '';
+            if (instance.current_step_idx >= engineConfig.length) return;
+
+            const step = engineConfig[instance.current_step_idx];
+
+            if (step.type === 'user_task') {
+                const canApprove = (currentUserRole === 'admin' || currentUserRole === step.role_target);
+                area.innerHTML = buildActionBox(step.name, canApprove, null);
+            } else {
+                // 并行组处理
+                step.branches.forEach(b => {
+                    const isDone = instance.parallel_status[b.branch_id];
+                    if (isDone) {
+                        area.innerHTML += `
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-3 flex justify-between items-center opacity-70">
+                                <div>
+                                    <p class="font-bold text-emerald-800 text-sm">${b.name}</p>
+                                    <p class="text-xs text-emerald-600">已处理完成，等待其他并联任务</p>
+                                </div>
+                                <span class="material-symbols-outlined text-emerald-500">check_circle</span>
+                            </div>
+                        `;
+                    } else {
+                        const canApprove = (currentUserRole === 'admin' || currentUserRole === b.role_target);
+                        area.innerHTML += buildActionBox(b.name, canApprove, b.branch_id);
+                    }
+                });
+            }
+        }
+
+        function buildActionBox(title, canApprove, branchId) {
+            if (!canApprove) {
+                return `
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="material-symbols-outlined text-gray-400 text-[18px]">lock</span>
+                            <span class="font-bold text-gray-600 text-sm">等待：${title}</span>
+                        </div>
+                        <p class="text-xs text-gray-400">切换到拥有权限的角色以进行操作</p>
+                    </div>
+                `;
+            }
+            return `
+                <div class="bg-white border border-primary/20 rounded-xl p-4 mb-3 shadow-md shadow-primary/5 relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                    <h5 class="font-bold text-primary mb-3 ml-2">${title} (您的待办)</h5>
+                    <textarea id="comment-${branchId||'main'}" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs focus:ring-1 outline-none mb-3 ml-2" placeholder="填写合规审核意见..."></textarea>
+                    <div class="flex gap-2 ml-2">
+                        <button onclick="executeAction('pass', '${branchId}')" class="flex-1 bg-primary text-white text-xs font-bold py-2.5 rounded-lg hover:bg-blue-700 transition shadow-sm">提交同意</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function executeAction(actionType, branchId) {
+            const instance = engineInstances[currentModalBizNo];
+            const step = engineConfig[instance.current_step_idx];
+            const commentId = `comment-${branchId!=='undefined' ? branchId : 'main'}`;
+            const comment = document.getElementById(commentId)?.value || '核查无误，同意。';
+            
+            const userText = document.getElementById('user-selector').options[document.getElementById('user-selector').selectedIndex].text.split(' ')[0];
+
+            instance.history.push({
+                action: actionType, user: userText, 
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), 
+                comment: comment, isSystem: false
+            });
+
+            if (step.type === 'parallel_group' && branchId !== 'undefined') {
+                instance.parallel_status[branchId] = true;
+                const allDone = step.branches.every(b => instance.parallel_status[b.branch_id]);
+                if (allDone) instance.current_step_idx++;
+            } else {
+                instance.current_step_idx++;
+            }
+
+            if (instance.current_step_idx >= engineConfig.length) {
+                businessData.find(b => b.no === currentModalBizNo).status_value = 99;
+            }
+
+            openModal(currentModalBizNo);
+            renderList();
+        }
+
+        function triggerDataChange() {
+            const instance = engineInstances[currentModalBizNo];
+            
+            instance.history.push({
+                action: 'reject', user: 'Engine', time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), 
+                comment: '检测到财务结算金额被修改。已触发靶向回退机制，作废[财务工资结算]节点的确认状态，重新发回原节点审批。', 
+                isSystem: true
+            });
+
+            // 回退到特定节点 (Step 2)
+            instance.current_step_idx = 1; 
+            // 仅重置财务分支(b2)，保留 IT 资产(b1)的完成状态
+            instance.parallel_status['b2'] = false; 
+
+            businessData.find(b => b.no === currentModalBizNo).status_value = 1; 
+            openModal(currentModalBizNo);
+            renderList();
+        }
+
+        function mockSubmitNew() {
+            const newNo = `RES-00${businessData.length + 1}`;
+            businessData.push({ id: Date.now(), no: newNo, title: '新离职单据测试', status_value: 1, submitter: '测试人', date: new Date().toISOString().split('T')[0] });
+            engineInstances[newNo] = { current_step_idx: 0, parallel_status: {}, history: [{ action: 'submit', user: '测试人', time: '10:00', comment: '提交单据', isSystem: false }] };
+            renderList();
+        }
+
+        function closeModal() {
+            document.getElementById('modal-content').classList.replace('modal-enter', 'modal-leave');
+            setTimeout(() => document.getElementById('approval-modal').classList.add('hidden'), 200);
+        }
+
+        renderList();
+    </script>
+</body>
+</html>

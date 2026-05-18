@@ -7,14 +7,18 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { ModulesModule } from './modules/modules.module';
 import { MetadataModule } from './metadata/metadata.module';
 import { DatabaseService } from './database/database.service';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { WorkflowModule } from './workflow/workflow.module';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     DatabaseModule,
     EngineModule,
     PermissionsModule,
     ModulesModule,
     MetadataModule,
+    WorkflowModule,
   ],
   controllers: [AppController],
   providers: [AppService],

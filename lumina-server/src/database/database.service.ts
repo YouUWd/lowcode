@@ -171,6 +171,77 @@ export class DatabaseService {
         table.unique(['module_id', 'permission_node']);
       });
     }
+
+    // --- 审批流核心引擎表 ---
+    
+    // 1. 审批流模板定义表
+    if (!(await this.configDb.schema.hasTable('sys_approval_chain_config'))) {
+      await this.configDb.schema.createTable('sys_approval_chain_config', (table) => {
+        table.increments('id').primary();
+        table.string('module_id', 50).notNullable().comment('所属模块ID (对应 sys_module.module_id)');
+        table.integer('up_id').defaultTo(0).comment('上一个节点ID (双向链表)');
+        table.integer('next_id').defaultTo(0).comment('下一个节点ID (双向链表)');
+        table.string('node_name', 100).notNullable().comment('节点名称');
+        table.enum('node_type', ['user_task', 'parallel_group']).defaultTo('user_task').comment('节点类型: 普通任务或并行组');
+        table.string('approval_rule', 50).nullable().comment('审批规则 (0:指定, 1:角色或签, 2:角色全签, 3:会签百分比)');
+        table.string('role_target', 50).nullable().comment('目标角色(普通任务使用)');
+        table.integer('role_approval_percent').nullable().comment('会签百分比');
+        table.json('parallel_branches').nullable().comment('并行分支定义集合 [{branch_id, name, role_target}]');
+        table.string('re_approval_strategy', 50).defaultTo('strict_reset').comment('重审策略: strict_reset, smart_rollback, ignore');
+        table.string('condition', 500).nullable().comment('生效条件表达式(支持变量解析)');
+        table.boolean('is_jump').defaultTo(false).comment('是否允许紧急跳过');
+        table.timestamps(true, true);
+      });
+    }
+
+    // 2. 统一流程实例表 (承载所有业务的草稿与宏观状态)
+    if (!(await this.configDb.schema.hasTable('sys_approval_instance'))) {
+      await this.configDb.schema.createTable('sys_approval_instance', (table) => {
+        table.string('business_no', 50).primary().comment('统一流水号 (PK, 跨越业务与引擎的唯一凭证)');
+        table.string('module_id', 50).notNullable().comment('绑定的业务模块ID');
+        table.string('title', 255).notNullable().comment('统一待办标题');
+        table.string('target_entity', 100).nullable().comment('要操作的具体物理表名 (可选，提供上下文)');
+        table.string('target_record_id', 100).nullable().comment('要修改的真实业务主键 (新增时可为空)');
+        table.enum('action_type', ['INSERT', 'UPDATE', 'DELETE', 'CUSTOM']).defaultTo('CUSTOM').comment('业务意图');
+        table.string('reason', 500).nullable().comment('申请事由/备注说明 (与实际业务数据隔离)');
+        table.json('payload').nullable().comment('【核心】业务数据载荷(仅包含真实的业务字段变更)');
+        table.integer('macro_status').defaultTo(1).comment('宏观状态: 1(审批中), 99(生效), -99(作废)');
+        table.string('submitter_id', 50).notNullable().comment('发起人标识');
+        table.timestamps(true, true);
+      });
+    }
+
+    // 3. 审批流运行实例任务表 (微观流转追踪)
+    if (!(await this.configDb.schema.hasTable('sys_approval_task'))) {
+      await this.configDb.schema.createTable('sys_approval_task', (table) => {
+        table.increments('id').primary();
+        table.string('business_no', 50).notNullable().comment('关联 sys_approval_instance.business_no');
+        table.integer('node_id').notNullable().comment('关联 sys_approval_chain_config 节点ID');
+        table.string('branch_id', 50).nullable().comment('如果是并行组，记录对应的分支ID');
+        table.enum('status', ['PENDING', 'PASS', 'REJECT', 'INVALIDATED']).defaultTo('PENDING').comment('任务状态');
+        table.string('approvers_list', 1000).nullable().comment('已审批人员工号(逗号分隔)记录，用于会签人数判定');
+        table.timestamps(true, true);
+        
+        table.index(['business_no', 'node_id']);
+        table.foreign('business_no').references('business_no').inTable('sys_approval_instance').onDelete('CASCADE');
+      });
+    }
+
+    // 4. 审批流执行日志表 (持久化流转轨迹)
+    if (!(await this.configDb.schema.hasTable('sys_approval_log'))) {
+      await this.configDb.schema.createTable('sys_approval_log', (table) => {
+        table.increments('id').primary();
+        table.string('business_no', 50).notNullable().comment('关联 sys_approval_instance.business_no');
+        table.string('action_type', 50).notNullable().comment('动作: submit, pass, reject, system_reset');
+        table.string('operator', 100).notNullable().comment('操作人 (如果是自动触发则为 System/Engine)');
+        table.string('node_name', 100).nullable().comment('发生动作的关联节点名称');
+        table.string('comment', 500).nullable().comment('审批意见或系统说明');
+        table.boolean('is_system').defaultTo(false).comment('是否为引擎或系统自动触发的动作');
+        table.timestamps(true, true);
+        
+        table.index('business_no');
+      });
+    }
   }
 
   /**
@@ -300,7 +371,51 @@ export class DatabaseService {
       await this.configDb('sys_module_field').del();
       await this.configDb('sys_module_entity').del();
       await this.configDb('sys_module').del();
-      console.log('[数据库服务] 配置数据清空完成');
+      
+      // 添加清空审批链模板数据
+      await this.configDb('sys_approval_chain_config').del();
+      
+      // 重要：清空所有在途流程实例、任务和日志，防止主外键引用失效或出现“脏数据”
+      await this.configDb('sys_approval_task').del();
+      await this.configDb('sys_approval_log').del();
+      await this.configDb('sys_approval_instance').del();
+      
+      console.log('[数据库服务] 配置与工作流历史数据清空完成');
+
+      // --- 工作流 DEMO 种子数据 ---
+      const [node1Id] = await this.configDb('sys_approval_chain_config').insert({
+        module_id: 'MOD-SCORE-DETAIL',
+        up_id: 0,
+        node_name: '教研组长初审',
+        node_type: 'user_task',
+        role_target: 'head_teacher'
+      }).returning('id');
+
+      const [node2Id] = await this.configDb('sys_approval_chain_config').insert({
+        module_id: 'MOD-SCORE-DETAIL',
+        up_id: node1Id.id || node1Id, // Handle both object and raw number return formats
+        node_name: '跨部门并联交接',
+        node_type: 'parallel_group',
+        parallel_branches: JSON.stringify([
+          { branch_id: 'b1', name: '教务处核准', role_target: 'academic_admin' },
+          { branch_id: 'b2', name: '财务处退费复核', role_target: 'finance' }
+        ]),
+        re_approval_strategy: 'smart_rollback'
+      }).returning('id');
+
+      const [node3Id] = await this.configDb('sys_approval_chain_config').insert({
+        module_id: 'MOD-SCORE-DETAIL',
+        up_id: node2Id.id || node2Id,
+        node_name: '校长终审',
+        node_type: 'user_task',
+        role_target: 'principal'
+      }).returning('id');
+
+      // 更新 next_id 链接 (双向链表)
+      await this.configDb('sys_approval_chain_config').where({ id: node1Id.id || node1Id }).update({ next_id: node2Id.id || node2Id });
+      await this.configDb('sys_approval_chain_config').where({ id: node2Id.id || node2Id }).update({ next_id: node3Id.id || node3Id });
+
+      console.log('[数据库服务] 审批流模板配置插入完成');
 
       // 1. 插入模块基本信息
       await this.configDb('sys_module').insert([

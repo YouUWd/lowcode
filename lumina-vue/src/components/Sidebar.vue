@@ -13,11 +13,17 @@
       </a>
 
       <!-- 模块列表 (Main Navigation, remains active when in child 'config' view) -->
-      <a @click="updateView('list')" :class="[(state.currentView === 'list' || state.currentView === 'config') ? 'text-[#005daa] bg-surface-container font-bold before:content-[\'\'] before:absolute before:left-0 before:w-1 before:h-6 before:bg-[#005daa] before:rounded-r-full' : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa]']" class="flex items-center px-4 py-3 rounded-xl relative hover:opacity-100 transition-colors duration-300 ease-in-out cursor-pointer select-none">
-        <span class="material-symbols-outlined mr-3 transition-transform" :class="{'scale-110': state.currentView === 'list' || state.currentView === 'config'}" :style="(state.currentView === 'list' || state.currentView === 'config') ? 'font-variation-settings: \'FILL\' 1;' : ''">view_module</span>
+      <a @click="updateView('list')" :class="[(state.currentView === 'list' || state.currentView === 'config' || state.currentView === 'permissions') ? 'text-[#005daa] bg-surface-container font-bold before:content-[\'\'] before:absolute before:left-0 before:w-1 before:h-6 before:bg-[#005daa] before:rounded-r-full' : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa]']" class="flex items-center px-4 py-3 rounded-xl relative hover:opacity-100 transition-colors duration-300 ease-in-out cursor-pointer select-none">
+        <span class="material-symbols-outlined mr-3 transition-transform" :class="{'scale-110': state.currentView === 'list' || state.currentView === 'config' || state.currentView === 'permissions'}" :style="(state.currentView === 'list' || state.currentView === 'config' || state.currentView === 'permissions') ? 'font-variation-settings: \'FILL\' 1;' : ''">view_module</span>
         模块管理
       </a>
       
+      <!-- 审批流引擎 -->
+      <a @click="updateView('workflow')" :class="[state.currentView === 'workflow' ? 'text-[#005daa] bg-surface-container font-bold before:content-[\'\'] before:absolute before:left-0 before:w-1 before:h-6 before:bg-[#005daa] before:rounded-r-full' : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa]']" class="flex items-center px-4 py-3 rounded-xl relative hover:opacity-100 transition-colors duration-300 ease-in-out cursor-pointer select-none">
+        <span class="material-symbols-outlined mr-3 transition-transform" :class="{'scale-110': state.currentView === 'workflow'}" :style="state.currentView === 'workflow' ? 'font-variation-settings: \'FILL\' 1;' : ''">account_tree</span>
+        审批流引擎
+      </a>
+
       <!-- 设置 -->
       <a class="flex items-center px-4 py-3 rounded-xl text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors duration-300 ease-in-out cursor-pointer select-none">
         <span class="material-symbols-outlined mr-3">settings</span>

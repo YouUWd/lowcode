@@ -8,5 +8,6 @@ import { PermissionsModule } from '../permissions/permissions.module';
   imports: [PermissionsModule],
   providers: [EngineService, ModulesService],
   controllers: [EngineController],
+  exports: [EngineService],
 })
 export class EngineModule {}

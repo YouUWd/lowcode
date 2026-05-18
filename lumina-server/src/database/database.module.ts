@@ -13,7 +13,7 @@ if (!fs.existsSync(dataDir)) {
 
 // Create config database Knex instance
 const configKnex = knex({
-  client: 'better-sqlite3',
+  client: 'sqlite3',
   connection: {
     filename: path.join(dataDir, 'config.db'),
   },
@@ -22,7 +22,7 @@ const configKnex = knex({
 
 // Create business database Knex instance
 const businessKnex = knex({
-  client: 'better-sqlite3',
+  client: 'sqlite3',
   connection: {
     filename: path.join(dataDir, 'business.db'),
   },

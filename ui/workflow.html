@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>核心审批引擎设计 - Lumina Architect</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#191c1d",
+                        "inverse-on-surface": "#f0f1f2",
+                        "surface-variant": "#e1e3e4",
+                        "tertiary-fixed-dim": "#ffb688",
+                        "on-surface-variant": "#404753",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#934600",
+                        "surface-dim": "#d9dadb",
+                        "primary-fixed": "#d4e3ff",
+                        "on-secondary-fixed-variant": "#3b485a",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-primary": "#a5c8ff",
+                        "surface": "#f8f9fa",
+                        "surface-container-high": "#e7e8e9",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-container": "#fffbff",
+                        "primary-fixed-dim": "#a5c8ff",
+                        "secondary": "#525f73",
+                        "inverse-surface": "#2e3132",
+                        "outline-variant": "#c0c7d6",
+                        "on-primary-container": "#fefcff",
+                        "surface-tint": "#005fae",
+                        "secondary-fixed-dim": "#bac7de",
+                        "surface-container-low": "#f3f4f5",
+                        "on-secondary-fixed": "#0f1c2d",
+                        "secondary-container": "#d6e3fb",
+                        "on-primary-fixed-variant": "#004785",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#733600",
+                        "on-background": "#191c1d",
+                        "secondary-fixed": "#d6e3fb",
+                        "tertiary-fixed": "#ffdbc7",
+                        "surface-container": "#edeeef",
+                        "primary-container": "#0075d5",
+                        "on-tertiary-fixed": "#311300",
+                        "on-primary-fixed": "#001c3a",
+                        "background": "#f8f9fa",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#b95a00",
+                        "outline": "#707785",
+                        "on-secondary-container": "#586579",
+                        "surface-container-highest": "#e1e3e4",
+                        "primary": "#005daa",
+                        "surface-bright": "#f8f9fa",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .node-connector::after {
+            content: ''; position: absolute; left: 50%; bottom: -48px;
+            width: 2px; height: 48px; background: repeating-linear-gradient(to bottom, #c0c7d6, #c0c7d6 4px, transparent 4px, transparent 8px);
+            transform: translateX(-50%);
+        }
+        .node-connector:last-child::after { display: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased flex h-screen overflow-hidden">
+    <!-- SideNavBar (Simplified) -->
+    <nav class="bg-[#f3f4f5] font-inter text-sm h-screen w-64 fixed left-0 top-0 z-40 flex flex-col py-6 px-4 space-y-2">
+        <div class="mb-8 px-4 flex flex-col">
+            <span class="font-manrope font-extrabold text-[#005daa] text-xl">Lumina Engine</span>
+            <span class="text-on-surface-variant text-[10px] uppercase tracking-tighter font-bold opacity-50">Workflow Core Prototype</span>
+        </div>
+        <div class="flex-1 space-y-1">
+            <button onclick="toggleView('design')" id="nav-design" class="w-full flex items-center px-4 py-3 rounded-xl font-bold text-primary bg-primary-fixed/30 transition-all">
+                <span class="material-symbols-outlined mr-3">account_tree</span>引擎设计器
+            </button>
+            <button onclick="toggleView('exec')" id="nav-exec" class="w-full flex items-center px-4 py-3 rounded-xl font-medium text-on-surface-variant hover:bg-surface-container transition-all">
+                <span class="material-symbols-outlined mr-3">play_circle</span>运行实例模拟
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="ml-64 flex-1 flex flex-col h-screen overflow-y-auto">
+        <header class="bg-white px-8 h-16 flex justify-between items-center border-b border-outline-variant/10 sticky top-0 z-30">
+            <div id="view-title" class="font-headline font-bold text-lg text-on-surface">审批流定义 (Config)</div>
+            <div class="flex gap-4">
+                <div class="flex items-center bg-surface-container-low px-3 py-1 rounded-full border border-outline-variant/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
+                    <span class="text-[10px] font-bold text-on-surface-variant uppercase">Engine Online</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-8 max-w-[1200px] mx-auto w-full">
+            
+            <!-- ================= 设计器视图 ================= -->
+            <div id="view-design" class="space-y-10">
+                <div class="flex justify-between items-start">
+                    <div class="space-y-1">
+                        <h2 class="text-3xl font-headline font-extrabold tracking-tight">流水线编排</h2>
+                        <p class="text-on-surface-variant text-sm">配置 <code>sys_approval_chain_config</code> 核心属性</p>
+                    </div>
+                    <button onclick="addNode()" class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center">
+                        <span class="material-symbols-outlined mr-2">add_circle</span>新增逻辑节点
+                    </button>
+                </div>
+
+                <div id="nodes-container" class="flex flex-col items-center gap-12 pb-24">
+                    <!-- Nodes Rendered Here -->
+                </div>
+            </div>
+
+            <!-- ================= 执行器视图 ================= -->
+            <div id="view-exec" class="hidden grid grid-cols-12 gap-8">
+                <!-- 左侧：引擎状态与轨迹 -->
+                <div class="col-span-8 space-y-6">
+                    <div class="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/20 shadow-sm">
+                        <div class="flex justify-between items-center mb-8">
+                            <div class="space-y-1">
+                                <h3 class="font-headline font-bold text-xl">运行轨迹 (Instance Log)</h3>
+                                <p class="text-xs text-on-surface-variant">实时追踪 <code>sys_approval_chain</code> 状态流转</p>
+                            </div>
+                            <div id="global-biz-status" class="px-4 py-1.5 bg-primary-fixed text-primary rounded-full font-bold text-xs uppercase tracking-widest">
+                                业务状态: 初始 (1)
+                            </div>
+                        </div>
+
+                        <div id="timeline" class="space-y-6 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-outline-variant/30">
+                            <!-- Trace Rendered Here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧：多角色操作模拟器 -->
+                <div class="col-span-4">
+                    <div class="bg-white rounded-2xl border border-primary/10 p-6 sticky top-24 shadow-xl shadow-primary/5 space-y-6">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-primary-fixed text-primary rounded-lg"><span class="material-symbols-outlined">person_celebrate</span></div>
+                            <div>
+                                <h4 class="font-bold text-on-surface">角色身份模拟</h4>
+                                <p class="text-[10px] text-on-surface-variant uppercase">Current Role Simulation</p>
+                            </div>
+                        </div>
+
+                        <div id="action-area" class="space-y-4">
+                            <!-- Dynamic Action Panel -->
+                        </div>
+
+                        <div id="group-progress" class="hidden p-4 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                            <div class="flex justify-between text-[10px] font-bold uppercase mb-2">
+                                <span>会签进度 (Percent)</span>
+                                <span id="progress-val">0% / 50%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+                                <div id="progress-bar" class="h-full bg-primary transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-outline-variant/10">
+                            <button onclick="resetFlow()" class="w-full py-2 text-on-surface-variant text-xs font-bold hover:text-primary transition-colors flex items-center justify-center">
+                                <span class="material-symbols-outlined text-sm mr-1">refresh</span> 重置引擎实例
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Node Settings Modal (Logic Configuration) -->
+        <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 backdrop-blur-sm p-4">
+            <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-outline-variant/20 animate-slide-down">
+                <div class="p-6 border-b border-outline-variant/10 flex justify-between items-center">
+                    <h3 class="font-headline font-bold text-lg">节点逻辑配置</h3>
+                    <button onclick="closeSettings()" class="text-outline hover:text-on-surface"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="p-8 space-y-5" id="modal-content">
+                    <!-- Dynamic Fields -->
+                </div>
+                <div class="p-6 bg-surface-container-low flex justify-end gap-3">
+                    <button onclick="closeSettings()" class="px-6 py-2 text-on-surface-variant font-bold text-sm">取消</button>
+                    <button onclick="saveSettings()" class="px-8 py-2 bg-primary text-on-primary rounded-xl font-bold text-sm shadow-md">保存逻辑</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Core Engine Configuration (sys_approval_chain_config) ---
+        let configNodes = [
+            { 
+                id: 1, name: '直属主管审核', 
+                approval_rule: '0', // 0: Single User
+                next_status_group: 5,
+                up_step_logic: 'reset', // Rejection path
+                is_jump: 0
+            },
+            { 
+                id: 2, name: 'HRBP 角色会签', 
+                approval_rule: '3', // 3: Percent based
+                role_approval_percent: 50,
+                next_status_group: 10,
+                up_step_logic: 'prev',
+                is_jump: 0
+            },
+            { 
+                id: 3, name: '财务终核', 
+                approval_rule: '1', // 1: Any of role group
+                next_status_group: 99,
+                up_step_logic: 'prev',
+                is_jump: 1
+            }
+        ];
+
+        // --- Runtime State (sys_approval_chain instance) ---
+        let runtime = {
+            current_step_idx: 0,
+            approver_id_list: [], // Users who already approved this step
+            history: [],
+            is_finished: false,
+            biz_status: 1
+        };
+
+        let editingNodeIdx = null;
+
+        // --- View Logic ---
+        function toggleView(view) {
+            const isDesign = view === 'design';
+            document.getElementById('view-design').classList.toggle('hidden', !isDesign);
+            document.getElementById('view-exec').classList.toggle('hidden', isDesign);
+            document.getElementById('view-title').innerText = isDesign ? '审批流定义 (Config)' : '运行实例模拟 (Instance)';
+            
+            // UI Toggles
+            const navD = document.getElementById('nav-design');
+            const navE = document.getElementById('nav-exec');
+            navD.className = isDesign ? 'w-full flex items-center px-4 py-3 rounded-xl font-bold text-primary bg-primary-fixed/30 transition-all' : 'w-full flex items-center px-4 py-3 rounded-xl font-medium text-on-surface-variant hover:bg-surface-container transition-all';
+            navE.className = !isDesign ? 'w-full flex items-center px-4 py-3 rounded-xl font-bold text-primary bg-primary-fixed/30 transition-all' : 'w-full flex items-center px-4 py-3 rounded-xl font-medium text-on-surface-variant hover:bg-surface-container transition-all';
+            
+            if (isDesign) renderDesigner();
+            else renderExecutor();
+        }
+
+        // --- Designer Logic ---
+        function renderDesigner() {
+            const container = document.getElementById('nodes-container');
+            container.innerHTML = `<div class="w-40 py-2 bg-surface-container-highest text-on-surface-variant rounded-full text-center text-[10px] font-bold uppercase tracking-widest border border-outline-variant/30 node-connector">Start</div>`;
+            
+            configNodes.forEach((node, idx) => {
+                const div = document.createElement('div');
+                div.className = 'relative group node-connector flex flex-col items-center';
+                div.innerHTML = `
+                    <div class="w-[440px] bg-white border border-outline-variant/20 rounded-3xl p-6 shadow-sm group-hover:shadow-xl group-hover:border-primary/20 transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-surface-container-high rounded-2xl flex items-center justify-center text-primary">
+                                    <span class="material-symbols-outlined">${node.approval_rule === '3' ? 'groups' : 'person_pin'}</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-lg">${node.name}</h4>
+                                    <p class="text-[10px] font-bold text-on-surface-variant opacity-50 uppercase tracking-widest">Step ${idx + 1}</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="openSettings(${idx})" class="p-2 hover:bg-primary-fixed/20 rounded-full text-primary transition-colors"><span class="material-symbols-outlined text-lg">settings_suggest</span></button>
+                                <button onclick="removeNode(${idx})" class="p-2 hover:bg-error-container/20 rounded-full text-error opacity-0 group-hover:opacity-100 transition-all"><span class="material-symbols-outlined text-lg">delete</span></button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-surface-container-low p-3 rounded-2xl border border-outline-variant/10 text-center">
+                                <label class="text-[8px] font-black uppercase text-on-surface-variant block mb-1">规则类型</label>
+                                <span class="text-xs font-bold">${getRuleName(node.approval_rule)}</span>
+                            </div>
+                            <div class="bg-surface-container-low p-3 rounded-2xl border border-outline-variant/10 text-center">
+                                <label class="text-[8px] font-black uppercase text-on-surface-variant block mb-1">通过目标</label>
+                                <span class="text-xs font-bold text-primary">${node.approval_rule === '3' ? node.role_approval_percent + '%' : '单办通过'}</span>
+                            </div>
+                            <div class="bg-surface-container-low p-3 rounded-2xl border border-outline-variant/10 text-center">
+                                <label class="text-[8px] font-black uppercase text-on-surface-variant block mb-1">下一状态</label>
+                                <span class="text-xs font-bold text-secondary">Status ${node.next_status_group}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            
+            container.innerHTML += `<div class="w-40 py-2 bg-primary text-on-primary rounded-full text-center text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-primary/20">End / Status 99</div>`;
+        }
+
+        function getRuleName(id) {
+            const names = {'0': '指定用户', '1': '角色(或签)', '2': '角色(全办)', '3': '角色(会签%)'};
+            return names[id] || '未知';
+        }
+
+        function addNode() {
+            configNodes.push({ id: Date.now(), name: '新审批节点', approval_rule: '0', next_status_group: 10, up_step_logic: 'prev', is_jump: 0 });
+            renderDesigner();
+        }
+
+        function removeNode(idx) {
+            configNodes.splice(idx, 1);
+            renderDesigner();
+        }
+
+        // --- Settings Modal ---
+        function openSettings(idx) {
+            editingNodeIdx = idx;
+            const node = configNodes[idx];
+            const content = document.getElementById('modal-content');
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs font-bold mb-2 block">节点名称</label>
+                        <input type="text" id="edit-name" value="${node.name}" class="w-full border-outline-variant/20 rounded-xl bg-surface-container-low p-3">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold mb-2 block">审批规则 (approval_rule)</label>
+                            <select id="edit-rule" class="w-full border-none rounded-xl bg-surface-container-low p-3 font-bold" onchange="togglePercentField(this.value)">
+                                <option value="0" ${node.approval_rule==='0'?'selected':''}>0: 指定用户 (OR)</option>
+                                <option value="1" ${node.approval_rule==='1'?'selected':''}>1: 角色组 (OR)</option>
+                                <option value="2" ${node.approval_rule==='2'?'selected':''}>2: 角色组 (AND)</option>
+                                <option value="3" ${node.approval_rule==='3'?'selected':''}>3: 角色组 (%)</option>
+                            </select>
+                        </div>
+                        <div id="percent-field" class="${node.approval_rule==='3'?'':'hidden'}">
+                            <label class="text-xs font-bold mb-2 block">通过比例 (%)</label>
+                            <input type="number" id="edit-percent" value="${node.role_approval_percent || 50}" class="w-full border-none rounded-xl bg-surface-container-low p-3 font-bold text-primary">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold mb-2 block">通过后业务状态</label>
+                            <input type="number" id="edit-status" value="${node.next_status_group}" class="w-full border-none rounded-xl bg-surface-container-low p-3 font-bold text-secondary">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold mb-2 block">驳回逻辑 (up_step)</label>
+                            <select id="edit-up" class="w-full border-none rounded-xl bg-surface-container-low p-3 font-bold">
+                                <option value="prev" ${node.up_step_logic==='prev'?'selected':''}>回退上一步</option>
+                                <option value="reset" ${node.up_step_logic==='reset'?'selected':''}>直接重置</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 pt-2">
+                        <input type="checkbox" id="edit-jump" ${node.is_jump?'checked':''} class="rounded text-primary">
+                        <label for="edit-jump" class="text-xs font-bold">允许跳过节点 (is_jump)</label>
+                    </div>
+                </div>
+            `;
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function togglePercentField(val) {
+            document.getElementById('percent-field').classList.toggle('hidden', val !== '3');
+        }
+
+        function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
+
+        function saveSettings() {
+            const n = configNodes[editingNodeIdx];
+            n.name = document.getElementById('edit-name').value;
+            n.approval_rule = document.getElementById('edit-rule').value;
+            n.role_approval_percent = parseInt(document.getElementById('edit-percent').value);
+            n.next_status_group = parseInt(document.getElementById('edit-status').value);
+            n.up_step_logic = document.getElementById('edit-up').value;
+            n.is_jump = document.getElementById('edit-jump').checked ? 1 : 0;
+            closeSettings();
+            renderDesigner();
+        }
+
+        // --- Executor Logic ---
+        function renderExecutor() {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = '';
+            
+            // 1. History
+            runtime.history.forEach(item => {
+                const color = item.type === 'approve' ? 'bg-primary' : 'bg-error';
+                const icon = item.type === 'approve' ? 'done_all' : 'keyboard_return';
+                timeline.innerHTML += `
+                    <div class="relative pl-10 flex gap-4 animate-slide-down">
+                        <div class="absolute left-0 top-1 w-8 h-8 ${color} text-white rounded-full flex items-center justify-center z-10 border-4 border-surface shadow-sm">
+                            <span class="material-symbols-outlined text-xs">${icon}</span>
+                        </div>
+                        <div class="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/10 flex-1">
+                            <div class="flex justify-between font-bold text-sm mb-1">
+                                <span>${item.nodeName}</span>
+                                <span class="text-[10px] opacity-40 font-mono">${item.time}</span>
+                            </div>
+                            <p class="text-[10px] text-on-surface-variant font-medium uppercase tracking-widest mb-2">处理人: ${item.user} (${item.role})</p>
+                            <div class="text-xs italic bg-white/50 p-2 rounded-lg border border-outline-variant/5">"${item.comment}"</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 2. Current Node
+            if (!runtime.is_finished) {
+                const node = configNodes[runtime.current_step_idx];
+                const isGroup = ['1','2','3'].includes(node.approval_rule);
+                
+                timeline.innerHTML += `
+                    <div class="relative pl-10">
+                        <div class="absolute left-0 top-1 w-8 h-8 bg-tertiary-fixed text-tertiary rounded-full flex items-center justify-center z-10 border-4 border-surface animate-pulse">
+                            <span class="material-symbols-outlined text-xs">hourglass_empty</span>
+                        </div>
+                        <div class="p-6 border-2 border-dashed border-primary/20 rounded-2xl bg-primary-fixed/5">
+                            <h4 class="font-bold text-on-surface">${node.name}</h4>
+                            <p class="text-[10px] text-on-surface-variant mt-1">
+                                规则: ${getRuleName(node.approval_rule)} | 
+                                等待 ${isGroup ? '组内成员' : '指定办理人'} 处理...
+                            </p>
+                        </div>
+                    </div>
+                `;
+                renderActionPanel(node);
+            } else {
+                timeline.innerHTML += `
+                    <div class="relative pl-10">
+                        <div class="absolute left-0 top-1 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center z-10 border-4 border-surface">
+                            <span class="material-symbols-outlined text-xs">verified</span>
+                        </div>
+                        <div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800">
+                            <span class="font-bold text-sm">实例执行完毕</span>
+                            <p class="text-[10px] mt-1 opacity-70">所有节点已通过，当前业务状态：99</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('action-area').innerHTML = `
+                    <div class="text-center py-4 text-on-surface-variant">
+                        <span class="material-symbols-outlined text-4xl block mb-2 opacity-20">inventory</span>
+                        <p class="text-xs font-bold">流程已归档</p>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('global-biz-status').innerText = `业务状态: ${runtime.biz_status}`;
+        }
+
+        function renderActionPanel(node) {
+            const area = document.getElementById('action-area');
+            const progress = document.getElementById('group-progress');
+            
+            // Simulating Users for the role
+            const users = [
+                { id: 101, name: '张经理', role: '领导' },
+                { id: 102, name: '李核算', role: '财务' },
+                { id: 103, name: '王专员', role: '人事' }
+            ];
+
+            area.innerHTML = `
+                <div class="space-y-3">
+                    <label class="text-[10px] font-bold text-on-surface-variant uppercase opacity-60">选择模拟用户点击</label>
+                    ${users.map(u => `
+                        <button onclick="handleEngineAction('${u.name}', '${u.role}', 'approve')" class="w-full flex items-center justify-between p-3 bg-surface-container hover:bg-primary-fixed/40 rounded-xl transition-all group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center font-bold text-xs group-hover:text-primary">${u.name[0]}</div>
+                                <span class="text-xs font-bold text-on-surface-variant">${u.name} (${u.role})</span>
+                            </div>
+                            <span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 text-primary">login</span>
+                        </button>
+                    `).join('')}
+                    
+                    <div class="pt-2">
+                        <button onclick="handleEngineAction('模拟用户', 'ALL', 'reject')" class="w-full py-3 bg-error-container/20 text-error font-bold rounded-xl text-xs hover:bg-error-container hover:text-white transition-all">
+                            <span class="material-symbols-outlined text-sm mr-1">block</span> 驳回流程
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Group Consensus Logic
+            if (node.approval_rule === '3') {
+                progress.classList.remove('hidden');
+                const total = users.length;
+                const count = runtime.approver_id_list.length;
+                const pct = Math.round((count / total) * 100);
+                const target = node.role_approval_percent;
+                document.getElementById('progress-val').innerText = `${pct}% / ${target}%`;
+                document.getElementById('progress-bar').style.width = `${pct}%`;
+            } else {
+                progress.classList.add('hidden');
+            }
+        }
+
+        function handleEngineAction(user, role, type) {
+            const node = configNodes[runtime.current_step_idx];
+            
+            if (type === 'approve') {
+                // Check Rule
+                if (node.approval_rule === '3') {
+                    // Percent Rule
+                    if (!runtime.approver_id_list.includes(user)) {
+                        runtime.approver_id_list.push(user);
+                        const totalUsersInRole = 3; // Simulated
+                        const currentPct = (runtime.approver_id_list.length / totalUsersInRole) * 100;
+                        
+                        historyPush(user, role, '已投票赞成', 'approve');
+                        
+                        if (currentPct >= node.role_approval_percent) {
+                            advanceStep();
+                        }
+                    }
+                } else if (node.approval_rule === '2') {
+                    // All Members Done Rule
+                    runtime.approver_id_list.push(user);
+                    historyPush(user, role, '已处理审批', 'approve');
+                    if (runtime.approver_id_list.length >= 3) {
+                        advanceStep();
+                    }
+                } else {
+                    // Single / Any of group Rule (OR)
+                    historyPush(user, role, '审批通过', 'approve');
+                    advanceStep();
+                }
+            } else {
+                // Reject Rule
+                historyPush(user, role, '流程驳回：请完善资料', 'reject');
+                if (node.up_step_logic === 'prev' && runtime.current_step_idx > 0) {
+                    runtime.current_step_idx--;
+                } else {
+                    runtime.current_step_idx = 0;
+                }
+                runtime.approver_id_list = [];
+                runtime.biz_status = 1; // Reset to initial
+            }
+            renderExecutor();
+        }
+
+        function advanceStep() {
+            const node = configNodes[runtime.current_step_idx];
+            runtime.biz_status = node.next_status_group;
+            runtime.approver_id_list = [];
+            
+            if (runtime.current_step_idx < configNodes.length - 1) {
+                runtime.current_step_idx++;
+            } else {
+                runtime.is_finished = true;
+                runtime.biz_status = 99;
+            }
+        }
+
+        function historyPush(user, role, comment, type) {
+            const node = configNodes[runtime.current_step_idx];
+            runtime.history.push({
+                nodeName: node.name,
+                user: user,
+                role: role,
+                comment: comment,
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                type: type
+            });
+        }
+
+        function resetFlow() {
+            runtime = { current_step_idx: 0, approver_id_list: [], history: [], is_finished: false, biz_status: 1 };
+            renderExecutor();
+        }
+
+        // Init
+        renderDesigner();
+    </script>
+</body>
+</html>
