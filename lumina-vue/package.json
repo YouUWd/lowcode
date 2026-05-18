@@ -17,7 +17,8 @@
     "bpmn-js": "^18.16.1",
     "dagre": "^0.8.5",
     "lucide-vue-next": "^1.0.0",
-    "vue": "^3.5.32"
+    "vue": "^3.5.32",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@tailwindcss/container-queries": "^0.1.1",

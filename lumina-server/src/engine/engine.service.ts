@@ -549,8 +549,6 @@ export class EngineService {
 
   private evalConcat(expression: string): string {
     // CONCAT('John', ' ', 'Doe') -> 'John Doe'
-    // CONCAT(95.5, "分 (", 'A', ")") -> '95.5分 (A)'
-    // 连接多个字符串值
     const match = expression.match(/CONCAT\((.*)\)/);
     if (match) {
       const argsString = match[1];
@@ -563,29 +561,25 @@ export class EngineService {
         const char = argsString[i];
         
         if ((char === '"' || char === "'") && !inQuote) {
-          // 开始引号
           inQuote = true;
           quoteChar = char;
         } else if (char === quoteChar && inQuote) {
-          // 结束引号
           inQuote = false;
           quoteChar = '';
         } else if (char === ',' && !inQuote) {
-          // 参数分隔符
-          args.push(currentArg.trim());
+          args.push(currentArg);
           currentArg = '';
         } else {
-          // 普通字符
-          currentArg += char;
+          if (inQuote || char.trim() !== '') {
+            currentArg += char;
+          }
         }
       }
       
-      // 添加最后一个参数
-      if (currentArg.trim()) {
-        args.push(currentArg.trim());
+      if (currentArg !== undefined) {
+        args.push(currentArg);
       }
       
-      // 连接所有参数
       return args.join('');
     }
     return expression;

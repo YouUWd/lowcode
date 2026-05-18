@@ -8,7 +8,7 @@
       </h2>
 
       <div class="flex space-x-3">
-        <button @click="updateView('config', state.activeModule)" class="px-4 py-2 border border-primary text-primary text-sm font-medium rounded-xl hover:bg-primary/5 transition-colors flex items-center">
+        <button @click="goToConfig" class="px-4 py-2 border border-primary text-primary text-sm font-medium rounded-xl hover:bg-primary/5 transition-colors flex items-center">
           <Settings class="w-4 h-4 mr-2" />
           模块配置
         </button>
@@ -32,7 +32,7 @@
     <section>
       <PermissionMatrix 
         :fields="derivedFields" 
-        :active-permissions="state.activePermissions"
+        :active-permissions="permissionsState.activeNodes"
         @toggle="togglePermission"
       />
     </section>
@@ -56,18 +56,26 @@
 <script setup>
 import { computed } from 'vue';
 import { Shield, Settings, CheckCheck, Eraser, Check, Info } from 'lucide-vue-next';
-import { state, updateView, updatePermissions } from '../store/mockStore';
-import PermissionMatrix from './PermissionMatrix.vue';
+import { appState } from '../../store/app';
+import { modulesState } from '../../store/modules';
+import { permissionsState, fetchDetailedPermissions, updatePermissions } from '../../store/permissions';
+import PermissionMatrix from './parts/PermissionMatrix.vue';
 
-const goBack = () => {
-  updateView('list');
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+const goToConfig = () => {
+  if (modulesState.activeModule) {
+    router.push(`/modules/${modulesState.activeModule.id}/config`);
+  }
 };
 
 const saveAndGoBack = async () => {
-  if (!state.activeModule) return;
-  const success = await updatePermissions(state.activeModule.id, state.activePermissions);
+  if (!modulesState.activeModule) return;
+  const success = await updatePermissions(modulesState.activeModule.id, permissionsState.activeNodes);
   if (success) {
-    updateView('list');
+    router.push('/modules');
   } else {
     alert('保存权限配置失败，请检查后端连接');
   }
@@ -75,11 +83,11 @@ const saveAndGoBack = async () => {
 
 const derivedFields = computed(() => {
   const fieldsMap = new Map();
-  const modId = state.activeModule?.id;
+  const modId = modulesState.activeModule?.id;
   if (!modId) return [];
 
-  // 1. 首先从本地配置映射中提取所有已定义的物理字段 (确保新增列立即可见)
-  const config = state.configs[modId];
+  // 1. 首先从本地配置映射中提取所有已定义的物理字段
+  const config = modulesState.configs[modId];
   if (config && config.mappings) {
     config.mappings.forEach(m => {
       m.physicalFields?.forEach(pf => {
@@ -89,23 +97,21 @@ const derivedFields = computed(() => {
             entity: pf.entity, 
             field: pf.field, 
             id: key,
-            logicalField: m.logicalField // 关联逻辑字段名
+            logicalField: m.logicalField
           });
         }
       });
     });
   }
 
-  // 2. 然后用后端返回的详细权限节点信息进行补充/修正 (如逻辑字段名同步)
-  if (state.detailedPermissions && state.detailedPermissions.length > 0) {
-    state.detailedPermissions.forEach(p => {
+  // 2. 然后用后端返回的详细权限节点信息进行补充/修正
+  if (permissionsState.detailedList && permissionsState.detailedList.length > 0) {
+    permissionsState.detailedList.forEach(p => {
       const key = `${p.entity}.${p.field_name}`;
       if (fieldsMap.has(key)) {
-        // 如果已存在，更新逻辑字段名（以权限定义为准）
         const existing = fieldsMap.get(key);
         existing.logicalField = p.logical_field || existing.logicalField;
       } else {
-        // 如果是权限系统中存在但配置中没有的（可能是历史遗留），也加上
         fieldsMap.set(key, { 
           entity: p.entity, 
           field: p.field_name, 
@@ -120,10 +126,10 @@ const derivedFields = computed(() => {
 });
 
 const togglePermission = (node) => {
-  if (state.activePermissions.has(node)) {
-    state.activePermissions.delete(node);
+  if (permissionsState.activeNodes.has(node)) {
+    permissionsState.activeNodes.delete(node);
   } else {
-    state.activePermissions.add(node);
+    permissionsState.activeNodes.add(node);
   }
 };
 
@@ -131,18 +137,18 @@ const toggleAll = (active) => {
   derivedFields.value.forEach(f => {
     ['READ', 'CREATE', 'UPDATE'].forEach(type => {
       const node = `${f.entity}.${f.field}.${type}`;
-      if (active) state.activePermissions.add(node);
-      else state.activePermissions.delete(node);
+      if (active) permissionsState.activeNodes.add(node);
+      else permissionsState.activeNodes.delete(node);
     });
   });
 };
 
 const activePermissionCount = computed(() => {
-  if (!state.activeModule) return 0;
+  if (!modulesState.activeModule) return 0;
   let count = 0;
   derivedFields.value.forEach(f => {
     ['READ', 'CREATE', 'UPDATE'].forEach(type => {
-      if (state.activePermissions.has(`${f.entity}.${f.field}.${type}`)) count++;
+      if (permissionsState.activeNodes.has(`${f.entity}.${f.field}.${type}`)) count++;
     });
   });
   return count;

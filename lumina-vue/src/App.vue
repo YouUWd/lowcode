@@ -2,23 +2,26 @@
   <Sidebar />
   <main class="ml-64 flex-1 flex flex-col h-screen overflow-y-auto bg-surface relative">
     <Header />
-    <Transition name="fade-page" mode="out-in">
-      <ModuleList v-if="state.currentView === 'list'" />
-      <ModuleConfig v-else-if="state.currentView === 'config'" />
-      <ModulePermissions v-else-if="state.currentView === 'permissions'" />
-      <WorkflowPanel v-else-if="state.currentView === 'workflow'" />
-    </Transition>
+    <router-view v-slot="{ Component }">
+      <Transition name="fade-page" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </router-view>
   </main>
 </template>
 
 <script setup>
-import Sidebar from './components/Sidebar.vue';
-import Header from './components/Header.vue';
-import ModuleList from './components/ModuleList.vue';
-import ModuleConfig from './components/ModuleConfig.vue';
-import ModulePermissions from './components/ModulePermissions.vue';
-import WorkflowPanel from './components/WorkflowPanel.vue';
-import { state } from './store/mockStore';
+import { onMounted } from 'vue';
+import Sidebar from './components/layout/Sidebar.vue';
+import Header from './components/layout/Header.vue';
+import { fetchModules } from './store/modules';
+import { loadDatabaseSchema } from './store/metadata';
+
+onMounted(() => {
+  console.log('[App] Initializing modular stores...');
+  fetchModules();
+  loadDatabaseSchema();
+});
 </script>
 
 <style>

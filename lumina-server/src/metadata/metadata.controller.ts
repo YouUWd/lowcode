@@ -14,11 +14,9 @@ export class MetadataController {
    * GET /metadata/tables
    */
   @Get('tables')
-  async getAllTables(
-    @Query('database') database: string = 'lumina_business',
-  ): Promise<TableInfo[]> {
-    console.log(`[元数据控制器] 获取所有表信息, database=${database}`);
-    return this.metadataService.getAllTables(database);
+  async getAllTables(): Promise<TableInfo[]> {
+    console.log(`[元数据控制器] 获取所有表信息`);
+    return this.metadataService.getAllTables();
   }
 
   /**
@@ -28,10 +26,9 @@ export class MetadataController {
   @Get('tables/:tableName/columns')
   async getTableColumns(
     @Param('tableName') tableName: string,
-    @Query('database') database: string = 'lumina_business',
   ) {
     console.log(`[元数据控制器] 获取表 ${tableName} 的字段信息`);
-    return this.metadataService.getTableColumns(database, tableName);
+    return this.metadataService.getTableColumns(tableName);
   }
 
   /**
@@ -41,10 +38,9 @@ export class MetadataController {
   @Get('tables/:tableName/foreign-keys')
   async getTableForeignKeys(
     @Param('tableName') tableName: string,
-    @Query('database') database: string = 'lumina_business',
   ) {
     console.log(`[元数据控制器] 获取表 ${tableName} 的外键信息`);
-    return this.metadataService.getTableForeignKeys(database, tableName);
+    return this.metadataService.getTableForeignKeys(tableName);
   }
 
   /**
@@ -52,23 +48,9 @@ export class MetadataController {
    * GET /metadata/schema
    */
   @Get('schema')
-  async getDatabaseSchema(
-    @Query('database') database: string = 'lumina_business',
-  ): Promise<DatabaseSchema> {
-    console.log(`[元数据控制器] 获取数据库 ${database} 的完整模型信息`);
-    return this.cacheService.getDatabaseSchema(database);
-  }
-
-  /**
-   * 获取前端格式的数据库模型 (带缓存)
-   * GET /metadata/schema/ui
-   */
-  @Get('schema/ui')
-  async getDbSchemaForUI(
-    @Query('database') database: string = 'lumina_business',
-  ): Promise<Record<string, any>> {
-    console.log(`[元数据控制器] 获取前端格式的数据库模型`);
-    return this.cacheService.getDbSchemaForUI(database);
+  async getDatabaseSchema(): Promise<DatabaseSchema> {
+    console.log(`[元数据控制器] 获取完整模型信息`);
+    return this.cacheService.getDatabaseSchema();
   }
 
   /**
@@ -78,10 +60,9 @@ export class MetadataController {
   @Get('tables/:tableName')
   async getTableDetail(
     @Param('tableName') tableName: string,
-    @Query('database') database: string = 'lumina_business',
   ): Promise<TableInfo | null> {
     console.log(`[元数据控制器] 获取表 ${tableName} 的详细信息`);
-    return this.metadataService.getTableDetail(tableName, database);
+    return this.metadataService.getTableDetail(tableName);
   }
 
   /**
@@ -91,10 +72,9 @@ export class MetadataController {
   @Get('tables/:tableName/fields')
   async getTableFieldNames(
     @Param('tableName') tableName: string,
-    @Query('database') database: string = 'lumina_business',
   ): Promise<string[]> {
     console.log(`[元数据控制器] 获取表 ${tableName} 的字段列表`);
-    return this.metadataService.getTableFieldNames(tableName, database);
+    return this.metadataService.getTableFieldNames(tableName);
   }
 
   /**
@@ -104,10 +84,9 @@ export class MetadataController {
   @Get('tables/:tableName/exists')
   async tableExists(
     @Param('tableName') tableName: string,
-    @Query('database') database: string = 'lumina_business',
   ): Promise<{ exists: boolean }> {
     console.log(`[元数据控制器] 检查表 ${tableName} 是否存在`);
-    const exists = await this.metadataService.tableExists(tableName, database);
+    const exists = await this.metadataService.tableExists(tableName);
     return { exists };
   }
 
@@ -119,13 +98,11 @@ export class MetadataController {
   async columnExists(
     @Param('tableName') tableName: string,
     @Param('columnName') columnName: string,
-    @Query('database') database: string = 'lumina_business',
   ): Promise<{ exists: boolean }> {
     console.log(`[元数据控制器] 检查字段 ${tableName}.${columnName} 是否存在`);
     const exists = await this.metadataService.columnExists(
       tableName,
       columnName,
-      database,
     );
     return { exists };
   }
@@ -135,12 +112,10 @@ export class MetadataController {
    * POST /metadata/cache/refresh
    */
   @Post('cache/refresh')
-  async refreshCache(
-    @Query('database') database: string = 'lumina_business',
-  ): Promise<{ message: string }> {
-    console.log(`[元数据控制器] 刷新缓存: ${database}`);
-    await this.cacheService.refreshCache(database);
-    return { message: `缓存已刷新: ${database}` };
+  async refreshCache(): Promise<{ message: string }> {
+    console.log(`[元数据控制器] 刷新缓存`);
+    await this.cacheService.refreshCache();
+    return { message: `缓存已刷新` };
   }
 
   /**

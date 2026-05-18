@@ -48,7 +48,7 @@
       <div class="p-6 border-b border-surface-container-low flex justify-between items-center bg-surface-container-low/30">
         <h3 class="font-headline font-bold text-lg">模块列表</h3>
         <div class="flex items-center gap-3">
-          <div v-if="state.loading" class="flex items-center gap-2 text-primary text-xs font-bold animate-pulse mr-2">
+          <div v-if="appState.loading" class="flex items-center gap-2 text-primary text-xs font-bold animate-pulse mr-2">
             <span class="material-symbols-outlined text-sm animate-spin">sync</span>
             同步中...
           </div>
@@ -74,7 +74,7 @@
             </tr>
           </thead>
           <tbody class="text-sm">
-            <tr v-for="mod in state.modules" :key="mod.id" class="border-b border-outline-variant/15 hover:bg-surface-container-low/30 transition-colors group">
+            <tr v-for="mod in modulesState.list" :key="mod.id" class="border-b border-outline-variant/15 hover:bg-surface-container-low/30 transition-colors group">
               <td class="px-6 py-5">
                 <span class="font-mono text-xs font-semibold bg-surface-container-high px-2 py-1 rounded" :class="{'text-slate-400': !mod.active}">{{ mod.id }}</span>
               </td>
@@ -226,21 +226,26 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Trash2, Settings, ShieldCheck, PlusCircle, RefreshCw, Edit, TableProperties as TableChart } from 'lucide-vue-next';
-import { state, updateView, addModule, deleteModule, fetchModules, mockDbSchema } from '../store/mockStore';
+import { appState } from '../../store/app';
+import { modulesState, fetchModules, addModule, deleteModule } from '../../store/modules';
+import { tableMap } from '../../store/metadata';
+
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 
 const goToConfig = (mod) => {
-  updateView('config', mod);
+  router.push(`/modules/${mod.id}/config`);
 };
 
 const openPermissionModal = (mod) => {
-  updateView('permissions', mod);
+  router.push(`/modules/${mod.id}/permissions`);
 };
 
 const availableTables = computed(() => {
-  const schema = mockDbSchema.value || {};
-  return Object.keys(schema).map(key => ({
+  return Object.keys(tableMap.value).map(key => ({
     name: key,
-    desc: schema[key].desc
+    desc: tableMap.value[key].desc
   }));
 });
 

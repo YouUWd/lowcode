@@ -8,7 +8,7 @@ export interface Mapping {
   logicalField: string;
   physicalFields: Array<{
     entity: string;
-    name: string;
+    field: string;
   }>;
   transformer: string | null;
   transformerEnv: TransformerEnv;
@@ -73,86 +73,87 @@ export class ModulesService {
   async getModuleConfig(id: string): Promise<ModuleConfig | null> {
     console.log(`[模块服务] 查询模块配置: ${id}`);
     
-    return this.knex('sys_module')
+    const dbModule = await this.knex('sys_module')
       .where('module_id', id)
-      .first()
-      .then(async (dbModule) => {
-        console.log(`[模块服务] 查询模块基本信息结果:`, dbModule ? { id: dbModule.module_id, name: dbModule.module_name } : 'null');
-        
-        if (!dbModule) return null;
+      .first();
 
-        // 查询关联表（包含关系类型）
-        console.log(`[模块服务] 查询关联表: module_id = ${dbModule.module_id}`);
-        const entities = await this.knex('sys_module_entity')
-          .where('module_id', dbModule.module_id)
-          .orderBy('sort_order');
-        console.log(`[模块服务] 查询到关联表数: ${entities.length}`);
-        console.log(`[模块服务] 关联表数据:`, entities.map(e => ({ id: e.entity_id, name: e.entity_name, relationType: e.relation_type })));
+    if (!dbModule) {
+      console.log(`[模块服务] 模块不存在: ${id}`);
+      return null;
+    }
 
-        // 查询字段配置
-        console.log(`[模块服务] 查询字段配置: module_id = ${dbModule.module_id}`);
-        const fields = await this.knex('sys_module_field')
-          .where('module_id', dbModule.module_id)
-          .where('is_visible', true)
-          .orderBy('sort_order');
-        console.log(`[模块服务] 查询到字段数: ${fields.length}`);
+    console.log(`[模块服务] 查询到模块基本信息: ${dbModule.module_name}`);
 
-        // 构建映射配置（从 source_mapping JSON 解析）
-        const mappings = fields.map((field) => {
-          let physicalFields: Array<{ entity: string; name: string }> = [];
-          
-          if (field.source_mapping) {
-            try {
-              const sources = JSON.parse(field.source_mapping);
-              physicalFields = sources.map((s: any) => ({
-                entity: s.entity,
-                field: s.field,
-              }));
-            } catch (e) {
-              console.warn(`[模块服务] 解析 source_mapping 失败: ${field.logical_field}`, e);
-            }
-          }
+    // 1. 查询关联表
+    const entities = await this.knex('sys_module_entity')
+      .where('module_id', id)
+      .orderBy('sort_order');
+    
+    console.log(`[模块服务] 查询到关联表数: ${entities.length}`);
 
-          return {
-            displayName: field.display_name,
-            logicalField: field.logical_field,
-            physicalFields,
-            transformer: field.transformer,
-            transformerEnv: field.transformer_env as TransformerEnv,
-            renderIcon: field.render_icon,
-            renderType: field.render_type,
-          };
-        });
+    // 2. 查询字段配置
+    const fields = await this.knex('sys_module_field')
+      .where('module_id', id)
+      .where('is_visible', true)
+      .orderBy('sort_order');
+    
+    console.log(`[模块服务] 查询到字段数: ${fields.length}`);
 
-        // 构建模块配置
-        const moduleConfig: ModuleConfig = {
-          id: dbModule.module_id,
-          name: dbModule.module_name,
-          desc: dbModule.module_desc,
-          entity: dbModule.primary_entity,
-          count: dbModule.record_count,
-          active: dbModule.is_active,
-          primaryEntity: {
-            name: dbModule.primary_entity,
-            desc: dbModule.primary_entity_desc,
-          },
-          entities: entities.map((e) => ({
-            id: e.entity_id,
-            name: e.entity_name,
-            desc: e.entity_desc,
-            status: e.entity_status,
-            relationType: (e.relation_type || '1:1') as RelationType,
-            joinCondition: {
-              left: e.join_left_field,
-              right: e.join_right_field,
-            },
-          })),
-          mappings,
-        };
+    // 3. 构建字段映射
+    const mappings: Mapping[] = fields.map((field) => {
+      let physicalFields: Array<{ entity: string; field: string }> = [];
 
-        console.log(`[模块服务] 构建完成的模块配置: 实体数=${moduleConfig.entities.length}, 字段数=${moduleConfig.mappings.length}`);
-        return moduleConfig;
-      });
+      if (field.source_mapping) {
+        try {
+          const sources = JSON.parse(field.source_mapping);
+          physicalFields = sources.map((s: any) => ({
+            entity: s.entity,
+            field: s.field, // 映射到 field 属性
+          }));
+        } catch (e) {
+          console.warn(`[模块服务] 解析 source_mapping 失败: ${field.logical_field}`, e);
+        }
+      }
+
+      return {
+        displayName: field.display_name,
+        logicalField: field.logical_field,
+        physicalFields,
+        transformer: field.transformer,
+        transformerEnv: field.transformer_env as TransformerEnv,
+        renderIcon: field.render_icon,
+        renderType: field.render_type,
+      };
+    });
+
+    // 4. 组装完整配置
+    const config: ModuleConfig = {
+      id: dbModule.module_id,
+      name: dbModule.module_name,
+      desc: dbModule.module_desc,
+      entity: dbModule.primary_entity,
+      count: dbModule.record_count,
+      active: dbModule.is_active,
+      primaryEntity: {
+        name: dbModule.primary_entity,
+        desc: dbModule.primary_entity_desc,
+      },
+      entities: entities.map((e) => ({
+        id: e.entity_id,
+        name: e.entity_name,
+        desc: e.entity_desc,
+        status: e.entity_status,
+        relationType: (e.relation_type || '1:1') as RelationType,
+        joinCondition: {
+          left: e.join_left_field,
+          right: e.join_right_field,
+        },
+      })),
+      mappings,
+    };
+
+    console.log(`[模块服务] 模块配置构建完成: ${id}`);
+    return config;
   }
 
   /**
@@ -242,11 +243,16 @@ export class ModulesService {
    * 添加模块字段配置
    */
   async addModuleField(moduleId: string, fieldData: any): Promise<void> {
+    const physicalFields = (fieldData.physicalFields || []).map((pf: any) => ({
+      entity: pf.entity,
+      field: pf.field,
+    }));
+
     await this.knex('sys_module_field').insert({
       module_id: moduleId,
       logical_field: fieldData.logicalField,
       display_name: fieldData.displayName,
-      source_mapping: JSON.stringify(fieldData.physicalFields),
+      source_mapping: JSON.stringify(physicalFields),
       transformer: fieldData.transformer || null,
       transformer_env: fieldData.transformerEnv || 'none',
       render_icon: fieldData.renderIcon || '',
@@ -260,12 +266,17 @@ export class ModulesService {
    * 更新模块字段配置
    */
   async updateModuleField(moduleId: string, logicalField: string, fieldData: any): Promise<void> {
+    const physicalFields = (fieldData.physicalFields || []).map((pf: any) => ({
+      entity: pf.entity,
+      field: pf.field,
+    }));
+
     await this.knex('sys_module_field')
       .where('module_id', moduleId)
       .where('logical_field', logicalField)
       .update({
         display_name: fieldData.displayName,
-        source_mapping: JSON.stringify(fieldData.physicalFields),
+        source_mapping: JSON.stringify(physicalFields),
         transformer: fieldData.transformer,
         transformer_env: fieldData.transformerEnv,
         render_icon: fieldData.renderIcon,

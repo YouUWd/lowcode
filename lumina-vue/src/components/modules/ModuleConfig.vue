@@ -8,7 +8,7 @@
       </h2>
 
       <div class="flex space-x-3">
-        <button @click="updateView('permissions', state.activeModule)" class="px-4 py-2 border border-tertiary text-tertiary text-sm font-medium rounded-xl hover:bg-tertiary/5 transition-colors flex items-center">
+        <button @click="goToPermissions" class="px-4 py-2 border border-tertiary text-tertiary text-sm font-medium rounded-xl hover:bg-tertiary/5 transition-colors flex items-center">
           <span class="material-symbols-outlined text-[18px] mr-2">security</span>
           权限定义
         </button>
@@ -63,9 +63,9 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import AggregationSetup from './AggregationSetup.vue';
-import FieldMappingTable from './FieldMappingTable.vue';
-import { updateView, currentConfig } from '../store/mockStore';
+import AggregationSetup from './parts/AggregationSetup.vue';
+import FieldMappingTable from './parts/FieldMappingTable.vue';
+import { modulesState, currentConfig } from '../../store/modules';
 
 const showSqlPreview = ref(false);
 
@@ -99,8 +99,18 @@ const copySql = async () => {
   }
 };
 
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+const goToPermissions = () => {
+  if (modulesState.activeModule) {
+    router.push(`/modules/${modulesState.activeModule.id}/permissions`);
+  }
+};
+
 const goBack = () => {
-  updateView('list');
+  router.push('/modules');
 };
 </script>
 

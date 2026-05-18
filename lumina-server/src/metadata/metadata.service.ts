@@ -52,7 +52,7 @@ export class MetadataService {
   /**
    * 获取所有表信息
    */
-  async getAllTables(database: string = 'lumina_business'): Promise<TableInfo[]> {
+  async getAllTables(): Promise<TableInfo[]> {
     try {
       console.log(`[元数据服务] 获取所有表信息...`);
       
@@ -70,8 +70,8 @@ export class MetadataService {
 
       for (const table of tables) {
         const tableName = table.tableName;
-        const fields = await this.getTableColumns(database, tableName);
-        const foreignKeys = await this.getTableForeignKeys(database, tableName);
+        const fields = await this.getTableColumns(tableName);
+        const foreignKeys = await this.getTableForeignKeys(tableName);
 
         result.push({
           tableName,
@@ -91,10 +91,7 @@ export class MetadataService {
   /**
    * 获取表的字段信息
    */
-  async getTableColumns(
-    database: string = 'lumina_business',
-    tableName: string,
-  ): Promise<ColumnInfo[]> {
+  async getTableColumns(tableName: string): Promise<ColumnInfo[]> {
     try {
       console.log(`[元数据服务] 获取表 ${tableName} 的字段信息...`);
       
@@ -120,10 +117,7 @@ export class MetadataService {
   /**
    * 获取表的外键信息
    */
-  async getTableForeignKeys(
-    database: string = 'lumina_business',
-    tableName: string,
-  ): Promise<ForeignKeyInfo[]> {
+  async getTableForeignKeys(tableName: string): Promise<ForeignKeyInfo[]> {
     try {
       console.log(`[元数据服务] 获取表 ${tableName} 的外键信息...`);
       
@@ -147,48 +141,28 @@ export class MetadataService {
   /**
    * 获取完整的数据库模型信息
    */
-  async getDatabaseSchema(database: string = 'lumina_business'): Promise<DatabaseSchema> {
-    console.log(`[元数据服务] 开始加载数据库 ${database} 的模型信息...`);
+  async getDatabaseSchema(): Promise<DatabaseSchema> {
+    console.log(`[元数据服务] 开始加载模型信息...`);
     
-    const tables = await this.getAllTables(database);
+    const tables = await this.getAllTables();
     
     console.log(`[元数据服务] 成功加载 ${tables.length} 个表的模型信息`);
     
     return {
-      database,
+      database: 'business',
       tables,
     };
   }
 
   /**
-   * 转换为前端格式 (兼容 mockDbSchema)
-   */
-  async getDbSchemaForUI(database: string = 'lumina_business'): Promise<Record<string, any>> {
-    const schema = await this.getDatabaseSchema(database);
-    const result: Record<string, any> = {};
-
-    for (const table of schema.tables) {
-      result[table.tableName] = {
-        desc: table.tableComment || table.tableName,
-        fields: table.fields.map(f => f.columnName),
-      };
-    }
-
-    return result;
-  }
-
-  /**
    * 获取特定表的详细信息
    */
-  async getTableDetail(
-    tableName: string,
-    database: string = 'lumina_business',
-  ): Promise<TableInfo | null> {
+  async getTableDetail(tableName: string): Promise<TableInfo | null> {
     try {
       console.log(`[元数据服务] 获取表 ${tableName} 的详细信息...`);
       
-      const fields = await this.getTableColumns(database, tableName);
-      const foreignKeys = await this.getTableForeignKeys(database, tableName);
+      const fields = await this.getTableColumns(tableName);
+      const foreignKeys = await this.getTableForeignKeys(tableName);
 
       return {
         tableName,
@@ -205,21 +179,15 @@ export class MetadataService {
   /**
    * 获取表的字段列表 (简化版，仅返回字段名)
    */
-  async getTableFieldNames(
-    tableName: string,
-    database: string = 'lumina_business',
-  ): Promise<string[]> {
-    const columns = await this.getTableColumns(database, tableName);
+  async getTableFieldNames(tableName: string): Promise<string[]> {
+    const columns = await this.getTableColumns(tableName);
     return columns.map(col => col.columnName);
   }
 
   /**
    * 检查表是否存在
    */
-  async tableExists(
-    tableName: string,
-    database: string = 'lumina_business',
-  ): Promise<boolean> {
+  async tableExists(tableName: string): Promise<boolean> {
     try {
       console.log(`[元数据服务] 检查表 ${tableName} 是否存在...`);
       
@@ -243,11 +211,7 @@ export class MetadataService {
   /**
    * 检查字段是否存在
    */
-  async columnExists(
-    tableName: string,
-    columnName: string,
-    database: string = 'lumina_business',
-  ): Promise<boolean> {
+  async columnExists(tableName: string, columnName: string): Promise<boolean> {
     try {
       console.log(`[元数据服务] 检查字段 ${tableName}.${columnName} 是否存在...`);
       

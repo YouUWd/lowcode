@@ -11,7 +11,7 @@ const statusClass = computed(() => {
   const status = props.data.status || 'PENDING'
   return {
     'border-[#10b981] bg-[#10b981]/5 text-[#065f46]': status === 'PASSED',
-    'border-[#2563eb] bg-[#2563eb]/5 text-[#1e40af] ring-4 ring-[#2563eb]/20 animate-pulse-slow': status === 'ACTIVE',
+    'border-[#2563eb] bg-[#2563eb]/5 text-[#1e40af] ring-4 ring-[#2563eb]/20 animate-pulse-slow shadow-[0_0_15px_rgba(37,99,235,0.2)]': status === 'ACTIVE',
     'border-slate-200 bg-slate-50 text-slate-400': status === 'PENDING',
     'border-amber-400 bg-amber-50 text-amber-700 opacity-60': status === 'INVALIDATED'
   }
@@ -30,33 +30,38 @@ const iconColor = computed(() => {
 
 <template>
   <div class="relative flex items-center justify-center">
-    <!-- 起点 (32x32) -->
+    <!-- 起点 (48x48) -->
     <template v-if="data.kind === 'start'">
-      <div class="flex items-center justify-center border-2 rounded-full w-8 h-8 font-black shadow-sm z-10 transition-all duration-500"
-           :style="{ borderColor: iconColor, color: iconColor, backgroundColor: 'white' }">
-        ▶
+      <div class="relative flex flex-col items-center">
+        <div class="flex items-center justify-center border-2 rounded-2xl w-10 h-10 shadow-sm z-10 transition-all duration-500 bg-white"
+             :style="{ borderColor: iconColor, color: iconColor }">
+          <span class="material-symbols-outlined text-xl">play_arrow</span>
+        </div>
+        <div class="text-[9px] font-black uppercase tracking-widest mt-1 opacity-40 absolute top-full">Start</div>
+        <Handle id="out-main" type="source" :position="Position.Right" class="!opacity-0 !border-0" style="top: 20px;" />
       </div>
-      <Handle id="out-main" type="source" :position="Position.Right" class="!opacity-0 !border-0" />
     </template>
 
-    <!-- 终点 (32x32) -->
+    <!-- 终点 (48x48) -->
     <template v-else-if="data.kind === 'end'">
-      <Handle id="in-main" type="target" :position="Position.Left" class="!opacity-0 !border-0" />
-      <div class="flex items-center justify-center border-2 bg-white rounded-full w-8 h-8 shadow-sm z-10 transition-all duration-500"
-           :style="{ borderColor: data.status === 'PASSED' ? '#10b981' : '#e2e8f0' }">
-        <div class="w-3 h-3 rounded-sm transition-all duration-500" 
-             :style="{ backgroundColor: data.status === 'PASSED' ? '#10b981' : '#e2e8f0' }" />
+      <div class="relative flex flex-col items-center">
+        <Handle id="in-main" type="target" :position="Position.Left" class="!opacity-0 !border-0" style="top: 20px;" />
+        <div class="flex items-center justify-center border-2 bg-white rounded-2xl w-10 h-10 shadow-sm z-10 transition-all duration-500"
+             :style="{ borderColor: data.status === 'PASSED' ? '#10b981' : '#e2e8f0', color: data.status === 'PASSED' ? '#10b981' : '#94a3b8' }">
+          <span class="material-symbols-outlined text-xl">stop</span>
+        </div>
+        <div class="text-[9px] font-black uppercase tracking-widest mt-1 opacity-40 absolute top-full" :style="{ color: data.status === 'PASSED' ? '#10b981' : '#94a3b8' }">End</div>
       </div>
     </template>
 
     <!-- 网关（菱形）：上下分支从顶/底竖向出线 (40x40) -->
     <template v-else-if="data.kind === 'gateway'">
-      <Handle id="in-main" type="target" :position="Position.Left" class="!opacity-0 !border-0" />
-      <Handle id="out-main" type="source" :position="Position.Right" class="!opacity-0 !border-0" />
-      <Handle id="out-top" type="source" :position="Position.Top" class="!opacity-0 !border-0" />
-      <Handle id="out-bottom" type="source" :position="Position.Bottom" class="!opacity-0 !border-0" />
-      <Handle id="in-top" type="target" :position="Position.Top" class="!opacity-0 !border-0" />
-      <Handle id="in-bottom" type="target" :position="Position.Bottom" class="!opacity-0 !border-0" />
+      <Handle id="in-main" type="target" :position="Position.Left" class="!opacity-0 !border-0" style="top: 20px;" />
+      <Handle id="out-main" type="source" :position="Position.Right" class="!opacity-0 !border-0" style="top: 20px;" />
+      <Handle id="out-top" type="source" :position="Position.Top" class="!opacity-0 !border-0" style="left: 20px;" />
+      <Handle id="out-bottom" type="source" :position="Position.Bottom" class="!opacity-0 !border-0" style="left: 20px;" />
+      <Handle id="in-top" type="target" :position="Position.Top" class="!opacity-0 !border-0" style="left: 20px;" />
+      <Handle id="in-bottom" type="target" :position="Position.Bottom" class="!opacity-0 !border-0" style="left: 20px;" />
 
       <div class="w-10 h-10 bg-white border-2 rotate-45 flex items-center justify-center relative shadow-sm z-10 transition-all duration-500"
            :class="data.status === 'ACTIVE' ? 'ring-4 ring-[#2563eb]/20' : ''"
@@ -67,7 +72,7 @@ const iconColor = computed(() => {
 
     <!-- 任务节点 (56px h-14) -->
     <template v-else>
-      <Handle id="in-main" type="target" :position="Position.Left" class="!opacity-0 !border-0" />
+      <Handle id="in-main" type="target" :position="Position.Left" class="!opacity-0 !border-0" style="top: 28px;" />
       <div class="border-2 px-6 min-w-[140px] h-[56px] flex flex-col items-center justify-center rounded-lg shadow-sm z-10 transition-all duration-500"
            :class="statusClass">
         <div class="font-bold text-sm tracking-wide flex items-center gap-1">
@@ -77,7 +82,7 @@ const iconColor = computed(() => {
         </div>
         <div v-if="data.code" class="text-[10px] opacity-50 mt-0.5 uppercase tracking-widest font-mono">{{ data.code }}</div>
       </div>
-      <Handle id="out-main" type="source" :position="Position.Right" class="!opacity-0 !border-0" />
+      <Handle id="out-main" type="source" :position="Position.Right" class="!opacity-0 !border-0" style="top: 28px;" />
     </template>
   </div>
 </template>

@@ -15,8 +15,8 @@ export class MetadataCacheService {
   /**
    * 获取缓存的数据库模型信息
    */
-  async getDatabaseSchema(database: string = 'lumina_business'): Promise<DatabaseSchema> {
-    const cacheKey = `schema:${database}`;
+  async getDatabaseSchema(): Promise<DatabaseSchema> {
+    const cacheKey = `schema:business`;
     const cached = this.getFromCache(cacheKey);
 
     if (cached) {
@@ -25,26 +25,7 @@ export class MetadataCacheService {
     }
 
     console.log(`[元数据缓存] 缓存未命中: ${cacheKey}，从数据库加载`);
-    const schema = await this.metadataService.getDatabaseSchema(database);
-    this.setCache(cacheKey, schema);
-
-    return schema;
-  }
-
-  /**
-   * 获取前端格式的数据库模型
-   */
-  async getDbSchemaForUI(database: string = 'lumina_business'): Promise<Record<string, any>> {
-    const cacheKey = `schema:ui:${database}`;
-    const cached = this.getFromCache(cacheKey);
-
-    if (cached) {
-      console.log(`[元数据缓存] 命中缓存: ${cacheKey}`);
-      return cached;
-    }
-
-    console.log(`[元数据缓存] 缓存未命中: ${cacheKey}，从数据库加载`);
-    const schema = await this.metadataService.getDbSchemaForUI(database);
+    const schema = await this.metadataService.getDatabaseSchema();
     this.setCache(cacheKey, schema);
 
     return schema;
@@ -53,19 +34,17 @@ export class MetadataCacheService {
   /**
    * 手动刷新缓存
    */
-  async refreshCache(database: string = 'lumina_business'): Promise<void> {
-    console.log(`[元数据缓存] 刷新缓存: ${database}`);
+  async refreshCache(): Promise<void> {
+    console.log(`[元数据缓存] 刷新缓存`);
     
     const cacheKeys = [
-      `schema:${database}`,
-      `schema:ui:${database}`,
+      `schema:business`,
     ];
 
     cacheKeys.forEach(key => this.cache.delete(key));
 
     // 预加载缓存
-    await this.getDatabaseSchema(database);
-    await this.getDbSchemaForUI(database);
+    await this.getDatabaseSchema();
 
     console.log(`[元数据缓存] 缓存刷新完成`);
   }

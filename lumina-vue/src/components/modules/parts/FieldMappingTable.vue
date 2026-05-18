@@ -267,7 +267,7 @@ const resolveRenderIcon = (iconName) => {
 
   return iconMap[iconName] || Type;
 };
-import { currentConfig, addMappingToCurrentConfig, deleteMappingFromCurrentConfig } from '../store/mockStore';
+import { currentConfig, addMappingToCurrentConfig, deleteMappingFromCurrentConfig } from '../../../store/modules';
 
 const rows = computed(() => currentConfig.value.mappings || []);
 
@@ -429,7 +429,7 @@ const addRow = async () => {
 
   newRow.displayName = '';
   newRow.logicalField = '';
-  newRow.physFields = [{ entity: '', name: '' }];
+  newRow.physFields = [{ entity: '', field: '' }];
   newRow.transformer = '';
   newRow.transformerEnv = 'none';
   newRow.renderType = 'Text';

@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { EngineService, QueryOptions } from './engine.service';
-import { ModulesService } from '../modules/modules.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { ModulesService } from '../modules/modules.service';
 
 @Controller()
 export class EngineController {
@@ -10,20 +10,6 @@ export class EngineController {
     private readonly modulesService: ModulesService,
     private readonly permissionsService: PermissionsService,
   ) {}
-
-  @Get('modules')
-  async getModules() {
-    return this.modulesService.getAllModules();
-  }
-
-  @Get('modules/:id')
-  async getModuleConfig(@Param('id') id: string) {
-    const config = await this.modulesService.getModuleConfig(id);
-    if (!config) {
-      return { error: 'Module not found' };
-    }
-    return config;
-  }
 
   @Get('query/:moduleId')
   async query(

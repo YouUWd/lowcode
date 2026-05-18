@@ -201,26 +201,34 @@
 </template>
 
 <script setup>
-import { ref, onMounted, shallowRef, markRaw } from 'vue';
+import { ref, onMounted, shallowRef, markRaw, computed } from 'vue';
 import { VueFlow } from '@vue-flow/core';
 import LightweightWorkflowBuilder from './LightweightWorkflowBuilder.vue';
-import FlowNodes from './workflow-nodes/FlowNodes.vue';
+import FlowNodes from './FlowNodes.vue';
+import { 
+  fetchWorkflowInstances, 
+  fetchWorkflowDetail, 
+  submitWorkflowTask,
+  workflowState as state
+} from '../../store/workflow';
+import { workflowApi } from '../../api/workflow';
 
 const nodeTypes = {
   custom: markRaw(FlowNodes),
 };
 
 const viewMode = ref('list');
-const API_BASE = 'http://localhost:3001/api';
-const list = ref([]);
 const currentUserRole = ref('admin');
 const showModal = ref(false);
 const currentBizNo = ref(null);
-const currentDetail = ref(null);
-const activeTasks = ref([]);
 const taskComments = ref({});
 
 const elements = shallowRef([]);
+
+// Computed properties mapping to store state
+const list = computed(() => state.instances || []);
+const currentDetail = computed(() => state.currentDetail);
+const activeTasks = computed(() => state.activeTasks || []);
 
 const onFlowReady = (instance) => {
   instance.fitView({ padding: 0.1 });
@@ -231,22 +239,21 @@ const buildGraph = () => {
   
   const newElements = [];
   let currentX = 20; const spacingX = 220;
-  const backboneY = 100; // 主干道 Y 轴绝对锁定 100
+  const backboneY = 100;
 
-  // 1. Start Node (H=32, offset 16 -> y=84)
+  // 1. Start Node
   const isStartPassed = currentDetail.value.nodes.length > 0;
   newElements.push({ 
     id: 'start', type: 'custom', 
-    position: { x: currentX, y: backboneY - 16 }, 
+    position: { x: currentX, y: backboneY - 20 }, 
     data: { kind: 'start', status: isStartPassed ? 'PASSED' : 'ACTIVE' } 
   });
-  let prevId = 'start'; let prevStatus = isStartPassed ? 'PASSED' : 'ACTIVE';
+  let prevId = 'start';
   currentX += 80;
 
   currentDetail.value.nodes.forEach((node) => {
     if (node.type === 'user_task') {
       const nodeId = `node-${node.id}`;
-      // Task (H=56, offset 28 -> y=72)
       newElements.push({ 
         id: nodeId, type: 'custom', 
         position: { x: currentX, y: backboneY - 28 }, 
@@ -258,11 +265,10 @@ const buildGraph = () => {
         animated: node.status === 'ACTIVE',
         style: { stroke: node.status === 'PASSED' || node.status === 'ACTIVE' ? (node.status === 'PASSED' ? '#10b981' : '#2563eb') : '#e2e8f0', strokeWidth: 2 }
       });
-      prevId = nodeId; prevStatus = node.status; currentX += spacingX;
+      prevId = nodeId; currentX += spacingX;
     } else if (node.type === 'parallel_group') {
       const forkId = `fork-${node.id}`; const joinId = `join-${node.id}`;
       
-      // Gateway (H=40, offset 20 -> y=80)
       newElements.push({ 
         id: forkId, type: 'custom', 
         position: { x: currentX, y: backboneY - 20 }, 
@@ -289,7 +295,6 @@ const buildGraph = () => {
         const taskStatus = task?.status || 'PENDING';
         const isAnim = taskStatus === 'PENDING' && node.status === 'ACTIVE';
 
-        // 任务节点偏移 Y
         const bY = backboneY + (offsets[bIdx % 2] || 0);
 
         newElements.push({ 
@@ -318,19 +323,19 @@ const buildGraph = () => {
         position: { x: currentX + spacingX + 90, y: backboneY - 20 }, 
         data: { kind: 'gateway', status: node.status } 
       });
-      prevId = joinId; prevStatus = node.status; currentX += spacingX + 190;
+      prevId = joinId; currentX += spacingX + 190;
     }
   });
 
-  // End Node (H=32, offset 16 -> y=84)
+  // End Node
   const isEndReached = currentDetail.value.macroStatus === 99;
   newElements.push({ 
     id: 'end', type: 'custom', 
-    position: { x: currentX, y: backboneY - 16 }, 
+    position: { x: currentX, y: backboneY - 20 }, 
     data: { kind: 'end', status: isEndReached ? 'PASSED' : 'PENDING' } 
   });
   newElements.push({ 
-    id: `e-${prevId}-end`, source: prevId, sourceHandle: prevId.startsWith('join-') ? 'out-main' : undefined, target: 'end', 
+    id: `e-${prevId}-end`, source: prevId, sourceHandle: prevId.startsWith('join-') ? 'out-main' : 'out-main', target: 'end', targetHandle: 'in-main',
     type: 'smoothstep',
     style: { stroke: isEndReached ? '#10b981' : '#e2e8f0', strokeWidth: 2 }
   });
@@ -339,33 +344,24 @@ const buildGraph = () => {
 };
 
 const fetchList = async () => {
-  try {
-    const res = await fetch(`${API_BASE}/workflow/instances`);
-    if (res.ok) {
-      const data = await res.json();
-      list.value = data;
-      data.forEach(async (inst, index) => {
-        try {
-          const taskRes = await fetch(`${API_BASE}/workflow/tasks/${inst.businessNo}`);
-          if (taskRes.ok) {
-            const tasks = await taskRes.json();
-            list.value[index].tasks = tasks;
-          }
-        } catch (err) { console.warn(err); }
-      });
-    }
-  } catch (e) { console.error(e); }
+  await fetchWorkflowInstances();
 };
 
 const mockSubmitNew = async () => {
   try {
-    const res = await fetch(`${API_BASE}/workflow/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ moduleId: 'MOD-SCORE-DETAIL', targetEntity: 'score', targetRecordId: '1', actionType: 'UPDATE', reason: '手工录入错误', payload: { score: 99 }, submitterId: currentUserRole.value })
+    await workflowApi.startProcess({ 
+      moduleId: 'MOD-SCORE-DETAIL', 
+      targetEntity: 'score', 
+      targetRecordId: '1', 
+      actionType: 'UPDATE', 
+      reason: '手工录入错误', 
+      payload: { score: 99 }, 
+      submitterId: currentUserRole.value 
     });
-    if (res.ok) fetchList();
-  } catch (e) { alert(e.message); }
+    fetchList();
+  } catch (e) { 
+    alert(e.message); 
+  }
 };
 
 const openModal = async (no) => {
@@ -377,46 +373,35 @@ const openModal = async (no) => {
 
 const closeModal = () => { 
   showModal.value = false; 
-  currentDetail.value = null; 
+  state.currentDetail = null; 
   elements.value = [];
   fetchList(); 
 };
 
 const fetchDetail = async (no) => {
-  try {
-    const res = await fetch(`${API_BASE}/workflow/panorama/${no}`);
-    if (res.ok) {
-      const data = await res.json();
-      currentDetail.value = data;
-      
-      buildGraph();
-
-      // Refresh active tasks for dispatcher
-      activeTasks.value = (data.tasks || []).filter(t => t.status === 'PENDING').map(t => {
-        const node = data.nodes.find(n => n.id == t.nodeId);
-        return { ...t, nodeConfig: node ? { node_name: node.name, node_type: node.type, role_target: node.role } : { node_name: '未知' } };
-      });
-      activeTasks.value.forEach(t => { if(!taskComments.value[t.id]) taskComments.value[t.id] = ''; });
-    }
-  } catch (e) { console.error(e); }
+  const data = await fetchWorkflowDetail(no);
+  if (data) {
+    buildGraph();
+    activeTasks.value.forEach(t => { 
+      if(!taskComments.value[t.id]) taskComments.value[t.id] = ''; 
+    });
+  }
 };
 
 const handleTask = async (taskId, action) => {
-  try {
-    const res = await fetch(`${API_BASE}/workflow/handle/${currentBizNo.value}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, action, comment: taskComments.value[taskId], userId: currentUserRole.value })
-    });
-    if (res.ok) await fetchDetail(currentBizNo.value);
-  } catch (e) { console.error(e); }
+  const success = await submitWorkflowTask(currentBizNo.value, taskId, action, taskComments.value[taskId], currentUserRole.value);
+  if (success) {
+    await fetchDetail(currentBizNo.value);
+  }
 };
 
 const mockDataChange = async () => {
   try {
-    await fetch(`${API_BASE}/workflow/mock-data-change/${currentBizNo.value}`, { method: 'POST' });
+    await workflowApi.mockDataChange(currentBizNo.value);
     fetchDetail(currentBizNo.value);
-  } catch (e) { console.error(e); }
+  } catch (e) { 
+    console.error(e); 
+  }
 };
 
 const getTargetRole = (n, bId) => {
@@ -448,8 +433,24 @@ onMounted(() => { fetchList(); });
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .vue-flow__attribution { display: none; }
 
-/* Enforce solid lines for our specific visual style, overrides default dashed */
-.vue-flow__edge-path {
-  stroke-dasharray: none !important;
+/* Dynamic flowing edge animation */
+.vue-flow__edge.animated .vue-flow__edge-path {
+  stroke-dasharray: 8;
+  animation: dashdraw 0.6s linear infinite;
+  stroke-width: 3;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 16;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Glow effect for active paths */
+.vue-flow__edge.animated .vue-flow__edge-path {
+  filter: drop-shadow(0 0 4px rgba(37, 99, 235, 0.4));
 }
 </style>

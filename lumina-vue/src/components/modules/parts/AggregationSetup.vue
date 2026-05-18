@@ -148,28 +148,28 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
-import { currentConfig, addEntityToCurrentConfig, removeEntityFromCurrentConfig, mockDbSchema } from '../store/mockStore';
+import { currentConfig, addEntityToCurrentConfig, removeEntityFromCurrentConfig } from '../../../store/modules';
+import { tableMap } from '../../../store/metadata';
 
 const primaryEntity = computed(() => currentConfig.value.primaryEntity);
 const entities = computed(() => currentConfig.value.entities);
 
 // Computed properties for dropdowns
 const availableTables = computed(() => {
-  const schema = mockDbSchema.value || {};
-  return Object.keys(schema).map(key => ({
+  return Object.keys(tableMap.value).map(key => ({
     name: key,
-    desc: schema[key].desc
+    desc: tableMap.value[key].desc
   }));
 });
 
 const primaryFields = computed(() => {
   if (!primaryEntity.value?.name) return ['id'];
-  return mockDbSchema.value[primaryEntity.value.name]?.fields || ['id'];
+  return tableMap.value[primaryEntity.value.name]?.fields || ['id'];
 });
 
 const associatedFields = computed(() => {
   if (!newEntity.name) return ['id'];
-  return mockDbSchema.value[newEntity.name]?.fields || ['id'];
+  return tableMap.value[newEntity.name]?.fields || ['id'];
 });
 
 const showAddModal = ref(false);
@@ -190,9 +190,9 @@ const cardinalityHint = computed(() => {
 
 // Auto-fill desc and select default associated field when physical table changes
 watch(() => newEntity.name, (newVal) => {
-  if (newVal && mockDbSchema.value[newVal]) {
-    newEntity.desc = mockDbSchema.value[newVal].desc;
-    newEntity.right = mockDbSchema.value[newVal].fields[0] || 'id';
+  if (newVal && tableMap.value[newVal]) {
+    newEntity.desc = tableMap.value[newVal].desc;
+    newEntity.right = tableMap.value[newVal].fields[0] || 'id';
     
     // 智能推断关系：如果是 hr_emp_job 等表通常是 1:1，如果是 education 通常是 1:N
     if (newVal.includes('education') || newVal.includes('payroll') || newVal.includes('record')) {
