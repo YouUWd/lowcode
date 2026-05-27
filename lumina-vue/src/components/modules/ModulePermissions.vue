@@ -1,6 +1,6 @@
 <template>
   <div class="p-8 space-y-12 w-full animate-in fade-in duration-500">
-    <!-- Header Action Section -->
+    <!-- Header Action Section (标题与按钮对齐) -->
     <div class="flex justify-between items-center mb-6 mt-[-1rem]">
       <h2 class="font-headline text-lg font-bold text-on-surface flex items-center">
         <Shield class="mr-2 text-primary w-5 h-5" />

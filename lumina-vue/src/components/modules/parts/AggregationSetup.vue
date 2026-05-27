@@ -8,7 +8,7 @@
       <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_8px_24px_rgba(25,28,29,0.06)] z-10 w-80 border-t-4 border-primary relative mb-8 flex flex-col">
         <div class="flex justify-between items-start mb-4">
           <span class="text-xs font-bold text-primary uppercase tracking-wider bg-primary-fixed text-on-primary-fixed px-2 py-1 rounded">主实体 (Root)</span>
-          <span class="material-symbols-outlined text-outline">database</span>
+          <Database class="w-5 h-5 text-outline" />
         </div>
         <div class="flex items-end justify-between">
           <div>
@@ -19,7 +19,7 @@
         
         <!-- Integrated Add Button -->
         <button @click="showAddModal = true" class="mt-6 w-full flex items-center justify-center space-x-2 py-2 border border-dashed border-primary/40 text-primary rounded-lg hover:bg-primary/5 hover:border-primary transition-all text-sm font-bold active:scale-95">
-          <span class="material-symbols-outlined text-[18px]">add</span>
+          <Plus class="w-4 h-4 mr-1" />
           <span>添加关联实体</span>
         </button>
       </div>
@@ -33,9 +33,7 @@
           <div class="absolute -top-5 left-1/2 -translate-x-1/2 border border-outline-variant/40 bg-surface px-3 py-1.5 rounded-full text-[11px] font-mono flex items-center shadow-sm whitespace-nowrap z-20 text-on-surface transition-all group-hover:-translate-y-1 group-hover:shadow-md group-hover:border-primary/50">
             <span class="text-primary font-medium mr-1">{{ entity.joinCondition.left }}</span>
             <div class="flex flex-col items-center mx-1 px-2 border-x border-outline-variant/20">
-              <span class="material-symbols-outlined text-[14px] text-outline">
-                {{ entity.relationType === '1:1' ? 'sync_alt' : (entity.relationType === '1:N' ? 'fork_right' : 'fork_left') }}
-              </span>
+              <component :is="entity.relationType === '1:1' ? ArrowLeftRight : (entity.relationType === '1:N' ? GitMerge : GitPullRequest)" class="w-3.5 h-3.5 text-outline" />
               <span class="text-[8px] font-bold opacity-50">{{ entity.relationType || '1:1' }}</span>
             </div>
             <span class="font-medium ml-1 text-on-surface">{{ entity.joinCondition.right }}</span>
@@ -46,9 +44,9 @@
             <div class="flex justify-between items-start mb-3">
               <span class="text-[10px] font-bold text-secondary uppercase tracking-wider bg-surface-container-high px-2 py-0.5 rounded">关联实体</span>
               <div class="flex items-center space-x-2">
-                <span class="material-symbols-outlined text-outline text-sm">link</span>
+                <Link class="w-4 h-4 text-outline" />
                 <button @click="removeEntity(entity.id)" class="text-error/70 hover:text-error hover:bg-error/10 p-1 rounded-full transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer">
-                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                  <Trash2 class="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -69,11 +67,11 @@
             <div class="bg-surface-container-lowest w-full max-w-md rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.18)] border border-outline-variant/20 overflow-hidden flex flex-col relative z-10 mx-4">
               <div class="px-6 py-4 border-b border-outline-variant/15 flex justify-between items-center bg-surface">
                 <h3 class="font-headline font-bold text-lg text-on-surface flex items-center">
-                  <span class="material-symbols-outlined mr-2 text-primary">add_circle</span>
+                  <PlusCircle class="mr-2 text-primary w-5 h-5" />
                   添加关联实体
                 </h3>
-                <button @click="showAddModal = false" class="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 rounded-full hover:bg-surface-variant/50">
-                  <span class="material-symbols-outlined text-xl">close</span>
+                <button @click="showAddModal = false" class="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 rounded-full hover:bg-surface-variant/50 flex items-center justify-center">
+                  <X class="w-5 h-5" />
                 </button>
               </div>
               
@@ -100,9 +98,7 @@
                         ? 'bg-primary text-on-primary shadow-sm' 
                         : 'text-on-surface-variant hover:bg-surface-variant/50'"
                     >
-                      <span class="material-symbols-outlined text-[16px]">
-                        {{ type === '1:1' ? 'sync_alt' : (type === '1:N' ? 'fork_right' : 'fork_left') }}
-                      </span>
+                      <component :is="type === '1:1' ? ArrowLeftRight : (type === '1:N' ? GitMerge : GitPullRequest)" class="w-4 h-4" />
                       {{ type }}
                     </button>
                   </div>
@@ -148,6 +144,17 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
+import { 
+  Database, 
+  Plus, 
+  ArrowLeftRight, 
+  GitMerge, 
+  GitPullRequest, 
+  Link, 
+  Trash2, 
+  PlusCircle, 
+  X 
+} from 'lucide-vue-next';
 import { currentConfig, addEntityToCurrentConfig, removeEntityFromCurrentConfig } from '../../../store/modules';
 import { tableMap } from '../../../store/metadata';
 

@@ -59,7 +59,7 @@
             </td>
             <td class="p-5 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button class="text-primary hover:text-primary-container p-2 rounded-lg hover:bg-primary-fixed transition-colors">
-                <Edit2 class="w-4 h-4" />
+                <Edit class="w-4 h-4" />
               </button>
               <button @click="deleteRow(row.logicalField)" class="text-error hover:text-on-error-container p-2 rounded-lg hover:bg-error-container transition-colors">
                 <Trash2 class="w-4 h-4" />
@@ -231,7 +231,7 @@
 import { ref, reactive, computed, markRaw } from 'vue';
 import { 
   Columns, Code, GripVertical, Cpu, SquareFunction, 
-  Edit2, Trash2, Plus, PlusCircle, X, Link as LinkIcon, 
+  Edit, Trash2, Plus, PlusCircle, X, Link as LinkIcon, 
   Database, Info, Terminal, Copy, Type, Tag, Hash, Circle,
   Fingerprint, GraduationCap, Users, BookOpen, Calendar, 
   Mail, Phone, MapPin, ShieldCheck, User, School, Star

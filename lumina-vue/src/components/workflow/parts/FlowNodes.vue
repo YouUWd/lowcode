@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
+import { Play, Flag, GitBranch, ShieldCheck } from 'lucide-vue-next'
 
 const props = defineProps({
   data: { type: Object, required: true },
@@ -19,13 +20,13 @@ const statusClass = computed(() => {
   return mapping[rawStatus] || rawStatus;
 })
 
-// 动态映射图标名称
-const iconName = computed(() => {
+// 动态映射图标组件
+const nodeIcon = computed(() => {
   switch (props.data.kind) {
-    case 'start': return 'play_arrow';
-    case 'end': return 'flag';
-    case 'gateway': return 'alt_route';
-    default: return 'shield_person';
+    case 'start': return Play;
+    case 'end': return Flag;
+    case 'gateway': return GitBranch;
+    default: return ShieldCheck;
   }
 })
 
@@ -39,13 +40,47 @@ const titleText = computed(() => {
   }
 })
 
-// 动态映射副标题/角色名称
+const roleCodeMap = {
+  head_teacher: 'TEA',
+  academic_admin: 'EDU',
+  finance: 'FIN',
+  principal: 'PRN',
+  hr_director: 'HRD'
+};
+
+const userLabelMap = {
+  alex_zhang: '张老师',
+  bella_wang: '王教务',
+  charlie_li: '李财务',
+  david_zhao: '赵校长',
+  emma_sun: '孙人事'
+};
+
+// 动态映射副标题/角色名称 (全面支持多选审批与会签或签模式)
 const subtitleText = computed(() => {
   switch (props.data.kind) {
     case 'start': return '申请人发起';
     case 'end': return '归档并生效';
     case 'gateway': return '分流/汇聚';
-    default: return props.data.code || 'SYS_ROLE';
+    default: {
+      const type = props.data.approverType || 'role';
+      const modeText = props.data.approveMode === 'AND' ? '会签' : '或签';
+      
+      if (type === 'user' && props.data.users && props.data.users.length) {
+        const names = props.data.users.map(u => userLabelMap[u] || u).join('+');
+        return `${names} (${modeText})`;
+      }
+      
+      if (props.data.roles && props.data.roles.length) {
+        const codes = props.data.roles.map(r => roleCodeMap[r] || r.substring(0, 3).toUpperCase()).join('+');
+        return `${codes} (${modeText})`;
+      }
+      
+      // 兼容历史老数据单角色字段
+      const legacyCode = props.data.code || 'SYS_ROLE';
+      const codeUpper = roleCodeMap[legacyCode] || legacyCode.substring(0, 3).toUpperCase();
+      return codeUpper;
+    }
   }
 })
 </script>
@@ -59,7 +94,7 @@ const subtitleText = computed(() => {
     <div class="card-body animate-fade">
       <!-- 左侧：图标容器 -->
       <div class="icon-wrapper">
-        <span class="material-symbols-outlined node-icon">{{ iconName }}</span>
+        <component :is="nodeIcon" class="node-icon" />
       </div>
 
       <!-- 右侧：文字说明仓 -->
@@ -159,8 +194,9 @@ const subtitleText = computed(() => {
 }
 
 .node-icon {
-  font-size: 16px !important;
-  font-weight: bold;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5px;
 }
 
 /* 右侧文本排版 */

@@ -2,7 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 import ModuleList from '../components/modules/ModuleList.vue';
 import ModuleConfig from '../components/modules/ModuleConfig.vue';
 import ModulePermissions from '../components/modules/ModulePermissions.vue';
-import WorkflowPanel from '../components/workflow/WorkflowPanel.vue';
+import WorkflowList from '../components/workflow/WorkflowList.vue';
+import LightweightWorkflowBuilder from '../components/workflow/LightweightWorkflowBuilder.vue';
+import WorkflowDetail from '../components/workflow/WorkflowDetail.vue';
 import { updateView } from '../store/index';
 import { modulesState } from '../store/modules';
 
@@ -44,10 +46,33 @@ const routes = [
   },
   {
     path: '/workflow',
-    name: 'workflow',
-    component: WorkflowPanel,
+    redirect: '/workflow/list'
+  },
+  {
+    path: '/workflow/list',
+    name: 'workflow-list',
+    component: WorkflowList,
     beforeEnter: (to, from, next) => {
-      updateView('workflow');
+      updateView('workflow-list');
+      next();
+    }
+  },
+  {
+    path: '/workflow/designer',
+    name: 'workflow-designer',
+    component: LightweightWorkflowBuilder,
+    beforeEnter: (to, from, next) => {
+      updateView('workflow-designer');
+      next();
+    }
+  },
+  {
+    path: '/workflow/:id/detail',
+    name: 'workflow-detail',
+    component: WorkflowDetail,
+    beforeEnter: async (to, from, next) => {
+      const bizNo = to.params.id;
+      await updateView('workflow-detail', { id: bizNo });
       next();
     }
   }

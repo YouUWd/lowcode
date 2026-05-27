@@ -1,6 +1,7 @@
 import { setView } from './app';
 import { fetchConfig, setActiveModule } from './modules';
 import { fetchDetailedPermissions } from './permissions';
+import { fetchWorkflowInstances } from './workflow';
 
 /**
  * Coordination Action: updateView
@@ -8,6 +9,10 @@ import { fetchDetailedPermissions } from './permissions';
  */
 export const updateView = async (view, module = null) => {
   setView(view);
+  
+  if (view === 'workflow-list') {
+    await fetchWorkflowInstances();
+  }
   
   if (module && module.id) {
     setActiveModule(module);

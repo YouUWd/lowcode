@@ -5,8 +5,8 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
       <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
         <div class="flex items-center gap-4 mb-4">
-          <div class="p-3 bg-secondary-container rounded-xl text-on-secondary-container">
-            <span class="material-symbols-outlined">widgets</span>
+          <div class="p-3 bg-secondary-container rounded-xl text-on-secondary-container flex items-center justify-center">
+            <LayoutGrid class="w-6 h-6" />
           </div>
           <span class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">总模块数</span>
         </div>
@@ -18,8 +18,8 @@
 
       <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
         <div class="flex items-center gap-4 mb-4">
-          <div class="p-3 bg-primary-container/10 rounded-xl text-primary">
-            <span class="material-symbols-outlined">account_tree</span>
+          <div class="p-3 bg-primary-container/10 rounded-xl text-primary flex items-center justify-center">
+            <Network class="w-6 h-6" />
           </div>
           <span class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">活跃实体</span>
         </div>
@@ -31,8 +31,8 @@
 
       <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)] border-b-4 border-primary">
         <div class="flex items-center gap-4 mb-4">
-          <div class="p-3 bg-tertiary-fixed rounded-xl text-on-tertiary-fixed">
-            <span class="material-symbols-outlined">health_and_safety</span>
+          <div class="p-3 bg-tertiary-fixed rounded-xl text-on-tertiary-fixed flex items-center justify-center">
+            <Activity class="w-6 h-6" />
           </div>
           <span class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">系统健康度</span>
         </div>
@@ -49,15 +49,15 @@
         <h3 class="font-headline font-bold text-lg">模块列表</h3>
         <div class="flex items-center gap-3">
           <div v-if="appState.loading" class="flex items-center gap-2 text-primary text-xs font-bold animate-pulse mr-2">
-            <span class="material-symbols-outlined text-sm animate-spin">sync</span>
+            <RefreshCw class="w-3.5 h-3.5 animate-spin" />
             同步中...
           </div>
-          <button @click="fetchModules" class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors" title="刷新">
-            <span class="material-symbols-outlined text-sm">refresh</span>
+          <button @click="fetchModules" class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="刷新">
+            <RefreshCw class="w-4 h-4" />
           </button>
-          <div class="w-px bg-outline-variant/30 my-1 mx-1"></div>
+          <div class="w-px bg-outline-variant/30 my-1 mx-1 h-6"></div>
           <button @click="isAddModalOpen = true" class="px-4 py-2 text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 rounded-lg transition-colors flex items-center gap-2">
-            <span class="material-symbols-outlined text-sm">add_circle</span> 新建模块
+            <PlusCircle class="w-4 h-4" /> 新建模块
           </button>
         </div>
       </div>
@@ -98,7 +98,7 @@
                     <Settings class="w-5 h-5" />
                   </button>
                   <button @click.stop="openPermissionModal(mod)" class="p-2 hover:bg-tertiary/10 hover:text-tertiary rounded-lg transition-colors text-on-surface-variant" title="权限节点定义">
-                    <ShieldCheck class="w-5 h-5" />
+                    <Shield class="w-5 h-5" />
                   </button>
                   <button @click.stop class="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-on-surface-variant" title="编辑">
                     <Edit class="w-5 h-5" />
@@ -115,11 +115,11 @@
       <div class="p-6 bg-surface-container-low/10 flex justify-between items-center text-sm font-medium text-on-surface-variant">
         <div>显示 1 - 4 之 48 个模块</div>
         <div class="flex gap-1">
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"><ChevronLeft class="w-4 h-4" /></button>
           <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-on-primary">1</button>
           <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors">2</button>
           <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors">3</button>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"><ChevronRight class="w-4 h-4" /></button>
         </div>
       </div>
     </div>
@@ -133,7 +133,7 @@
           <button class="bg-white text-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-surface-bright transition-colors">查看架构指南</button>
         </div>
         <div class="w-full md:w-48 h-32 rounded-lg bg-white/10 backdrop-blur-md flex items-center justify-center">
-          <span class="material-symbols-outlined text-5xl opacity-40">auto_awesome</span>
+          <Sparkles class="w-12 h-12 opacity-40" />
         </div>
       </div>
       <div class="lg:col-span-4 bg-surface-container-highest p-8 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
@@ -166,11 +166,11 @@
             <!-- Modal Header -->
             <div class="px-6 py-4 border-b border-surface-container-low flex justify-between items-center bg-surface-container-lowest">
               <h3 class="text-lg font-bold text-on-surface flex items-center">
-                <span class="material-symbols-outlined text-primary mr-2">add_box</span>
+                <PackagePlus class="text-primary mr-2 w-5 h-5" />
                 新建系统模块
               </h3>
-              <button @click="isAddModalOpen = false" class="p-1.5 hover:bg-surface-container rounded-lg text-on-surface-variant transition-colors">
-                <span class="material-symbols-outlined text-xl">close</span>
+              <button @click="isAddModalOpen = false" class="p-1.5 hover:bg-surface-container rounded-lg text-on-surface-variant transition-colors flex items-center justify-center">
+                <X class="w-5 h-5" />
               </button>
             </div>
             
@@ -212,7 +212,7 @@
                 取消
               </button>
               <button @click="submitModule" class="px-6 py-2 text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 shadow-sm rounded-lg transition-colors flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">check</span>
+                <Check class="w-4 h-4" />
                 确认创建
               </button>
             </div>
@@ -225,7 +225,24 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Trash2, Settings, ShieldCheck, PlusCircle, RefreshCw, Edit, TableProperties as TableChart } from 'lucide-vue-next';
+import { 
+  Trash2, 
+  Settings, 
+  Shield, 
+  PlusCircle, 
+  RefreshCw, 
+  Edit, 
+  TableProperties as TableChart,
+  LayoutGrid,
+  Network,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  PackagePlus,
+  X,
+  Check
+} from 'lucide-vue-next';
 import { appState } from '../../store/app';
 import { modulesState, fetchModules, addModule, deleteModule } from '../../store/modules';
 import { tableMap } from '../../store/metadata';
