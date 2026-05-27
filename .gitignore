@@ -42,3 +42,6 @@
 **/.tsbuildinfo
 **/.eslintcache
 **/.stylelintcache
+
+# ui
+ui/

@@ -267,7 +267,7 @@ export class WorkflowService {
     // 获取当前活跃的节点信息
     const activeTasks = tasks.filter(t => t.status === 'PENDING');
     const passedNodeIds = [...new Set(tasks.filter(t => t.status === 'PASS').map(t => t.node_id))];
-    const invalidatedNodeIds = [...new Set(tasks.filter(t => t.status === 'INVALIDATED').map(t => t.node_id))];
+    const invalidatedNodeIds = [...new Set(tasks.filter(t => t.status === 'INVALIDATED' || t.status === 'REJECT').map(t => t.node_id))];
 
     const safeJsonParse = (str: any, defaultVal: any) => {
       try {
