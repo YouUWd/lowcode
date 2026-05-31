@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  roles     UserRole[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  releaseOrders ReleaseOrder[]
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g. "releases:create"
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserRole {
+  userId Int
+  roleId Int
+  user   User @relation(fields: [userId], references: [id])
+  role   Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model Application {
+  id                Int      @id @default(autoincrement())
+  name              String
+  code              String   @unique
+  owner             String
+  description       String?
+  yunxiaoPipelineId String?
+  gitRepository     String?
+  namespace         String?
+  status            String   @default("ACTIVE")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  releaseOrders ReleaseOrder[]
+}
+
+model Environment {
+  id               Int      @id @default(autoincrement())
+  name             String   @unique // DEV, SIT, UAT, PRE, PROD
+  approvalRequired Boolean  @default(false)
+  releaseWindow    String?  // JSON string or specific format like "09:00-18:00"
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  releaseOrders ReleaseOrder[]
+}
+
+model WorkflowDefinition {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  flowData    String   // SQLite doesn't support @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  releaseOrders ReleaseOrder[]
+}
+
+model ReleaseOrder {
+  id                 Int      @id @default(autoincrement())
+  releaseNo          String   @unique
+  title              String
+  applicationId      Int
+  environmentId      Int
+  version            String
+  creatorId          Int
+  workflowInstanceId Int?     // Could map to workflow def for MVP
+  pipelineRunId      String?
+  status             String   @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVING, APPROVED, RELEASING, SUCCESS, FAILED, ROLLBACK
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  application        Application        @relation(fields: [applicationId], references: [id])
+  environment        Environment        @relation(fields: [environmentId], references: [id])
+  creator            User               @relation(fields: [creatorId], references: [id])
+  workflowDefinition WorkflowDefinition? @relation(fields: [workflowInstanceId], references: [id])
+
+  history ReleaseHistory[]
+}
+
+model ReleaseHistory {
+  id             Int      @id @default(autoincrement())
+  releaseOrderId Int
+  imageTag       String?
+  version        String?
+  runRecord      String?  // SQLite doesn't support @db.Text
+  status         String
+  createdAt      DateTime @default(now())
+
+  releaseOrder   ReleaseOrder @relation(fields: [releaseOrderId], references: [id])
+}
