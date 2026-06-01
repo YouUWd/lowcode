@@ -1,10 +1,8 @@
 <template>
-  <div class="w-[300px] h-full flex flex-col bg-[#F5F7FA]">
-    <div class="px-4 py-3 font-semibold text-gray-700 text-sm border-b border-gray-200">
-      {{ data.title }}
-      <span v-if="data.count !== undefined" class="text-gray-400 font-normal ml-1">· {{ data.count }}</span>
+  <div class="w-[280px] h-full flex flex-col bg-surface-bright border-l border-outline-variant">
+    <div class="px-md py-sm border-b border-outline-variant flex items-center justify-between">
+      <h2 class="font-title-sm text-title-sm text-on-surface">{{ data.title }}</h2>
     </div>
-    <!-- The actual VueFlow node acts as a container, children will be positioned relative to the canvas but this visually provides the column background -->
   </div>
 </template>
 

@@ -1,60 +1,45 @@
 <template>
-  <div class="w-64 h-[120px] bg-white border border-gray-200 rounded-md shadow-sm relative overflow-hidden flex flex-col justify-between"
-       :class="{'border-l-4 border-l-green-500': data.status === 'success', 'border-l-4 border-l-red-500': data.status === 'failed', 'border-l-4 border-l-gray-300': data.status === 'pending'}">
+  <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-sm shadow-sm w-48 z-10 relative overflow-visible"
+       :class="{'border-l-4 border-l-secondary': data.status === 'success', 'border-l-4 border-l-error': data.status === 'failed', 'border-l-4 border-l-primary': data.status === 'approval', 'border-l-4 border-l-outline': data.status === 'pending', 'ring-4 ring-primary/20 border-2 border-primary': data.status === 'running' }">
 
-    <div class="p-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <el-icon v-if="data.status === 'success'" class="text-green-500"><CircleCheckFilled /></el-icon>
-          <el-icon v-else-if="data.status === 'failed'" class="text-red-500"><CircleCloseFilled /></el-icon>
-          <el-icon v-else class="text-gray-400"><Clock /></el-icon>
-          <span class="font-bold text-sm text-gray-800">{{ data.title }}</span>
-          <el-tag v-if="data.tag" size="small" type="info" class="ml-1" effect="light">{{ data.tag }}</el-tag>
-        </div>
-        <el-button v-if="data.action" size="small" class="text-xs">{{ data.action }}</el-button>
-      </div>
+    <div class="flex items-center gap-sm mb-xs">
+      <span class="material-symbols-outlined text-[20px]"
+            :class="{'text-secondary': data.status === 'success', 'text-error': data.status === 'failed', 'text-surface-tint': data.status === 'approval', 'text-on-surface-variant': data.status === 'pending', 'text-secondary-fixed-dim': data.status === 'running' }">
+        {{ getIcon(data.status) }}
+      </span>
+      <span class="text-[14px] font-semibold text-on-surface truncate">{{ data.title }}</span>
+    </div>
 
-      <div class="text-xs text-gray-500 mt-2 flex justify-between">
-        <span>{{ data.duration || '0秒' }}</span>
-        <div class="flex gap-2">
-          <span v-if="data.hasReport" class="flex items-center gap-1 cursor-pointer hover:text-blue-500"><el-icon><Document /></el-icon> 扫描报告</span>
-          <span v-if="data.hasLog" class="flex items-center gap-1 cursor-pointer hover:text-blue-500"><el-icon><Tickets /></el-icon> 日志</span>
-        </div>
+    <div class="text-[13px] text-on-surface-variant flex justify-between">
+      <span>{{ data.duration || '0秒' }}</span>
+      <div class="flex gap-2">
+         <span v-if="data.hasReport" class="flex items-center gap-1 cursor-pointer hover:text-surface-tint"><span class="material-symbols-outlined text-[14px]">description</span></span>
+         <span v-if="data.hasLog" class="flex items-center gap-1 cursor-pointer hover:text-surface-tint"><span class="material-symbols-outlined text-[14px]">terminal</span></span>
       </div>
     </div>
 
-    <!-- Error state specific content -->
-    <div v-if="data.status === 'failed' && data.errorMessage" class="px-3 pb-2 text-xs text-red-500 border-t border-red-100 pt-1">
-      <p>{{ data.errorMessage }}</p>
-      <div class="flex justify-end gap-2 mt-1">
-         <span class="flex items-center gap-1 text-blue-500 cursor-pointer hover:underline"><el-icon><Aim /></el-icon> 智能排查</span>
-         <span class="flex items-center gap-1 text-blue-500 cursor-pointer hover:underline"> 重试</span>
-      </div>
-    </div>
-
-    <!-- Code scan specific stats -->
-    <div v-else-if="data.stats" class="px-3 pb-2 pt-1 border-t border-gray-100 flex justify-between text-center">
-      <div><div class="text-red-500 font-bold">{{ data.stats.total }}</div><div class="text-xs text-gray-500">总数</div></div>
-      <div><div class="text-red-500 font-bold">{{ data.stats.block }}</div><div class="text-xs text-gray-500">阻塞</div></div>
-      <div><div class="text-orange-500 font-bold">{{ data.stats.critical }}</div><div class="text-xs text-gray-500">严重</div></div>
-      <div><div class="text-gray-500 font-bold">{{ data.stats.normal }}</div><div class="text-xs text-gray-500">一般</div></div>
+    <!-- Error State -->
+    <div v-if="data.status === 'failed' && data.errorMessage" class="mt-xs pt-xs border-t border-outline-variant/30 text-[12px] text-error">
+      {{ data.errorMessage }}
     </div>
 
     <!-- Approver text -->
-    <div v-else-if="data.footerText" class="px-3 py-2 bg-blue-50 text-xs text-gray-600">
+    <div v-else-if="data.footerText" class="mt-xs pt-xs border-t border-outline-variant/30 text-[12px] text-on-surface-variant">
       {{ data.footerText }}
     </div>
+
+    <!-- Active Indicator -->
+    <div v-if="data.status === 'running'" class="absolute -top-2 -right-2 w-4 h-4 bg-primary rounded-full border-2 border-surface-container-lowest"></div>
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { CircleCheckFilled, CircleCloseFilled, Clock, Document, Tickets, Aim } from '@element-plus/icons-vue';
 
 const props = defineProps<{
   data: {
     title: string;
-    status: 'success' | 'failed' | 'pending';
+    status: 'success' | 'failed' | 'pending' | 'approval' | 'running';
     duration?: string;
     tag?: string;
     action?: string;
@@ -70,4 +55,15 @@ const props = defineProps<{
     }
   }
 }>();
+
+const getIcon = (status: string) => {
+  switch (status) {
+    case 'success': return 'check_circle';
+    case 'failed': return 'cancel';
+    case 'approval': return 'person';
+    case 'pending': return 'play_circle';
+    case 'running': return 'database';
+    default: return 'play_circle';
+  }
+}
 </script>

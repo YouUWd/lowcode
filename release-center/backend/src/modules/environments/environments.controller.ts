@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { EnvironmentsService } from './environments.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CreateEnvironmentDto } from './dto/create-environment.dto';
+import { UpdateEnvironmentDto } from './dto/update-environment.dto';
 
 @Controller('environments')
 @UseGuards(JwtAuthGuard)
@@ -20,14 +22,14 @@ export class EnvironmentsController {
   }
 
   @Post()
-  async create(@Body() body: any) {
-    const data = await this.environmentsService.create(body);
+  async create(@Body() createEnvironmentDto: CreateEnvironmentDto) {
+    const data = await this.environmentsService.create(createEnvironmentDto);
     return { code: 0, message: 'success', data };
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
-    const data = await this.environmentsService.update(+id, body);
+  async update(@Param('id') id: string, @Body() updateEnvironmentDto: UpdateEnvironmentDto) {
+    const data = await this.environmentsService.update(+id, updateEnvironmentDto);
     return { code: 0, message: 'success', data };
   }
 

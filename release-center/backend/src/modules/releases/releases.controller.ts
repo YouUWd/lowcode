@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { ReleasesService } from './releases.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CreateReleaseDto } from './dto/create-release.dto';
 
 @Controller('releases')
 @UseGuards(JwtAuthGuard)
@@ -20,8 +21,8 @@ export class ReleasesController {
   }
 
   @Post()
-  async create(@Body() body: any, @Request() req) {
-    const data = await this.releasesService.create(body, req.user.id);
+  async create(@Body() createReleaseDto: CreateReleaseDto, @Request() req) {
+    const data = await this.releasesService.create(createReleaseDto, req.user.id);
     return { code: 0, message: 'success', data };
   }
 

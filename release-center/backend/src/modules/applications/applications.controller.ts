@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ApplicationsService } from './applications.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CreateApplicationDto } from './dto/create-application.dto';
+import { UpdateApplicationDto } from './dto/update-application.dto';
 
 @Controller('applications')
 @UseGuards(JwtAuthGuard)
@@ -20,14 +22,14 @@ export class ApplicationsController {
   }
 
   @Post()
-  async create(@Body() body: any) {
-    const data = await this.applicationsService.create(body);
+  async create(@Body() createApplicationDto: CreateApplicationDto) {
+    const data = await this.applicationsService.create(createApplicationDto);
     return { code: 0, message: 'success', data };
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
-    const data = await this.applicationsService.update(+id, body);
+  async update(@Param('id') id: string, @Body() updateApplicationDto: UpdateApplicationDto) {
+    const data = await this.applicationsService.update(+id, updateApplicationDto);
     return { code: 0, message: 'success', data };
   }
 
