@@ -76,9 +76,10 @@ public class ModuleEngine {
         if (req.getId() != null) {
             @SuppressWarnings("unchecked")
             Map<String, Object> detailData = (Map<String, Object>) result.remove("detail");
-            if (detailData != null) {
-                result.putAll(detailData);
+            if (detailData == null) {
+                return null; // 主表数据不存在，整体直接返回 null，不加载子表或关联关系
             }
+            result.putAll(detailData);
 
             for (TableMeta sub : meta.getSubTables()) {
                 if (fetchAllRelations || withMap.containsKey(sub.getTableName())) {

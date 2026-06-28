@@ -209,7 +209,7 @@ public class ModuleControllerTest {
 
     @Test
     public void testDetailQueryNotFound() throws Exception {
-        // 测试查询不存在的 ID，返回的 data 应不包含 orders，且关联表均为空列表
+        // 测试查询不存在的 ID，整个 data 应返回 null
         String reqJson = "{\"id\":99999}";
         mockMvc.perform(post("/api/module/order/query")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -217,11 +217,7 @@ public class ModuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"))
-                .andExpect(jsonPath("$.data.orders").doesNotExist())
-                .andExpect(jsonPath("$.data.order_items").isArray())
-                .andExpect(jsonPath("$.data.order_items", hasSize(0)))
-                .andExpect(jsonPath("$.data.tags").isArray())
-                .andExpect(jsonPath("$.data.tags", hasSize(0)));
+                .andExpect(jsonPath("$.data").value(nullValue()));
     }
 
     @Test
@@ -481,18 +477,14 @@ public class ModuleControllerTest {
         assertFalse(dsl.fetchExists(dsl.selectFrom("order_tags").where(DSL.field("order_id").eq(generatedId))));
 
         // ── API 校验（删除后）─────────────────────────────────────────────
-        // 确认删除后无法查到该主表与从表明细数据
+        // 确认删除后无法查到该主表与从表，且整体直接返回 null
         mockMvc.perform(post("/api/module/order/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(detailJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"))
-                .andExpect(jsonPath("$.data.orders").doesNotExist())
-                .andExpect(jsonPath("$.data.order_items").isArray())
-                .andExpect(jsonPath("$.data.order_items", hasSize(0)))
-                .andExpect(jsonPath("$.data.tags").isArray())
-                .andExpect(jsonPath("$.data.tags", hasSize(0)));
+                .andExpect(jsonPath("$.data").value(nullValue()));
     }
 
     // ================================================================
