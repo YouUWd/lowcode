@@ -40,10 +40,19 @@ public class ModuleControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.rows").isArray())
                 .andExpect(jsonPath("$.data.total").value(3))
+                // 精确校验第 1 行 (ID 3):
                 .andExpect(jsonPath("$.data.rows[0].orders.id").value(3))
                 .andExpect(jsonPath("$.data.rows[0].orders.order_no").value("ORD-20240102-003"))
                 .andExpect(jsonPath("$.data.rows[0].orders.customer").value("王五"))
-                .andExpect(jsonPath("$.data.rows[0].customer_profiles.level").value("REGULAR"));
+                .andExpect(jsonPath("$.data.rows[0].orders.amount").value(800.00))
+                .andExpect(jsonPath("$.data.rows[0].orders.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.rows[0].orders.remark").value(nullValue()))
+                .andExpect(jsonPath("$.data.rows[0].orders.created_at").exists())
+                .andExpect(jsonPath("$.data.rows[0].orders.updated_at").exists())
+                .andExpect(jsonPath("$.data.rows[0].customer_profiles.id").value(3))
+                .andExpect(jsonPath("$.data.rows[0].customer_profiles.name").value("王五"))
+                .andExpect(jsonPath("$.data.rows[0].customer_profiles.level").value("REGULAR"))
+                .andExpect(jsonPath("$.data.rows[0].customer_profiles.contact_phone").value("13700137000"));
     }
 
     @Test
@@ -59,8 +68,20 @@ public class ModuleControllerTest {
                 .andExpect(jsonPath("$.data.rows[2].orders.id").value(1))
                 .andExpect(jsonPath("$.data.rows[2].order_items").isArray())
                 .andExpect(jsonPath("$.data.rows[2].order_items", hasSize(2)))
+                // 校验订单 1 绑定的所有明细项的完整属性映射
+                .andExpect(jsonPath("$.data.rows[2].order_items[0].id").value(1))
+                .andExpect(jsonPath("$.data.rows[2].order_items[0].order_id").value(1))
                 .andExpect(jsonPath("$.data.rows[2].order_items[0].product_name").value("鼠标"))
-                .andExpect(jsonPath("$.data.rows[2].order_items[1].product_name").value("键盘"));
+                .andExpect(jsonPath("$.data.rows[2].order_items[0].qty").value(1))
+                .andExpect(jsonPath("$.data.rows[2].order_items[0].price").value(500.00))
+                .andExpect(jsonPath("$.data.rows[2].order_items[0].created_at").exists())
+
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].id").value(2))
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].order_id").value(1))
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].product_name").value("键盘"))
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].qty").value(1))
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].price").value(1000.00))
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].created_at").exists());
     }
 
     @Test
@@ -76,7 +97,10 @@ public class ModuleControllerTest {
                 .andExpect(jsonPath("$.data.rows[2].orders.id").value(1))
                 .andExpect(jsonPath("$.data.rows[2].tags").isArray())
                 .andExpect(jsonPath("$.data.rows[2].tags", hasSize(2)))
+                // 校验订单 1 多对多绑定的全部标签细节
+                .andExpect(jsonPath("$.data.rows[2].tags[0].id").value(1))
                 .andExpect(jsonPath("$.data.rows[2].tags[0].name").value("VIP"))
+                .andExpect(jsonPath("$.data.rows[2].tags[1].id").value(4))
                 .andExpect(jsonPath("$.data.rows[2].tags[1].name").value("特价"));
     }
 
@@ -89,14 +113,38 @@ public class ModuleControllerTest {
                         .content(reqJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
+                // 精确断言主表行每一个字段
                 .andExpect(jsonPath("$.data.orders.id").value(1))
+                .andExpect(jsonPath("$.data.orders.order_no").value("ORD-20240101-001"))
                 .andExpect(jsonPath("$.data.orders.customer").value("张三"))
+                .andExpect(jsonPath("$.data.orders.amount").value(1500.00))
+                .andExpect(jsonPath("$.data.orders.status").value("PAID"))
+                .andExpect(jsonPath("$.data.orders.remark").value("首单客户"))
+                .andExpect(jsonPath("$.data.orders.created_at").exists())
+                .andExpect(jsonPath("$.data.orders.updated_at").exists())
+                // 精确断言子表行每一个字段
                 .andExpect(jsonPath("$.data.order_items").isArray())
                 .andExpect(jsonPath("$.data.order_items", hasSize(2)))
+                .andExpect(jsonPath("$.data.order_items[0].id").value(1))
+                .andExpect(jsonPath("$.data.order_items[0].order_id").value(1))
                 .andExpect(jsonPath("$.data.order_items[0].product_name").value("鼠标"))
+                .andExpect(jsonPath("$.data.order_items[0].qty").value(1))
+                .andExpect(jsonPath("$.data.order_items[0].price").value(500.00))
+                .andExpect(jsonPath("$.data.order_items[0].created_at").exists())
+                
+                .andExpect(jsonPath("$.data.order_items[1].id").value(2))
+                .andExpect(jsonPath("$.data.order_items[1].order_id").value(1))
+                .andExpect(jsonPath("$.data.order_items[1].product_name").value("键盘"))
+                .andExpect(jsonPath("$.data.order_items[1].qty").value(1))
+                .andExpect(jsonPath("$.data.order_items[1].price").value(1000.00))
+                .andExpect(jsonPath("$.data.order_items[1].created_at").exists())
+                // 精确断言多对多关联每一个字段
                 .andExpect(jsonPath("$.data.tags").isArray())
                 .andExpect(jsonPath("$.data.tags", hasSize(2)))
-                .andExpect(jsonPath("$.data.tags[0].name").value("VIP"));
+                .andExpect(jsonPath("$.data.tags[0].id").value(1))
+                .andExpect(jsonPath("$.data.tags[0].name").value("VIP"))
+                .andExpect(jsonPath("$.data.tags[1].id").value(4))
+                .andExpect(jsonPath("$.data.tags[1].name").value("特价"));
     }
 
     @Test
@@ -109,11 +157,20 @@ public class ModuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.orders.id").value(1))
+                .andExpect(jsonPath("$.data.orders.order_no").value("ORD-20240101-001"))
                 .andExpect(jsonPath("$.data.orders.customer").value("张三"))
+                .andExpect(jsonPath("$.data.orders.amount").value(1500.00))
+                .andExpect(jsonPath("$.data.orders.status").value("PAID"))
+                .andExpect(jsonPath("$.data.orders.remark").value("首单客户"))
                 .andExpect(jsonPath("$.data.order_items").isArray())
                 .andExpect(jsonPath("$.data.order_items", hasSize(2)))
+                // 精确检验投影拉取出来的特定列存在性与正确值，并且其他未选中的列必须不存在
                 .andExpect(jsonPath("$.data.order_items[0].product_name").value("鼠标"))
-                .andExpect(jsonPath("$.data.order_items[0].qty").doesNotExist()) // 字段未被选择，不应存在
+                .andExpect(jsonPath("$.data.order_items[0].price").value(500.00))
+                .andExpect(jsonPath("$.data.order_items[0].id").doesNotExist())
+                .andExpect(jsonPath("$.data.order_items[0].order_id").doesNotExist())
+                .andExpect(jsonPath("$.data.order_items[0].qty").doesNotExist())
+                .andExpect(jsonPath("$.data.order_items[0].created_at").doesNotExist())
                 .andExpect(jsonPath("$.data.tags").doesNotExist()); // 标签未被 with 包含，不应存在
     }
 
@@ -132,8 +189,15 @@ public class ModuleControllerTest {
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.rows").isArray())
                 .andExpect(jsonPath("$.data.rows", hasSize(1)))
+                // 校验被筛选出的唯一条订单的每一个字段，没有缺失
                 .andExpect(jsonPath("$.data.rows[0].orders.id").value(1))
-                .andExpect(jsonPath("$.data.rows[0].orders.customer").value("张三"));
+                .andExpect(jsonPath("$.data.rows[0].orders.order_no").value("ORD-20240101-001"))
+                .andExpect(jsonPath("$.data.rows[0].orders.customer").value("张三"))
+                .andExpect(jsonPath("$.data.rows[0].orders.amount").value(1500.00))
+                .andExpect(jsonPath("$.data.rows[0].orders.status").value("PAID"))
+                .andExpect(jsonPath("$.data.rows[0].orders.remark").value("首单客户"))
+                .andExpect(jsonPath("$.data.rows[0].orders.created_at").exists())
+                .andExpect(jsonPath("$.data.rows[0].orders.updated_at").exists());
     }
 
     @Test
