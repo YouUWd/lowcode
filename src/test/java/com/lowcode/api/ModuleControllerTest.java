@@ -39,8 +39,11 @@ public class ModuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.rows").isArray())
-                .andExpect(jsonPath("$.data.total").value(greaterThanOrEqualTo(3)))
-                .andExpect(jsonPath("$.data.rows[0].customer_profiles.level").exists());
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.rows[0].orders.id").value(3))
+                .andExpect(jsonPath("$.data.rows[0].orders.order_no").value("ORD-20240102-003"))
+                .andExpect(jsonPath("$.data.rows[0].orders.customer").value("王五"))
+                .andExpect(jsonPath("$.data.rows[0].customer_profiles.level").value("REGULAR"));
     }
 
     @Test
@@ -52,7 +55,12 @@ public class ModuleControllerTest {
                         .content(reqJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.rows[0].order_items").isArray());
+                .andExpect(jsonPath("$.data.rows").isArray())
+                .andExpect(jsonPath("$.data.rows[2].orders.id").value(1))
+                .andExpect(jsonPath("$.data.rows[2].order_items").isArray())
+                .andExpect(jsonPath("$.data.rows[2].order_items", hasSize(2)))
+                .andExpect(jsonPath("$.data.rows[2].order_items[0].product_name").value("鼠标"))
+                .andExpect(jsonPath("$.data.rows[2].order_items[1].product_name").value("键盘"));
     }
 
     @Test
@@ -64,7 +72,12 @@ public class ModuleControllerTest {
                         .content(reqJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.rows[0].tags").isArray());
+                .andExpect(jsonPath("$.data.rows").isArray())
+                .andExpect(jsonPath("$.data.rows[2].orders.id").value(1))
+                .andExpect(jsonPath("$.data.rows[2].tags").isArray())
+                .andExpect(jsonPath("$.data.rows[2].tags", hasSize(2)))
+                .andExpect(jsonPath("$.data.rows[2].tags[0].name").value("VIP"))
+                .andExpect(jsonPath("$.data.rows[2].tags[1].name").value("特价"));
     }
 
     @Test
@@ -77,8 +90,13 @@ public class ModuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.orders.id").value(1))
+                .andExpect(jsonPath("$.data.orders.customer").value("张三"))
                 .andExpect(jsonPath("$.data.order_items").isArray())
-                .andExpect(jsonPath("$.data.tags").isArray());
+                .andExpect(jsonPath("$.data.order_items", hasSize(2)))
+                .andExpect(jsonPath("$.data.order_items[0].product_name").value("鼠标"))
+                .andExpect(jsonPath("$.data.tags").isArray())
+                .andExpect(jsonPath("$.data.tags", hasSize(2)))
+                .andExpect(jsonPath("$.data.tags[0].name").value("VIP"));
     }
 
     @Test
@@ -91,7 +109,10 @@ public class ModuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.orders.id").value(1))
-                .andExpect(jsonPath("$.data.order_items[0].product_name").exists())
+                .andExpect(jsonPath("$.data.orders.customer").value("张三"))
+                .andExpect(jsonPath("$.data.order_items").isArray())
+                .andExpect(jsonPath("$.data.order_items", hasSize(2)))
+                .andExpect(jsonPath("$.data.order_items[0].product_name").value("鼠标"))
                 .andExpect(jsonPath("$.data.order_items[0].qty").doesNotExist()) // 字段未被选择，不应存在
                 .andExpect(jsonPath("$.data.tags").doesNotExist()); // 标签未被 with 包含，不应存在
     }
@@ -108,7 +129,11 @@ public class ModuleControllerTest {
                         .content(reqJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.rows[0].orders.customer").value(containsString("张")));
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.rows").isArray())
+                .andExpect(jsonPath("$.data.rows", hasSize(1)))
+                .andExpect(jsonPath("$.data.rows[0].orders.id").value(1))
+                .andExpect(jsonPath("$.data.rows[0].orders.customer").value("张三"));
     }
 
     @Test
