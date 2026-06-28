@@ -23,9 +23,9 @@
     "page": 1,
     "size": 10,
     "with": [
-      {
-        "tableName": "customer_profiles"
-      }
+        {
+          "tableName": "customer_profiles"
+        }
     ]
   }
   ```
@@ -325,7 +325,7 @@
       },
       "order_items": [
         {
-          "id": 8, // 保留并修改原有明细（假设刚才新增的商品A主键是8）
+          "id": 6, // 保留并修改原有明细（假设刚才新增的商品A主键是8）
           "product_name": "测试商品A (已修改名称)",
           "qty": 3
         },
@@ -334,7 +334,7 @@
           "qty": 1,
           "price": 12.50
         }
-        // 原本的 9 号明细（商品B）在此列表中被省略：引擎应当自动在库中 delete 它！
+        // 原本的 7 号明细（商品B）在此列表中被省略：引擎应当自动在库中 delete 它！
       ],
       "tags": [
         { "id": 1 } // 修改多对多关联：改绑为仅剩标签1 (VIP)
@@ -353,11 +353,11 @@
 
 ---
 
-## 4. 删除接口测试 (`DELETE /{moduleId}/delete`)
+## 4. 删除接口测试 (`DELETE /{moduleId}/{id}`)
 
-### 用例 4.1: 级联级物理删除
+### 用例 4.1: 级联物理删除
 * **目的**：测试删除订单主表记录时，对应的从表记录、中间表关联记录是否被事务安全地清理干净。
-* **请求地址**：`DELETE /api/module/order/delete?id=4`
+* **请求地址**：`DELETE /api/module/order/4`
 * **期望响应 (Response)**：
   ```json
   {
