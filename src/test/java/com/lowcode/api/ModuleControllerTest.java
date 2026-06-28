@@ -1,5 +1,7 @@
 package com.lowcode.api;
 
+import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -8,7 +10,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -20,6 +25,9 @@ public class ModuleControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private DSLContext dsl;
 
     @Test
     public void testQueryList() throws Exception {
@@ -130,8 +138,11 @@ public class ModuleControllerTest {
         String saveJson = "{" +
                 "\"data\":{" +
                 "\"orders\":{\"order_no\":\"ORD-TEST-1234\",\"customer\":\"测试自动\",\"amount\":888.00,\"status\":\"PENDING\"}," +
-                "\"order_items\":[{\"product_name\":\"测试商品X\",\"qty\":5,\"price\":100.00}]," +
-                "\"tags\":[{\"id\":1}]" +
+                "\"order_items\":[" +
+                "{\"product_name\":\"测试商品A\",\"qty\":2,\"price\":100.00}," +
+                "{\"product_name\":\"测试商品B\",\"qty\":1,\"price\":688.00}" +
+                "]," +
+                "\"tags\":[{\"id\":1},{\"id\":2}]" +
                 "}" +
                 "}";
 
@@ -147,22 +158,90 @@ public class ModuleControllerTest {
         Number newId = com.jayway.jsonpath.JsonPath.read(resultStr, "$.data");
         long generatedId = newId.longValue();
 
-        // 10. 测试保存后读取主表与明细数据正确
+        // --- 数据库严密校验 (新增后) ---
+        // 1. 主表订单确认存在，且字段正确
+        var dbOrder = dsl.selectFrom("orders").where(DSL.field("id").eq(generatedId)).fetchOne();
+        assertNotNull(dbOrder);
+        assertEquals("ORD-TEST-1234", dbOrder.get("order_no"));
+        assertEquals("测试自动", dbOrder.get("customer"));
+        assertEquals(0, new BigDecimal("888.00").compareTo((BigDecimal) dbOrder.get("amount")));
+
+        // 2. 从表订单项应包含2个商品，且名称和价格无误
+        var dbItems = dsl.selectFrom("order_items").where(DSL.field("order_id").eq(generatedId)).orderBy(DSL.field("id").asc()).fetch();
+        assertEquals(2, dbItems.size());
+        assertEquals("测试商品A", dbItems.get(0).get("product_name"));
+        assertEquals("测试商品B", dbItems.get(1).get("product_name"));
+
+        // 3. 关联标签确认存在2个
+        var dbTags = dsl.selectFrom("order_tags").where(DSL.field("order_id").eq(generatedId)).orderBy(DSL.field("tag_id").asc()).fetch();
+        assertEquals(2, dbTags.size());
+        assertEquals(1L, ((Number) dbTags.get(0).get("tag_id")).longValue());
+        assertEquals(2L, ((Number) dbTags.get(1).get("tag_id")).longValue());
+
+        // 10. 测试保存后读取主表与明细数据正确 (API 端校验)
         String detailJson = "{\"id\":" + generatedId + "}";
         mockMvc.perform(post("/api/module/order/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(detailJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orders.customer").value("测试自动"))
-                .andExpect(jsonPath("$.data.order_items[0].product_name").value("测试商品X"))
+                .andExpect(jsonPath("$.data.order_items[0].product_name").value("测试商品A"))
                 .andExpect(jsonPath("$.data.tags[0].id").value(1));
 
-        // 11. 执行删除操作
+        // 11. 执行级联更新 (更新主表 customer，修改 A，删除 B，新增 C，更换标签为 2, 4)
+        long itemAId = ((Number) dbItems.get(0).get("id")).longValue();
+        String updateJson = "{" +
+                "\"data\":{" +
+                "\"orders\":{\"id\":" + generatedId + ",\"order_no\":\"ORD-TEST-1234\",\"customer\":\"测试修改\",\"amount\":999.00,\"status\":\"PAID\"}," +
+                "\"order_items\":[" +
+                "{\"id\":" + itemAId + ",\"product_name\":\"测试商品A-改\",\"qty\":3,\"price\":120.00}," +
+                "{\"product_name\":\"测试商品C\",\"qty\":1,\"price\":639.00}" +
+                "]," +
+                "\"tags\":[{\"id\":2},{\"id\":4}]" +
+                "}" +
+                "}";
+
+        mockMvc.perform(post("/api/module/order/save")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        // --- 数据库严密校验 (更新后) ---
+        // 1. 主表更新正确
+        var dbOrderUpdated = dsl.selectFrom("orders").where(DSL.field("id").eq(generatedId)).fetchOne();
+        assertNotNull(dbOrderUpdated);
+        assertEquals("测试修改", dbOrderUpdated.get("customer"));
+        assertEquals(0, new BigDecimal("999.00").compareTo((BigDecimal) dbOrderUpdated.get("amount")));
+
+        // 2. 从表订单项：商品 B 应当已被自动删除；商品 A 的属性已被更新；商品 C 已被插入
+        var dbItemsUpdated = dsl.selectFrom("order_items").where(DSL.field("order_id").eq(generatedId)).orderBy(DSL.field("id").asc()).fetch();
+        assertEquals(2, dbItemsUpdated.size());
+        // 第一个是修改后的 A
+        assertEquals(itemAId, ((Number) dbItemsUpdated.get(0).get("id")).longValue());
+        assertEquals("测试商品A-改", dbItemsUpdated.get(0).get("product_name"));
+        assertEquals(3, ((Number) dbItemsUpdated.get(0).get("qty")).intValue());
+        // 第二个是新增的 C
+        assertEquals("测试商品C", dbItemsUpdated.get(1).get("product_name"));
+
+        // 3. 关联关系：标签应当已经更新为 2, 4
+        var dbTagsUpdated = dsl.selectFrom("order_tags").where(DSL.field("order_id").eq(generatedId)).orderBy(DSL.field("tag_id").asc()).fetch();
+        assertEquals(2, dbTagsUpdated.size());
+        assertEquals(2L, ((Number) dbTagsUpdated.get(0).get("tag_id")).longValue());
+        assertEquals(4L, ((Number) dbTagsUpdated.get(1).get("tag_id")).longValue());
+
+        // 12. 执行删除操作
         mockMvc.perform(delete("/api/module/order/" + generatedId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
-        // 12. 确认删除后无法查到该主表与从表明细数据
+        // --- 数据库严密校验 (删除后) ---
+        // 确保所有关联数据在底层数据库已物理清除干净
+        assertFalse(dsl.fetchExists(dsl.selectFrom("orders").where(DSL.field("id").eq(generatedId))));
+        assertFalse(dsl.fetchExists(dsl.selectFrom("order_items").where(DSL.field("order_id").eq(generatedId))));
+        assertFalse(dsl.fetchExists(dsl.selectFrom("order_tags").where(DSL.field("order_id").eq(generatedId))));
+
+        // 13. 确认删除后无法查到该主表与从表明细数据 (API 端校验)
         mockMvc.perform(post("/api/module/order/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(detailJson))
@@ -172,7 +251,7 @@ public class ModuleControllerTest {
 
     @Test
     public void testRefreshCache() throws Exception {
-        // 13. 测试缓存刷新接口
+        // 14. 测试缓存刷新接口
         mockMvc.perform(post("/api/module/order/refresh-cache"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
