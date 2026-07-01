@@ -28,26 +28,38 @@ public class SaveHandler {
     /**
      * 批量保存从表数据
      */
-    public void saveSubTableBatch(TableMeta sub, Long mainId, List<Map<String, Object>> dataList) {
+    public void saveSubTableBatch(TableMeta sub, Long mainId, List<Map<String, Object>> dataList,
+                                  Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         for (Map<String, Object> data : dataList) {
             data.put(sub.getForeignKey(), mainId);
             Long itemId = data.get("id") != null
                     ? ((Number) data.get("id")).longValue()
                     : null;
-            upsertTable(sub, data, itemId);
+            upsertTable(sub, data, itemId, perms);
         }
     }
 
     /**
      * 通用单表 upsert 操作
      */
-    public Long upsertTable(TableMeta table, Map<String, Object> data, Long id) {
+    public Long upsertTable(TableMeta table, Map<String, Object> data, Long id,
+                            Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         Table<Record> t = DSL.table(DSL.name(table.getTableName()));
 
         Map<Field<?>, Object> fieldMap = new LinkedHashMap<>();
         data.forEach((columnName, val) -> {
             FieldMeta fm = table.getFieldByName(columnName);
             if (fm != null && fm.isWritable()) {
+                com.lowcode.meta.domain.FieldPerm perm = perms.getOrDefault(fm.getId(), com.lowcode.meta.domain.FieldPerm.NONE);
+                if (id == null) {
+                    if (!perm.canWrite()) {
+                        throw new IllegalArgumentException("无权写入字段: " + table.getTableName() + "." + columnName);
+                    }
+                } else {
+                    if (!perm.canUpdate()) {
+                        throw new IllegalArgumentException("无权更新字段: " + table.getTableName() + "." + columnName);
+                    }
+                }
                 fieldMap.put(DSL.field(DSL.name(fm.getColumnName())), val);
             }
         });

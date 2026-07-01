@@ -2,6 +2,8 @@ package com.lowcode.engine.handler;
 
 import lombok.RequiredArgsConstructor;
 import com.lowcode.meta.domain.RelationMeta;
+import com.lowcode.meta.domain.TableMeta;
+import com.lowcode.meta.domain.FieldMeta;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
@@ -23,16 +25,20 @@ public class RelationHandler {
     private final DSLContext dsl;
 
     /**
-     * 查询关联的右表数据（通过中间表 JOIN），支持字段选择
+     * 查询关联的右表数据（通过中间表 JOIN），支持字段选择与权限校验
      */
-    public List<Map<String, Object>> queryRight(RelationMeta rel, Long leftId, List<String> fieldsSelect) {
+    public List<Map<String, Object>> queryRight(RelationMeta rel, Long leftId, List<String> fieldsSelect,
+                                                TableMeta rightTableMeta, Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         Table<Record> junction = DSL.table(DSL.name(rel.getJunctionTable()));
         String rightTableName = rel.getRightTable();
         Table<Record> right = DSL.table(DSL.name(rightTableName));
 
         String rightPk = defaultIfBlank(rel.getRightJoinColumn(), "id");
 
-        List<org.jooq.SelectFieldOrAsterisk> selectFields = buildRelationSelectFields(rightTableName, right, fieldsSelect);
+        List<org.jooq.SelectFieldOrAsterisk> selectFields = buildRelationSelectFields(rightTableName, right, fieldsSelect, rightTableMeta, perms);
+        if (selectFields.isEmpty()) {
+            return Collections.emptyList();
+        }
 
         return dsl
                 .select(selectFields)
@@ -46,11 +52,11 @@ public class RelationHandler {
     }
 
     /**
-     * 批量查询关联的右表数据（解决 N+1 问题）。
-     * 一次查出多个 leftId 对应的所有关联记录，返回按 leftId 分组的 Map。
+     * 批量查询关联的右表数据（解决 N+1 问题），支持权限校验。
      */
     public Map<Long, List<Map<String, Object>>> queryRightBatch(
-            RelationMeta rel, List<Long> leftIds, List<String> fieldsSelect) {
+            RelationMeta rel, List<Long> leftIds, List<String> fieldsSelect,
+            TableMeta rightTableMeta, Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         if (leftIds == null || leftIds.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -63,7 +69,11 @@ public class RelationHandler {
         String leftFk = rel.getLeftFk();
 
         // 选择字段 + 中间表的 leftFk（用于分组）
-        List<org.jooq.SelectFieldOrAsterisk> selectFields = buildRelationSelectFields(rightTableName, right, fieldsSelect);
+        List<org.jooq.SelectFieldOrAsterisk> selectFields = buildRelationSelectFields(rightTableName, right, fieldsSelect, rightTableMeta, perms);
+        if (selectFields.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        
         Field<Object> leftFkField = DSL.field(DSL.name(rel.getJunctionTable(), leftFk));
         selectFields.add(leftFkField.as("__left_fk__"));
 
@@ -113,13 +123,32 @@ public class RelationHandler {
     // ==================== 私有方法 ====================
 
     private List<org.jooq.SelectFieldOrAsterisk> buildRelationSelectFields(
-            String rightTableName, Table<Record> right, List<String> fieldsSelect) {
+            String rightTableName, Table<Record> right, List<String> fieldsSelect,
+            TableMeta rightTableMeta, Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         List<org.jooq.SelectFieldOrAsterisk> selectFields = new ArrayList<>();
-        if (fieldsSelect == null || fieldsSelect.isEmpty() || fieldsSelect.contains("*")) {
-            selectFields.add(right.asterisk());
+        if (rightTableMeta != null) {
+            List<String> toSelect = new ArrayList<>();
+            if (fieldsSelect == null || fieldsSelect.isEmpty() || fieldsSelect.contains("*")) {
+                rightTableMeta.getFields().forEach(f -> toSelect.add(f.getColumnName()));
+            } else {
+                toSelect.addAll(fieldsSelect);
+            }
+            for (String col : toSelect) {
+                com.lowcode.meta.domain.FieldMeta fm = rightTableMeta.getFieldByName(col);
+                if (fm != null) {
+                    com.lowcode.meta.domain.FieldPerm perm = perms.getOrDefault(fm.getId(), com.lowcode.meta.domain.FieldPerm.NONE);
+                    if (perm.canRead()) {
+                        selectFields.add(DSL.field(DSL.name(rightTableName, col)).as(col));
+                    }
+                }
+            }
         } else {
-            for (String f : fieldsSelect) {
-                selectFields.add(DSL.field(DSL.name(rightTableName, f)).as(f));
+            if (fieldsSelect == null || fieldsSelect.isEmpty() || fieldsSelect.contains("*")) {
+                selectFields.add(right.asterisk());
+            } else {
+                for (String f : fieldsSelect) {
+                    selectFields.add(DSL.field(DSL.name(rightTableName, f)).as(f));
+                }
             }
         }
         return selectFields;

@@ -66,6 +66,7 @@ public class MetaRepository {
                 case "LIST" -> meta.getListTables().add(table);
                 case "SUB"  -> meta.getSubTables().add(table);
                 case "JOIN" -> meta.getJoinTables().add(table);
+                case "RELATION" -> meta.getRelationTables().add(table);
             }
         }
 

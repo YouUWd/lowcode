@@ -24,9 +24,16 @@ public class SubTableHandler {
     /**
      * 查询单条记录的从表数据（用于详情查询）
      */
-    public List<Map<String, Object>> querySubTable(TableMeta sub, Long mainId, List<String> fieldsSelect) {
+    /**
+     * 查询单条记录的从表数据（用于详情查询）
+     */
+    public List<Map<String, Object>> querySubTable(TableMeta sub, Long mainId, List<String> fieldsSelect,
+                                                   Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         validateFieldsSelect(sub, fieldsSelect);
-        List<Field<?>> selectFields = buildSelectFields(sub, fieldsSelect);
+        List<Field<?>> selectFields = buildSelectFields(sub, fieldsSelect, perms);
+        if (selectFields.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
 
         return dsl.select(selectFields)
                 .from(DSL.table(DSL.name(sub.getTableName())))
@@ -39,17 +46,22 @@ public class SubTableHandler {
      * 使用 IN 条件一次查出所有主表 ID 对应的从表记录。
      */
     public List<Map<String, Object>> querySubTableBatch(TableMeta sub, List<Long> mainIds,
-                                                         List<String> fieldsSelect) {
+                                                         List<String> fieldsSelect,
+                                                         Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         validateFieldsSelect(sub, fieldsSelect);
 
-        // 批量查询时需要包含 foreignKey 以便分组
-        List<Field<?>> selectFields = buildSelectFields(sub, fieldsSelect);
-        // 确保 foreignKey 在选择列中
+        List<Field<?>> selectFields = buildSelectFields(sub, fieldsSelect, perms);
         String fk = sub.getForeignKey();
-        boolean fkIncluded = selectFields.stream()
-                .anyMatch(f -> f.getName().equals(fk));
-        if (!fkIncluded) {
-            selectFields.add(DSL.field(DSL.name(fk)).as(fk));
+        if (selectFields.isEmpty()) {
+            // 如果无任何可读字段，也必须选出 FK 进行后续的分组编排
+            selectFields.add(DSL.field(DSL.name(fk)).as("__group_fk__"));
+        } else {
+            // 确保 foreignKey 在选择列中
+            boolean fkIncluded = selectFields.stream()
+                    .anyMatch(f -> f.getName().equals(fk));
+            if (!fkIncluded) {
+                selectFields.add(DSL.field(DSL.name(fk)).as("__group_fk__"));
+            }
         }
 
         return dsl.select(selectFields)
@@ -74,12 +86,13 @@ public class SubTableHandler {
     /**
      * 根据字段选择构建 SELECT 字段列表
      */
-    private List<Field<?>> buildSelectFields(TableMeta table, List<String> fieldsSelect) {
+    private List<Field<?>> buildSelectFields(TableMeta table, List<String> fieldsSelect,
+                                             Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         List<Field<?>> selectFields = new ArrayList<>();
         for (FieldMeta f : table.getFields()) {
             boolean matched = fieldsSelect == null || fieldsSelect.isEmpty()
                     || fieldsSelect.contains("*") || fieldsSelect.contains(f.getColumnName());
-            if (matched) {
+            if (matched && perms.getOrDefault(f.getId(), com.lowcode.meta.domain.FieldPerm.NONE).canRead()) {
                 selectFields.add(DSL.field(DSL.name(f.getColumnName())).as(f.getColumnName()));
             }
         }

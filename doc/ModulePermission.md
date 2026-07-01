@@ -364,7 +364,7 @@ public class SecurityContext {
 
 下面这张图展示权限在整个请求链路中的拦截位置：
 
-![alt text](image-1.png)
+![alt text](images/image-1.png)
 
 ## 八、多角色权限合并
 

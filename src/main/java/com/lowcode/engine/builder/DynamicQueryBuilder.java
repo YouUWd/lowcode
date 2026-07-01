@@ -35,10 +35,11 @@ public class DynamicQueryBuilder {
      * withMap 由调用方（ModuleEngine）统一构建，不再重复解析 req.getWith()。
      */
     public SelectSeekStepN<Record> buildListQuery(TableMeta main, List<TableMeta> joinTables,
-                                                   QueryRequest req, Map<String, List<String>> withMap) {
+                                                   QueryRequest req, Map<String, List<String>> withMap,
+                                                   Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         Table<Record> mainTable = DSL.table(DSL.name(main.getTableName())).as(main.getTableName());
 
-        List<Field<?>> selectFields = collectAllFields(main, joinTables, withMap);
+        List<Field<?>> selectFields = collectAllFields(main, joinTables, withMap, perms);
 
         var joinStep = dsl
                 .select(selectFields)
@@ -73,11 +74,12 @@ public class DynamicQueryBuilder {
      * 构建详情查询 SQL
      */
     public Record buildDetailQuery(TableMeta main, List<TableMeta> joinTables,
-                                    Long id, Map<String, List<String>> withFields) {
+                                    Long id, Map<String, List<String>> withFields,
+                                    Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         Table<Record> mainTable = DSL.table(DSL.name(main.getTableName()))
                 .as(main.getTableName());
 
-        List<Field<?>> allFields = collectAllFields(main, joinTables, withFields);
+        List<Field<?>> allFields = collectAllFields(main, joinTables, withFields, perms);
 
         var joinStep = dsl
                 .select(allFields)
@@ -202,7 +204,8 @@ public class DynamicQueryBuilder {
     // ==================== 字段收集 ====================
 
     private List<Field<?>> collectAllFields(TableMeta main, List<TableMeta> joins,
-                                             Map<String, List<String>> withFields) {
+                                             Map<String, List<String>> withFields,
+                                             Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         List<Field<?>> fields = new ArrayList<>();
 
         // 主表字段
@@ -218,10 +221,16 @@ public class DynamicQueryBuilder {
         main.getFields().forEach(f -> {
             if (mainSelect == null || mainSelect.isEmpty()
                     || mainSelect.contains("*") || mainSelect.contains(f.getColumnName())) {
-                fields.add(DSL.field(DSL.name(main.getTableName(), f.getColumnName()))
-                        .as(main.getTableName() + "_" + f.getColumnName()));
+                if (perms.getOrDefault(f.getId(), com.lowcode.meta.domain.FieldPerm.NONE).canRead()) {
+                    fields.add(DSL.field(DSL.name(main.getTableName(), f.getColumnName()))
+                            .as(main.getTableName() + "_" + f.getColumnName()));
+                }
             }
         });
+
+        if (fields.isEmpty()) {
+            throw new IllegalArgumentException("表 [" + main.getTableName() + "] 无任何可读字段");
+        }
 
         // JOIN 表字段
         if (joins != null) {
@@ -238,8 +247,10 @@ public class DynamicQueryBuilder {
                 jt.getFields().forEach(f -> {
                     if (joinSelect == null || joinSelect.isEmpty()
                             || joinSelect.contains("*") || joinSelect.contains(f.getColumnName())) {
-                        fields.add(DSL.field(DSL.name(jt.getTableName(), f.getColumnName()))
-                                .as(jt.getTableName() + "_" + f.getColumnName()));
+                        if (perms.getOrDefault(f.getId(), com.lowcode.meta.domain.FieldPerm.NONE).canRead()) {
+                            fields.add(DSL.field(DSL.name(jt.getTableName(), f.getColumnName()))
+                                    .as(jt.getTableName() + "_" + f.getColumnName()));
+                        }
                     }
                 });
             });

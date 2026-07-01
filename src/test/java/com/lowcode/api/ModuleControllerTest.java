@@ -31,6 +31,7 @@ public class ModuleControllerTest {
 
     // ================================================================
     // 用例 1 - 3：列表查询（含 JOIN、从表、多对多标签）
+    // 所有旧用例通过指定 X-Role: admin 头部保证完全兼容
     // ================================================================
 
     @Test
@@ -46,6 +47,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -80,6 +82,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -98,6 +101,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(page2Json))
                 .andExpect(status().isOk())
@@ -119,6 +123,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -150,6 +155,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -178,6 +184,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -209,6 +216,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -232,6 +240,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -265,6 +274,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -287,6 +297,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reqJson))
                 .andExpect(status().isOk())
@@ -311,11 +322,12 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidTableJson))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value(containsString("Unknown table or relation")));
+                .andExpect(jsonPath("$.message").value(containsString("Unknown table or relation in 'with'")));
 
         // 测试表内非法的列名
         String invalidFieldJson = """
@@ -326,6 +338,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidFieldJson))
                 .andExpect(status().isBadRequest())
@@ -362,6 +375,7 @@ public class ModuleControllerTest {
                 """;
 
         String resultStr = mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(saveJson))
                 .andExpect(status().isOk())
@@ -395,6 +409,7 @@ public class ModuleControllerTest {
                 }
                 """, generatedId);
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(detailJson))
                 .andExpect(status().isOk())
@@ -429,6 +444,7 @@ public class ModuleControllerTest {
                 """, generatedId, itemAId);
 
         mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJson))
                 .andExpect(status().isOk())
@@ -451,6 +467,7 @@ public class ModuleControllerTest {
 
         // ── API 全字段校验（更新后）──────────────────────────────────────
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(detailJson))
                 .andExpect(status().isOk())
@@ -461,7 +478,8 @@ public class ModuleControllerTest {
                 .andExpect(jsonPath("$.data.tags[0].id").value(2));
 
         // ── 步骤 3: 级联物理删除 ─────────────────────────────────────────
-        mockMvc.perform(delete("/api/module/order/" + generatedId))
+        mockMvc.perform(delete("/api/module/order/" + generatedId)
+                        .header("X-Role", "admin"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"));
@@ -473,6 +491,7 @@ public class ModuleControllerTest {
 
         // ── API 校验（删除后）─────────────────────────────────────────────
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(detailJson))
                 .andExpect(status().isOk())
@@ -501,6 +520,7 @@ public class ModuleControllerTest {
                 }
                 """;
         mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(queryJson))
                 .andExpect(status().isOk())
@@ -508,4 +528,369 @@ public class ModuleControllerTest {
                 .andExpect(jsonPath("$.data.total").value(3))
                 .andExpect(jsonPath("$.data.rows", hasSize(3)));
     }
+
+    // ================================================================
+    // 新增：白名单字段级权限完整校验集成测试用例
+    // ================================================================
+
+    @Test
+    public void testPermissionsForViewerRole() throws Exception {
+        // 1. 测试 viewer 角色（查看员）查询详情 (ID=1)
+        // viewer 角色未配置 remark 字段权限记录，根据白名单原则，该字段应在响应中彻底被剥离
+        String reqJson = """
+                {
+                  "id": 1
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "viewer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(reqJson))
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.orders.id").value(1))
+                .andExpect(jsonPath("$.data.orders.order_no").value("ORD-20240101-001"))
+                .andExpect(jsonPath("$.data.orders.amount").value(1500.00))
+                // 验证 remark 字段在 API 返回中彻底不存在（即白名单过滤生效）
+                .andExpect(jsonPath("$.data.orders.remark").doesNotExist())
+                // viewer 角色有 level 与 contact_phone 权限
+                .andExpect(jsonPath("$.data.customer_profiles.level").value("VIP"))
+                .andExpect(jsonPath("$.data.customer_profiles.contact_phone").value("13800138000"));
+    }
+
+    @Test
+    public void testPermissionsForAnonymousRole() throws Exception {
+        // 2. 测试未传角色请求头（自动归为 anonymous 角色，没有任何字段权限配置）
+        // 按照纯白名单原则，没有配置任何可读列将直接抛出异常（400，无任何可读字段）
+        String reqJson = """
+                {
+                  "page": 1,
+                  "size": 5
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(reqJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("无任何可读字段")));
+    }
+
+    @Test
+    public void testSaveAndUpdatePermissionsForEditorRole() throws Exception {
+        // 3. 测试 editor 角色写入与更新过滤规则
+        // editor 角色对 amount 字段具有 w (can_write=true)，但不具备 u (can_update=false, 权限位为 6 = rw-)
+        // editor 角色对 status 字段不具备 w (can_write=false)，但具备 u (can_update=true, 权限位为 5 = r-u)
+
+        // ── 步骤 1: 写入测试 (INSERT) ──
+        // 只传入可写的 amount，不传入无权写的 status，应当成功
+        String saveJson = """
+                {
+                  "data": {
+                    "orders": {
+                      "order_no": "ORD-EDIT-11",
+                      "customer": "编辑新增",
+                      "amount": 555.00
+                    }
+                  }
+                }
+                """;
+
+        String resultStr = mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "editor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(saveJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andReturn().getResponse().getContentAsString();
+
+        Number newId = com.jayway.jsonpath.JsonPath.read(resultStr, "$.data");
+        long generatedId = newId.longValue();
+
+        // ── 数据库直接验证写入状态 ──
+        var dbOrder = dsl.selectFrom("orders").where(DSL.field("id").eq(generatedId)).fetchOne();
+        assertNotNull(dbOrder);
+        assertEquals("ORD-EDIT-11", dbOrder.get("order_no"));
+        assertEquals("编辑新增", dbOrder.get("customer"));
+        assertEquals(0, new BigDecimal("555.00").compareTo((BigDecimal) dbOrder.get("amount")));
+        assertEquals("PENDING", dbOrder.get("status")); // 默认值
+
+        // ── 步骤 2: 更新测试 (UPDATE) ──
+        // 只传入可更新的 status，不传入无更新权限的 amount，应当成功
+        String updateJson = String.format("""
+                {
+                  "data": {
+                    "orders": {
+                      "id": %d,
+                      "order_no": "ORD-EDIT-11",
+                      "customer": "编辑新增",
+                      "status": "PAID"
+                    }
+                  }
+                }
+                """, generatedId);
+
+        mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "editor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        // ── 数据库直接验证更新状态 ──
+        var dbOrderUpdated = dsl.selectFrom("orders").where(DSL.field("id").eq(generatedId)).fetchOne();
+        assertNotNull(dbOrderUpdated);
+        assertEquals(0, new BigDecimal("555.00").compareTo((BigDecimal) dbOrderUpdated.get("amount"))); // 没传，保持原值
+        assertEquals("PAID", dbOrderUpdated.get("status")); // 传入可更新的 status，应该成功更新
+
+        // ── 步骤 3: 级联物理清理 ──
+        mockMvc.perform(delete("/api/module/order/" + generatedId)
+                        .header("X-Role", "admin"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testViewerListQueryAndExcludeRemark() throws Exception {
+        // viewer 角色列表查询应该正常，但是不包含任何 orders.remark 字段值
+        String queryJson = """
+                {
+                  "page": 1,
+                  "size": 5
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "viewer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(queryJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.rows", hasSize(3)))
+                // 第一行数据字段校验：不能含有 remark 字段
+                .andExpect(jsonPath("$.data.rows[0].orders.id").exists())
+                .andExpect(jsonPath("$.data.rows[0].orders.order_no").exists())
+                .andExpect(jsonPath("$.data.rows[0].orders.remark").doesNotExist());
+    }
+
+    @Test
+    public void testViewerSaveRejected() throws Exception {
+        // viewer 角色的所有字段都是只读 (4)，不具备写操作权限，保存时应该因为没有任何可写字段而抛出错误 (400)
+        String saveJson = """
+                {
+                  "data": {
+                    "orders": {
+                      "order_no": "ORD-VIEW-99",
+                      "customer": "只读人员试图写入",
+                      "amount": 99.00,
+                      "status": "PENDING"
+                    }
+                  }
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "viewer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(saveJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("无权写入字段: orders.order_no")));
+    }
+
+    @Test
+    public void testEditorListQuery() throws Exception {
+        // editor 角色进行列表查询，应当正常工作并返回其被授权的字段
+        String queryJson = """
+                {
+                  "page": 1,
+                  "size": 5
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "editor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(queryJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.rows[0].orders.id").exists())
+                .andExpect(jsonPath("$.data.rows[0].orders.amount").exists())
+                .andExpect(jsonPath("$.data.rows[0].orders.status").exists());
+    }
+
+    @Test
+    public void testViewerUpdateRejected() throws Exception {
+        // viewer 只有只读权限 (4)，试图修改订单数据（customer 和 amount）
+        // 期望直接抛出无权更新字段异常并返回 400
+        String updateJson = """
+                {
+                  "data": {
+                    "orders": {
+                      "id": 1,
+                      "order_no": "ORD-20240101-001",
+                      "customer": "恶意篡改的姓名",
+                      "amount": 999999.99,
+                      "status": "COMPLETED"
+                    }
+                  }
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "viewer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("无权更新字段: orders.order_no")));
+    }
+
+    @Test
+    public void testEditorSaveUnauthorizedFieldRejected() throws Exception {
+        // editor 角色对 status 字段无写入权限 (can_write=false)，试图传入该字段保存
+        // 期望直接拦截并返回 400
+        String saveJson = """
+                {
+                  "data": {
+                    "orders": {
+                      "order_no": "ORD-EDIT-BAD-1",
+                      "customer": "编辑写入非法",
+                      "amount": 100.00,
+                      "status": "PAID"
+                    }
+                  }
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "editor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(saveJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("无权写入字段: orders.status")));
+    }
+
+    @Test
+    public void testEditorUpdateUnauthorizedFieldRejected() throws Exception {
+        // editor 角色对 amount 字段无更新权限 (can_update=false)，试图传入该字段修改
+        // 期望直接拦截并返回 400
+        String updateJson = """
+                {
+                  "data": {
+                    "orders": {
+                      "id": 1,
+                      "order_no": "ORD-20240101-001",
+                      "amount": 999.00
+                    }
+                  }
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "editor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("无权更新字段: orders.amount")));
+    }
+
+    @Test
+    public void testEditorSubTableSaveAndUpdatePermissions() throws Exception {
+        // editor 角色对 order_items 的普通字段（product_name, qty, price）有 w & u 权限
+        // 但对 created_at 字段只有只读权限 (4)，没有写入和更新权限。
+
+        // ── 步骤 1: 新增测试 (INSERT) ──
+        // 我们尝试在明细项中传入自定义的 created_at 时间
+        // 注意：orders 中省略了 editor 无权写入的 status 字段
+        String saveJson = """
+                {
+                  "data": {
+                    "orders": {
+                      "order_no": "ORD-EDIT-SUB",
+                      "customer": "编辑从表测试",
+                      "amount": 100.00
+                    },
+                    "order_items": [
+                      {
+                        "product_name": "测试鼠标",
+                        "qty": 5,
+                        "price": 20.00,
+                        "created_at": "2020-01-01 12:00:00"
+                      }
+                    ]
+                  }
+                }
+                """;
+
+        String resultStr = mockMvc.perform(post("/api/module/order/save")
+                        .header("X-Role", "editor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(saveJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andReturn().getResponse().getContentAsString();
+
+        Number newId = com.jayway.jsonpath.JsonPath.read(resultStr, "$.data");
+        long generatedId = newId.longValue();
+
+        try {
+            // 验证数据库：
+            var dbItem = dsl.selectFrom("order_items")
+                    .where(DSL.field("order_id").eq(generatedId))
+                    .fetchOne();
+            assertNotNull(dbItem);
+            assertEquals("测试鼠标", dbItem.get("product_name"));
+            // 应该忽略传入的自定义时间，由数据库生成默认当前时间（即不等于 2020 年）
+            Object createdAtObj = dbItem.get("created_at");
+            assertNotNull(createdAtObj);
+            assertFalse(createdAtObj.toString().startsWith("2020"));
+
+            // ── 步骤 2: 更新测试 (UPDATE) ──
+            // 注意：orders 中省略了 editor 无权更新的 amount 字段
+            long itemId = ((Number) dbItem.get("id")).longValue();
+            String updateJson = String.format("""
+                    {
+                      "data": {
+                        "orders": {
+                          "id": %d,
+                          "order_no": "ORD-EDIT-SUB",
+                          "customer": "编辑从表测试",
+                          "status": "PENDING"
+                        },
+                        "order_items": [
+                          {
+                            "id": %d,
+                            "product_name": "测试鼠标-改",
+                            "qty": 10,
+                            "price": 18.00,
+                            "created_at": "2021-05-05 12:00:00"
+                          }
+                        ]
+                      }
+                    }
+                    """, generatedId, itemId);
+
+            mockMvc.perform(post("/api/module/order/save")
+                            .header("X-Role", "editor")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(updateJson))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            // 验证更新后状态：
+            var dbItemUpdated = dsl.selectFrom("order_items")
+                    .where(DSL.field("id").eq(itemId))
+                    .fetchOne();
+            assertNotNull(dbItemUpdated);
+            assertEquals("测试鼠标-改", dbItemUpdated.get("product_name"));
+            assertEquals(10, dbItemUpdated.get("qty"));
+            // created_at 依旧不能被更新，应当维持原有的插入时间
+            Object createdAtObjUpdated = dbItemUpdated.get("created_at");
+            assertNotNull(createdAtObjUpdated);
+            assertEquals(createdAtObj.toString(), createdAtObjUpdated.toString());
+        } finally {
+            // ── 步骤 3: 物理清理 ──
+            mockMvc.perform(delete("/api/module/order/" + generatedId)
+                            .header("X-Role", "admin"))
+                    .andExpect(status().isOk());
+        }
+    }
 }
+

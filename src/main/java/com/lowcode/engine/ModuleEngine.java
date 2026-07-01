@@ -36,12 +36,17 @@ public class ModuleEngine {
     private final SubTableHandler subTableHandler;
     private final SaveHandler saveHandler;
     private final DSLContext dsl;
+    private final PermissionResolver permissionResolver;
 
     // ==================== 查询 ====================
 
     public Map<String, Object> query(String moduleId, QueryRequest req) {
         ModuleMeta meta = metaCache.get(moduleId);
         Map<String, Object> result = new LinkedHashMap<>();
+
+        // 获取当前用户权限
+        String roleCode = com.lowcode.config.UserContextHolder.get().getRoleCode();
+        Map<Long, com.lowcode.meta.domain.FieldPerm> perms = permissionResolver.resolveAll(meta, moduleId, roleCode);
 
         // 1. 构建 withMap 并校验表名合法性
         Map<String, List<String>> withMap = buildAndValidateWithMap(req, meta);
@@ -55,14 +60,14 @@ public class ModuleEngine {
 
             if (req.getId() != null) {
                 // 详情查询
-                result.put("detail", detailHandler.query(t, requiredJoins, req.getId(), withMap));
+                result.put("detail", detailHandler.query(t, requiredJoins, req.getId(), withMap, perms));
             } else {
                 // 列表查询
-                PageResult pr = listHandler.query(t, requiredJoins, req, withMap);
+                PageResult pr = listHandler.query(t, requiredJoins, req, withMap, perms);
 
                 // 批量加载从表和关联数据（解决 N+1）
                 if (!pr.getRows().isEmpty() && !withMap.isEmpty()) {
-                    batchLoadSubAndRelation(pr.getRows(), t, meta, withMap);
+                    batchLoadSubAndRelation(pr.getRows(), t, meta, withMap, perms);
                 }
 
                 result.put("rows", pr.getRows());
@@ -84,13 +89,14 @@ public class ModuleEngine {
             for (TableMeta sub : meta.getSubTables()) {
                 if (fetchAllRelations || withMap.containsKey(sub.getTableName())) {
                     result.put(sub.getTableName(),
-                            subTableHandler.querySubTable(sub, req.getId(), withMap.get(sub.getTableName())));
+                            subTableHandler.querySubTable(sub, req.getId(), withMap.get(sub.getTableName()), perms));
                 }
             }
             meta.getRelations().forEach(rel -> {
                 if (fetchAllRelations || withMap.containsKey(rel.getName())) {
                     result.put(rel.getName(),
-                            relationHandler.queryRight(rel, req.getId(), withMap.get(rel.getName())));
+                            relationHandler.queryRight(rel, req.getId(), withMap.get(rel.getName()),
+                                    meta.getTableByName(rel.getRightTable()), perms));
                 }
             });
         }
@@ -103,6 +109,10 @@ public class ModuleEngine {
     @Transactional(rollbackFor = Exception.class)
     public Long save(String moduleId, SaveRequest req) {
         ModuleMeta meta = metaCache.get(moduleId);
+
+        // 获取当前用户权限
+        String roleCode = com.lowcode.config.UserContextHolder.get().getRoleCode();
+        Map<Long, com.lowcode.meta.domain.FieldPerm> perms = permissionResolver.resolveAll(meta, moduleId, roleCode);
 
         Map<String, Object> reqData = req.getData();
         if (reqData == null) {
@@ -121,7 +131,7 @@ public class ModuleEngine {
         }
 
         Long mainId = mainData.get("id") != null ? ((Number) mainData.get("id")).longValue() : null;
-        mainId = saveHandler.upsertTable(mainTable, mainData, mainId);
+        mainId = saveHandler.upsertTable(mainTable, mainData, mainId, perms);
 
         if (mainId == null) {
             throw new IllegalArgumentException("保存主表失败，未能获取自增 ID");
@@ -153,7 +163,7 @@ public class ModuleEngine {
                             .execute();
                 }
 
-                saveHandler.saveSubTableBatch(sub, finalMainId, subDataList);
+                saveHandler.saveSubTableBatch(sub, finalMainId, subDataList, perms);
             }
         }
 
@@ -240,7 +250,8 @@ public class ModuleEngine {
      */
     @SuppressWarnings("unchecked")
     private void batchLoadSubAndRelation(List<Map<String, Object>> rows, TableMeta listTable,
-                                         ModuleMeta meta, Map<String, List<String>> withMap) {
+                                         ModuleMeta meta, Map<String, List<String>> withMap,
+                                         Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
         // 收集所有主表 ID
         List<Long> mainIds = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -255,11 +266,18 @@ public class ModuleEngine {
         for (TableMeta sub : meta.getSubTables()) {
             if (!withMap.containsKey(sub.getTableName())) continue;
 
-            List<Map<String, Object>> allSubData = subTableHandler.querySubTableBatch(sub, mainIds, withMap.get(sub.getTableName()));
+            List<Map<String, Object>> allSubData = subTableHandler.querySubTableBatch(sub, mainIds, withMap.get(sub.getTableName()), perms);
             // 按 foreignKey 分组
-            Map<Long, List<Map<String, Object>>> grouped = allSubData.stream()
-                    .collect(Collectors.groupingBy(
-                            m -> ((Number) m.get(sub.getForeignKey())).longValue()));
+            Map<Long, List<Map<String, Object>>> grouped = new HashMap<>();
+            for (Map<String, Object> subMap : allSubData) {
+                Long fkVal;
+                if (subMap.containsKey("__group_fk__")) {
+                    fkVal = ((Number) subMap.remove("__group_fk__")).longValue();
+                } else {
+                    fkVal = ((Number) subMap.get(sub.getForeignKey())).longValue();
+                }
+                grouped.computeIfAbsent(fkVal, k -> new ArrayList<>()).add(subMap);
+            }
 
             // 回填到各行
             for (Map<String, Object> row : rows) {
@@ -274,8 +292,9 @@ public class ModuleEngine {
         for (var rel : meta.getRelations()) {
             if (!withMap.containsKey(rel.getName())) continue;
 
-            Map<Long, List<Map<String, Object>>> grouped =
-                    relationHandler.queryRightBatch(rel, mainIds, withMap.get(rel.getName()));
+             Map<Long, List<Map<String, Object>>> grouped =
+                    relationHandler.queryRightBatch(rel, mainIds, withMap.get(rel.getName()),
+                            meta.getTableByName(rel.getRightTable()), perms);
 
             for (Map<String, Object> row : rows) {
                 Map<String, Object> mainData = (Map<String, Object>) row.get(listTable.getTableName());

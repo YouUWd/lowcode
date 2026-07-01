@@ -7,6 +7,8 @@ USE `low_code`;
 -- ============================================================
 -- 清理旧表（顺序：从表及关联表 -> 主表及元数据表）
 -- ============================================================
+DROP TABLE IF EXISTS `field_permission`;
+DROP TABLE IF EXISTS `sys_role`;
 DROP TABLE IF EXISTS `order_tags`;
 DROP TABLE IF EXISTS `order_items`;
 DROP TABLE IF EXISTS `orders`;
@@ -72,6 +74,28 @@ CREATE TABLE IF NOT EXISTS `relation_meta` (
     `right_join_column` VARCHAR(64) COMMENT '右表被关联列名',
     INDEX `idx_relation_meta_module` (`module_id`)
 ) ENGINE=InnoDB COMMENT='N:M多对多关联元数据';
+
+-- ============================================================
+-- 权限管理表结构
+-- ============================================================
+
+-- 系统角色表
+CREATE TABLE IF NOT EXISTS `sys_role` (
+    `id`   BIGINT       PRIMARY KEY AUTO_INCREMENT,
+    `code` VARCHAR(64)  UNIQUE NOT NULL COMMENT '角色编码',
+    `name` VARCHAR(128) COMMENT '角色名称'
+) ENGINE=InnoDB COMMENT='系统角色表';
+
+-- 字段级权限表 (白名单)
+CREATE TABLE IF NOT EXISTS `field_permission` (
+    `id`            BIGINT       PRIMARY KEY AUTO_INCREMENT,
+    `module_id`     VARCHAR(64)  NOT NULL COMMENT '模块ID',
+    `field_meta_id` BIGINT       NOT NULL COMMENT '字段元数据ID',
+    `role_code`     VARCHAR(64)  NOT NULL COMMENT '角色编码',
+    `perm_value`    TINYINT(1)   NOT NULL COMMENT '权限值(0-7)',
+    UNIQUE KEY `uk_field_role` (`field_meta_id`, `role_code`),
+    INDEX `idx_module_role` (`module_id`, `role_code`)
+) ENGINE=InnoDB COMMENT='字段级权限控制表';
 
 -- ============================================================
 -- 业务数据表结构
@@ -165,9 +189,59 @@ INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, 
 (@join_table_id, 'level',         '客户级别', 'VARCHAR',  1, 'EQ',   1, 3, 0),
 (@join_table_id, 'contact_phone', '联系电话', 'VARCHAR',  0, 'EQ',   0, 4, 0);
 
+-- 注册 N:M 多对多关联右表元数据 (表及字段)
+INSERT INTO `table_meta` (`module_id`, `table_name`, `query_type`, `join_type`, `join_on`, `foreign_key`, `sort_order`) VALUES
+('order', 'tags',              'RELATION', NULL, NULL,                                     NULL,       4);
+
+SET @tags_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='tags');
+INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `queryable`, `query_op`, `sortable`, `sort_order`, `writable`) VALUES
+(@tags_table_id, 'id',   '标签ID',   'BIGINT',   0, 'EQ',   0, 1, 0),
+(@tags_table_id, 'name', '标签名称', 'VARCHAR',  1, 'LIKE', 0, 2, 0);
+
 -- 导入关联元数据
 INSERT INTO `relation_meta` (`module_id`, `name`, `left_table`, `left_join_column`, `left_fk`, `junction_table`, `right_fk`, `right_table`, `right_join_column`) VALUES
 ('order', 'tags', 'orders', 'id', 'order_id', 'order_tags', 'tag_id', 'tags', 'id');
+
+-- ============================================================
+-- 权限初始化数据导入 (白名单)
+-- ============================================================
+
+INSERT INTO `sys_role` (`code`, `name`) VALUES
+('admin',  '管理员'),
+('editor', '编辑员'),
+('viewer', '查看员');
+
+-- 1. admin 角色配置所有字段 7 (rwu) 权限
+INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+SELECT 'order', `id`, 'admin', 7 FROM `field_meta`;
+
+-- 2. editor 角色配置权限
+-- orders 表、order_items 表与 tags 表配置可写列 7 (rwu)
+INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+SELECT 'order', `id`, 'editor', 7 FROM `field_meta` 
+WHERE `table_meta_id` IN (SELECT `id` FROM `table_meta` WHERE `table_name` IN ('orders', 'order_items', 'tags'))
+  AND `column_name` NOT IN ('id', 'order_id', 'amount', 'status', 'created_at', 'updated_at');
+
+-- 特殊字段权限
+INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`) VALUES
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='id' AND `table_meta_id`=@main_table_id), 'editor', 4),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='amount' AND `table_meta_id`=@main_table_id), 'editor', 6),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='status' AND `table_meta_id`=@main_table_id), 'editor', 5),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='created_at' AND `table_meta_id`=@main_table_id), 'editor', 4),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='updated_at' AND `table_meta_id`=@main_table_id), 'editor', 4),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='id' AND `table_meta_id`=@sub_table_id), 'editor', 4),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='order_id' AND `table_meta_id`=@sub_table_id), 'editor', 4),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='created_at' AND `table_meta_id`=@sub_table_id), 'editor', 4),
+('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='id' AND `table_meta_id`=@tags_table_id), 'editor', 4);
+
+-- customer_profiles (JOIN 表) 全只读 (4)
+INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+SELECT 'order', `id`, 'editor', 4 FROM `field_meta` WHERE `table_meta_id` = @join_table_id;
+
+-- 3. viewer 角色配置权限 (所有字段只读 4，除 remark 字段不做配置，使其默认无权限)
+INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+SELECT 'order', `id`, 'viewer', 4 FROM `field_meta`
+WHERE `column_name` != 'remark';
 
 -- ============================================================
 -- 业务初始化数据导入

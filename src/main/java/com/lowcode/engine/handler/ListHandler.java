@@ -21,8 +21,9 @@ public class ListHandler {
     private final DynamicQueryBuilder builder;
 
     public PageResult query(TableMeta main, List<TableMeta> joinTables,
-                            QueryRequest req, Map<String, List<String>> withMap) {
-        var query = builder.buildListQuery(main, joinTables, req, withMap);
+                            QueryRequest req, Map<String, List<String>> withMap,
+                            Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
+        var query = builder.buildListQuery(main, joinTables, req, withMap, perms);
         PageResult pr = builder.fetchPage(query, req.getPage(), req.getSize());
 
         // 反平铺所有表（包括主表）的数据为嵌套对象

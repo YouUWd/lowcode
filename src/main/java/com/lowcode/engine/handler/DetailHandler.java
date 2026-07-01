@@ -18,8 +18,10 @@ public class DetailHandler {
 
     private final DynamicQueryBuilder builder;
 
-    public Map<String, Object> query(TableMeta main, List<TableMeta> joinTables, Long id, java.util.Map<String, java.util.List<String>> withMap) {
-        Record row = builder.buildDetailQuery(main, joinTables, id, withMap);
+    public Map<String, Object> query(TableMeta main, List<TableMeta> joinTables, Long id,
+                                     java.util.Map<String, java.util.List<String>> withMap,
+                                     Map<Long, com.lowcode.meta.domain.FieldPerm> perms) {
+        Record row = builder.buildDetailQuery(main, joinTables, id, withMap, perms);
         if (row == null) {
             return null;
         }

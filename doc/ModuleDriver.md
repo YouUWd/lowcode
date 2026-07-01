@@ -513,7 +513,7 @@ public class MetaCache {
 
 下面这张图梳理了 JOOQ 在这个方案里各场景的分工：
 
-![alt text](image.png)
+![alt text](images/image.png)
 
 ## 九、几个值得注意的细节
 

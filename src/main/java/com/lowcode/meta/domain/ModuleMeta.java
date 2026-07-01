@@ -25,4 +25,25 @@ public class ModuleMeta {
     private List<TableMeta> joinTables = new ArrayList<>();
     /** N:M 多对多关联配置 */
     private List<RelationMeta> relations = new ArrayList<>();
+    /** RELATION 关联右表（不在主表查询中 JOIN，仅作元数据解析与权限过滤） */
+    private List<TableMeta> relationTables = new ArrayList<>();
+
+    public TableMeta getTableByName(String tableName) {
+        if (mainTable != null && tableName.equals(mainTable.getTableName())) {
+            return mainTable;
+        }
+        for (TableMeta t : listTables) {
+            if (tableName.equals(t.getTableName())) return t;
+        }
+        for (TableMeta t : subTables) {
+            if (tableName.equals(t.getTableName())) return t;
+        }
+        for (TableMeta t : joinTables) {
+            if (tableName.equals(t.getTableName())) return t;
+        }
+        for (TableMeta t : relationTables) {
+            if (tableName.equals(t.getTableName())) return t;
+        }
+        return null;
+    }
 }
