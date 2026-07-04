@@ -20,6 +20,8 @@ public class ModuleController {
 
     private final ModuleEngine moduleEngine;
     private final MetaCache metaCache;
+    private final com.lowcode.meta.repository.MetaRepository metaRepo;
+
 
     /**
      * 模块查询（列表 + 详情 + 关联）
@@ -58,6 +60,27 @@ public class ModuleController {
     @PostMapping("/{moduleId}/refresh-cache")
     public Result<Void> refreshCache(@PathVariable String moduleId) {
         metaCache.invalidate(moduleId);
+        return Result.ok();
+    }
+
+    /**
+     * 获取模块元数据模型，用于前端构建/设计页面模型
+     */
+    @GetMapping("/{moduleId}/meta")
+    public Result<com.lowcode.meta.domain.ModuleMeta> getMeta(@PathVariable String moduleId) {
+        return Result.ok(metaCache.get(moduleId));
+    }
+
+    /**
+     * 设计模块结构：保存/更新模块元数据，完成后自动刷新缓存
+     */
+    @PostMapping("/design")
+    public Result<Void> saveDesign(@RequestBody com.lowcode.meta.domain.ModuleMeta meta) {
+        if (meta == null || meta.getId() == null) {
+            throw new IllegalArgumentException("模块元数据及ID不能为空");
+        }
+        metaRepo.saveModuleMeta(meta);
+        metaCache.invalidate(meta.getId());
         return Result.ok();
     }
 }

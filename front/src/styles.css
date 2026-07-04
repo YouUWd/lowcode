@@ -1,0 +1,33 @@
+:root {
+  --lc-primary: #2563eb;
+  --lc-bg: #f5f7fa;
+  --lc-sidebar-bg: #0f172a;
+  --lc-sidebar-text: #cbd5e1;
+  --lc-border: #e5e7eb;
+
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', -apple-system, sans-serif;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: var(--lc-bg);
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--lc-primary);
+  --el-button-border-color: var(--lc-primary);
+}
+
+.page-card {
+  background: #fff;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+}
+
+.mono {
+  font-family: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+  font-size: 12px;
+}

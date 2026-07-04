@@ -151,10 +151,6 @@ public class DynamicQueryBuilder {
                 throw new IllegalArgumentException(
                         "Unknown field in filter: " + filter.getField() + " for table: " + tName);
             }
-            if (!fm.isQueryable()) {
-                throw new IllegalArgumentException(
-                        "Field is not queryable: " + filter.getField() + " for table: " + tName);
-            }
 
             Field<Object> col = DSL.field(DSL.name(table.getTableName(), fm.getColumnName()));
             Object val = filter.getValue();
@@ -190,7 +186,7 @@ public class DynamicQueryBuilder {
         if (req.getSorts() != null) {
             for (QueryRequest.SortItem sort : req.getSorts()) {
                 FieldMeta fm = table.getFieldByName(sort.getField());
-                if (fm == null || !fm.isSortable()) continue;
+                if (fm == null) continue;
                 Field<?> col = DSL.field(DSL.name(table.getTableName(), fm.getColumnName()));
                 sorts.add("DESC".equalsIgnoreCase(sort.getDir()) ? col.desc() : col.asc());
             }

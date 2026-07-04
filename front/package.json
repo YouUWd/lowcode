@@ -1,0 +1,29 @@
+{
+  "name": "lowcode-platform-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "typescript": "5.7.3",
+    "vite": "^8.1.3",
+    "vue-tsc": "^3.3.6"
+  },
+  "pnpm": {
+    "overrides": {
+      "hono": "4.12.25"
+    }
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "element-plus": "^2.14.2",
+    "vue": "^3.5.39",
+    "vue-router": "^5.1.0"
+  }
+}

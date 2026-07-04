@@ -15,12 +15,6 @@ public class FieldMeta {
     private String label;
     /** 数据类型（VARCHAR, BIGINT, DECIMAL, DATETIME 等） */
     private String dataType;
-    /** 是否允许作为查询条件 */
-    private boolean queryable;
-    /** 是否允许排序 */
-    private boolean sortable;
-    /** 是否允许写入 */
-    private boolean writable;
     /** 查询操作符（EQ, LIKE, GT, LT, GTE, LTE, IN, BETWEEN） */
     private String queryOp;
 }

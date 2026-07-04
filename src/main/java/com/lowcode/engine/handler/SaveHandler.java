@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 模块保存处理器 — 负责数据表的通用 upsert 与批量保存
@@ -49,7 +50,7 @@ public class SaveHandler {
         Map<Field<?>, Object> fieldMap = new LinkedHashMap<>();
         data.forEach((columnName, val) -> {
             FieldMeta fm = table.getFieldByName(columnName);
-            if (fm != null && fm.isWritable()) {
+            if (isWritableField(fm, table)) {
                 com.lowcode.meta.domain.FieldPerm perm = perms.getOrDefault(fm.getId(), com.lowcode.meta.domain.FieldPerm.NONE);
                 if (id == null) {
                     if (!perm.canWrite()) {
@@ -89,5 +90,21 @@ public class SaveHandler {
                     .execute();
             return id;
         }
+    }
+
+    private static final Set<String> SYSTEM_COLUMNS = Set.of("id", "created_at", "updated_at");
+
+    private boolean isWritableField(FieldMeta fm, TableMeta table) {
+        if (fm == null) {
+            return false;
+        }
+        String columnName = fm.getColumnName().toLowerCase();
+        if (SYSTEM_COLUMNS.contains(columnName)) {
+            return false;
+        }
+        if (table.getForeignKey() != null && columnName.equals(table.getForeignKey().toLowerCase())) {
+            return false;
+        }
+        return true;
     }
 }

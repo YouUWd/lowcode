@@ -11,6 +11,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -891,6 +895,227 @@ public class ModuleControllerTest {
                             .header("X-Role", "admin"))
                     .andExpect(status().isOk());
         }
+    }
+
+    @Test
+    public void testPermissionAdminGet() throws Exception {
+        // 验证管理员获取权限接口 GET /api/admin/permission/order/viewer
+        mockMvc.perform(get("/api/admin/permission/order/viewer"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data", hasSize(greaterThan(0))))
+                // 验证 orders.remark 字段存在于列表中且 perm 权限值为 0
+                .andExpect(jsonPath("$.data[?(@.tableName=='orders')].fields[?(@.columnName=='remark')].perm", contains(0)));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testPermissionAdminBatchUpdateAndTakeEffect() throws Exception {
+        // 1. 获取现有权限数据，用于还原和获取 fieldMetaId
+        String getResult = mockMvc.perform(get("/api/admin/permission/order/viewer"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<Map<String, Object>> tables = com.jayway.jsonpath.JsonPath.read(getResult, "$.data");
+        assertNotNull(tables);
+
+        // 找到 orders.remark 的记录，并且修改为可读
+        Long remarkFieldId = null;
+        List<Map<String, Object>> updateTables = new ArrayList<>();
+        for (var t : tables) {
+            Map<String, Object> newTable = new HashMap<>();
+            newTable.put("tableMetaId", t.get("tableMetaId"));
+            
+            List<Map<String, Object>> fields = (List<Map<String, Object>>) t.get("fields");
+            List<Map<String, Object>> newFields = new ArrayList<>();
+            for (var f : fields) {
+                Map<String, Object> newField = new HashMap<>();
+                newField.put("fieldMetaId", f.get("fieldMetaId"));
+                
+                int perm = ((Number) f.get("perm")).intValue();
+                if ("remark".equals(f.get("columnName")) && "orders".equals(t.get("tableName"))) {
+                    remarkFieldId = ((Number) f.get("fieldMetaId")).longValue();
+                    perm = 4; // 修改为 4 (r--) 只读
+                }
+                newField.put("perm", perm);
+                newFields.add(newField);
+            }
+            newTable.put("fields", newFields);
+            updateTables.add(newTable);
+        }
+
+        assertNotNull(remarkFieldId);
+
+        // 2. 调用批量修改权限接口，将 orders.remark 对 viewer 的读权限改为启用
+        Map<String, Object> batchRequest = new HashMap<>();
+        batchRequest.put("roleCode", "viewer");
+        batchRequest.put("moduleId", "order");
+        batchRequest.put("tables", updateTables);
+
+        String batchJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(batchRequest);
+
+        mockMvc.perform(post("/api/admin/permission/field/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(batchJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        // 3. 用 viewer 角色请求详情，验证原本屏蔽的 remark 字段现在可查到了（说明权限更新+缓存失效全链路生效）
+        String detailJson = """
+                {
+                  "id": 1
+                }
+                """;
+        mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "viewer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(detailJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orders.remark").value("首单客户"));
+
+        // 4. 恢复测试前 viewer 角色在 orders.remark 上的屏蔽状态
+        for (var t : updateTables) {
+            List<Map<String, Object>> fields = (List<Map<String, Object>>) t.get("fields");
+            for (var f : fields) {
+                if (remarkFieldId.equals(((Number) f.get("fieldMetaId")).longValue())) {
+                    f.put("perm", 0);
+                }
+            }
+        }
+        String restoreJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(batchRequest);
+        mockMvc.perform(post("/api/admin/permission/field/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(restoreJson))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testPermissionAdminGetModuleNotFound() throws Exception {
+        // 边界测试：获取不存在的模块权限，验证返回 400 (IllegalArgumentException) 以及 Module not found 错误提示
+        mockMvc.perform(get("/api/admin/permission/nonexistent_module/viewer"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("模块不存在: nonexistent_module"));
+    }
+
+    @Test
+    public void testPermissionAdminGetNonexistentRole() throws Exception {
+        // 边界测试：获取一个完全不存在的角色的权限列表，应该返回所有字段权限均为 0 (NONE)
+        mockMvc.perform(get("/api/admin/permission/order/nonexistent_role"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data", hasSize(greaterThan(0))))
+                // 验证首张表的所有字段权限值（perm）皆为 0
+                .andExpect(jsonPath("$.data[0].fields[*].perm", everyItem(is(0))));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testPermissionAdminBatchUpdateClearAll() throws Exception {
+        // 边界测试：物理清除某角色在模块的所有权限配置，直接传一个空 tables 列表
+        // 1. 先备份原有配置
+        String getResult = mockMvc.perform(get("/api/admin/permission/order/viewer"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Map<String, Object>> originalTables = com.jayway.jsonpath.JsonPath.read(getResult, "$.data");
+
+        // 2. 发送批量修改请求，传入空列表以清空角色权限配置
+        Map<String, Object> clearRequest = new HashMap<>();
+        clearRequest.put("roleCode", "viewer");
+        clearRequest.put("moduleId", "order");
+        clearRequest.put("tables", new ArrayList<>());
+
+        String clearJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(clearRequest);
+
+        mockMvc.perform(post("/api/admin/permission/field/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(clearJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        // 3. 此时以 viewer 角色查询模块订单列表，应直接被彻底拦截抛出 400 (无任何可读字段)
+        String queryJson = "{\"page\": 1, \"size\": 5}";
+        mockMvc.perform(post("/api/module/order/query")
+                        .header("X-Role", "viewer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(queryJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("表 [orders] 无任何可读字段"));
+
+        // 4. 物理还原备份的配置数据
+        List<Map<String, Object>> restoreTables = new ArrayList<>();
+        for (var t : originalTables) {
+            Map<String, Object> newTable = new HashMap<>();
+            newTable.put("tableMetaId", t.get("tableMetaId"));
+            List<Map<String, Object>> fields = (List<Map<String, Object>>) t.get("fields");
+            List<Map<String, Object>> newFields = new ArrayList<>();
+            for (var f : fields) {
+                Map<String, Object> newField = new HashMap<>();
+                newField.put("fieldMetaId", f.get("fieldMetaId"));
+                newField.put("perm", f.get("perm"));
+                newFields.add(newField);
+            }
+            newTable.put("fields", newFields);
+            restoreTables.add(newTable);
+        }
+        clearRequest.put("tables", restoreTables);
+        String restoreJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(clearRequest);
+        mockMvc.perform(post("/api/admin/permission/field/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(restoreJson))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testModuleGetMeta() throws Exception {
+        // 测试获取模块元数据结构，用于前端动态渲染/构建页面模型
+        mockMvc.perform(get("/api/module/order/meta"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value("order"))
+                .andExpect(jsonPath("$.data.name").value("订单模块"))
+                .andExpect(jsonPath("$.data.mainTable.tableName").value("orders"))
+                .andExpect(jsonPath("$.data.mainTable.fields", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.data.subTables[0].tableName").value("order_items"));
+    }
+
+    @Test
+    public void testModuleSaveDesign() throws Exception {
+        // 1. 获取原有 Meta 结构
+        String metaStr = mockMvc.perform(get("/api/module/order/meta"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        Map<String, Object> metaMap = mapper.readValue(
+                mapper.readTree(metaStr).get("data").toString(),
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
+        );
+
+        String originalDesc = (String) metaMap.get("description");
+
+        // 2. 更改字段 description 发起设计更新
+        metaMap.put("description", "设计更新后的订单描述");
+        String updateJson = mapper.writeValueAsString(metaMap);
+
+        mockMvc.perform(post("/api/module/design")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(status().isOk());
+
+        // 3. 再次获取并验证更新与缓存刷新成功生效
+        mockMvc.perform(get("/api/module/order/meta"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.description").value("设计更新后的订单描述"));
+
+        // 4. 环境还原
+        metaMap.put("description", originalDesc);
+        String restoreJson = mapper.writeValueAsString(metaMap);
+        mockMvc.perform(post("/api/module/design")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(restoreJson))
+                .andExpect(status().isOk());
     }
 }
 

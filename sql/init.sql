@@ -52,11 +52,7 @@ CREATE TABLE IF NOT EXISTS `field_meta` (
     `column_name`   VARCHAR(128) NOT NULL COMMENT '数据库列名',
     `label`         VARCHAR(128) COMMENT '前端显示标签',
     `data_type`     VARCHAR(32)  NOT NULL DEFAULT 'VARCHAR' COMMENT '数据类型',
-    `queryable`     TINYINT(1)   DEFAULT 0 COMMENT '是否允许作为查询条件',
     `query_op`      VARCHAR(16)  DEFAULT 'EQ' COMMENT '查询操作符: EQ/LIKE/GT/LT/GTE/LTE/IN/BETWEEN',
-    `sortable`      TINYINT(1)   DEFAULT 0 COMMENT '是否允许排序',
-    `sort_order`    INT          DEFAULT 0 COMMENT '排序权重',
-    `writable`      TINYINT(1)   DEFAULT 0 COMMENT '是否允许写入',
     INDEX `idx_table` (`table_meta_id`)
 ) ENGINE=InnoDB COMMENT='字段元数据';
 
@@ -163,40 +159,40 @@ INSERT INTO `table_meta` (`module_id`, `table_name`, `query_type`, `join_type`, 
 
 -- 导入字段元数据
 SET @main_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='orders');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `queryable`, `query_op`, `sortable`, `sort_order`, `writable`) VALUES
-(@main_table_id, 'id',         '编号',     'BIGINT',   0, 'EQ',      0, 1, 0),
-(@main_table_id, 'order_no',   '订单号',   'VARCHAR',  1, 'LIKE',    1, 2, 1),
-(@main_table_id, 'customer',   '客户名',   'VARCHAR',  1, 'LIKE',    1, 3, 1),
-(@main_table_id, 'amount',     '金额',     'DECIMAL',  1, 'GTE',     1, 4, 1),
-(@main_table_id, 'status',     '状态',     'VARCHAR',  1, 'EQ',      1, 5, 1),
-(@main_table_id, 'remark',     '备注',     'VARCHAR',  0, 'EQ',      0, 6, 1),
-(@main_table_id, 'created_at', '创建时间', 'DATETIME', 1, 'BETWEEN', 1, 7, 0),
-(@main_table_id, 'updated_at', '更新时间', 'DATETIME', 0, 'EQ',      1, 8, 0);
+INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
+(@main_table_id, 'id',         '编号',     'BIGINT',   'EQ'),
+(@main_table_id, 'order_no',   '订单号',   'VARCHAR',  'LIKE'),
+(@main_table_id, 'customer',   '客户名',   'VARCHAR',  'LIKE'),
+(@main_table_id, 'amount',     '金额',     'DECIMAL',  'GTE'),
+(@main_table_id, 'status',     '状态',     'VARCHAR',  'EQ'),
+(@main_table_id, 'remark',     '备注',     'VARCHAR',  'EQ'),
+(@main_table_id, 'created_at', '创建时间', 'DATETIME', 'BETWEEN'),
+(@main_table_id, 'updated_at', '更新时间', 'DATETIME', 'EQ');
 
 SET @sub_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='order_items');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `queryable`, `query_op`, `sortable`, `sort_order`, `writable`) VALUES
-(@sub_table_id, 'id',           '编号',     'BIGINT',   0, 'EQ',   0, 1, 0),
-(@sub_table_id, 'order_id',     '订单ID',   'BIGINT',   0, 'EQ',   0, 2, 0),
-(@sub_table_id, 'product_name', '商品名称', 'VARCHAR',  1, 'LIKE', 0, 3, 1),
-(@sub_table_id, 'qty',          '数量',     'INT',      0, 'EQ',   0, 4, 1),
-(@sub_table_id, 'price',        '单价',     'DECIMAL',  0, 'EQ',   0, 5, 1),
-(@sub_table_id, 'created_at',   '创建时间', 'DATETIME', 0, 'EQ',   1, 6, 0);
+INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
+(@sub_table_id, 'id',           '编号',     'BIGINT',   'EQ'),
+(@sub_table_id, 'order_id',     '订单ID',   'BIGINT',   'EQ'),
+(@sub_table_id, 'product_name', '商品名称', 'VARCHAR',  'LIKE'),
+(@sub_table_id, 'qty',          '数量',     'INT',      'EQ'),
+(@sub_table_id, 'price',        '单价',     'DECIMAL',  'EQ'),
+(@sub_table_id, 'created_at',   '创建时间', 'DATETIME', 'EQ');
 
 SET @join_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='customer_profiles');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `queryable`, `query_op`, `sortable`, `sort_order`, `writable`) VALUES
-(@join_table_id, 'id',            '档案ID',   'BIGINT',   0, 'EQ',   0, 1, 0),
-(@join_table_id, 'name',          '客户姓名', 'VARCHAR',  0, 'EQ',   0, 2, 0),
-(@join_table_id, 'level',         '客户级别', 'VARCHAR',  1, 'EQ',   1, 3, 0),
-(@join_table_id, 'contact_phone', '联系电话', 'VARCHAR',  0, 'EQ',   0, 4, 0);
+INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
+(@join_table_id, 'id',            '档案ID',   'BIGINT',   'EQ'),
+(@join_table_id, 'name',          '客户姓名', 'VARCHAR',  'EQ'),
+(@join_table_id, 'level',         '客户级别', 'VARCHAR',  'EQ'),
+(@join_table_id, 'contact_phone', '联系电话', 'VARCHAR',  'EQ');
 
 -- 注册 N:M 多对多关联右表元数据 (表及字段)
 INSERT INTO `table_meta` (`module_id`, `table_name`, `query_type`, `join_type`, `join_on`, `foreign_key`, `sort_order`) VALUES
 ('order', 'tags',              'RELATION', NULL, NULL,                                     NULL,       4);
 
 SET @tags_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='tags');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `queryable`, `query_op`, `sortable`, `sort_order`, `writable`) VALUES
-(@tags_table_id, 'id',   '标签ID',   'BIGINT',   0, 'EQ',   0, 1, 0),
-(@tags_table_id, 'name', '标签名称', 'VARCHAR',  1, 'LIKE', 0, 2, 0);
+INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
+(@tags_table_id, 'id',   '标签ID',   'BIGINT',   'EQ'),
+(@tags_table_id, 'name', '标签名称', 'VARCHAR',  'LIKE');
 
 -- 导入关联元数据
 INSERT INTO `relation_meta` (`module_id`, `name`, `left_table`, `left_join_column`, `left_fk`, `junction_table`, `right_fk`, `right_table`, `right_join_column`) VALUES
