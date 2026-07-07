@@ -93,7 +93,7 @@ public class PermissionAdminController {
     public Result<Void> setFieldPermissions(
             @RequestBody FieldPermissionBatchRequest req) {
 
-        var table = DSL.table(DSL.name("field_permission"));
+        var table = DSL.table(DSL.name("module_field_config"));
 
         // 1. 先物理清除该角色在此模块的所有老权限配置
         dsl.deleteFrom(table)

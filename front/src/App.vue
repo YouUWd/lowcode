@@ -25,6 +25,10 @@
           <el-icon><Lock /></el-icon>
           <span>字段权限配置</span>
         </el-menu-item>
+        <el-menu-item index="/schema">
+          <el-icon><Connection /></el-icon>
+          <span>ER 图管理</span>
+        </el-menu-item>
       </el-menu>
       <div class="sidebar-footer mono">Mock API · v1.0</div>
     </el-aside>

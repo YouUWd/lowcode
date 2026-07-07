@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SchemaDesigner - Interactive ER Diagram</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "primary-container": "#131b2e",
+                        "on-secondary-fixed": "#00174b",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#f2f4f6",
+                        "on-surface": "#191c1e",
+                        "outline": "#76777d",
+                        "surface-tint": "#565e74",
+                        "surface-dim": "#d8dadc",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "tertiary-container": "#0b1c30",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "on-primary-container": "#7c839b",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "primary-fixed-dim": "#bec6e0",
+                        "error-container": "#ffdad6",
+                        "primary": "#000000",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#131b2e",
+                        "background": "#f7f9fb",
+                        "surface-bright": "#f7f9fb",
+                        "on-background": "#191c1e",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#45464d",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-highest": "#e0e3e5",
+                        "surface-container": "#eceef0",
+                        "inverse-primary": "#bec6e0",
+                        "on-primary": "#ffffff",
+                        "secondary": "#0051d5",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "tertiary": "#000000",
+                        "on-secondary-container": "#fefcff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#f7f9fb",
+                        "primary-fixed": "#dae2fd",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-high": "#e6e8ea",
+                        "inverse-surface": "#2d3133",
+                        "secondary-container": "#316bf3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "canvas-grid": "24px",
+                        "row-height": "36px",
+                        "gutter-md": "16px",
+                        "margin-edge": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .canvas-bg {
+            background-image: radial-gradient(circle, #E2E8F0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .table-card {
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .table-card:hover {
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+            transform: translateY(-2px);
+        }
+        .connection-line {
+            stroke: #CBD5E1;
+            stroke-width: 1.5;
+            fill: none;
+            transition: stroke 0.2s ease;
+        }
+        .connection-line:hover, .connection-line.active {
+            stroke: #2563EB; /* Blue 600 */
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background h-screen w-screen overflow-hidden flex flex-col font-body-md">
+<!-- TopNavBar -->
+<header class="bg-surface-container-highest dark:bg-surface-container-highest docked full-width top-0 border-b border-outline-variant dark:border-outline flat no shadows flex justify-between items-center px-margin-edge h-[64px] w-full z-40 relative">
+<div class="flex items-center gap-8">
+<h1 class="font-headline-lg text-headline-lg font-black text-primary dark:text-primary-fixed">SchemaDesigner</h1>
+<nav class="hidden md:flex gap-6">
+<!-- Active: Models (since this is an ER diagram tool) -->
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors cursor-pointer active:opacity-80 transition-all font-body-lg" href="#">Explorer</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors cursor-pointer active:opacity-80 transition-all font-body-lg" href="#">Queries</a>
+<a class="text-secondary border-b-2 border-secondary font-bold hover:text-secondary dark:hover:text-secondary-fixed transition-colors cursor-pointer active:opacity-80 transition-all font-body-lg" href="#">Models</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-secondary dark:hover:text-secondary-fixed transition-colors cursor-pointer active:opacity-80 transition-all font-body-lg" href="#">History</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-headline-md text-headline-md hover:opacity-90 transition-opacity">Deploy</button>
+<button class="text-on-surface-variant hover:text-secondary transition-colors"><span class="material-symbols-outlined">settings</span></button>
+<button class="text-on-surface-variant hover:text-secondary transition-colors"><span class="material-symbols-outlined">help</span></button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-surface-container dark:bg-surface-container docked left-0 h-full w-64 border-r border-outline-variant dark:border-outline flat no shadows flex flex-col h-full py-4 space-y-2 z-30 hidden md:flex shrink-0">
+<div class="px-6 pb-4 border-b border-outline-variant mb-2">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Project Alpha</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant mt-1">PostgreSQL 15.4</div>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<!-- Active: Tables -->
+<a class="flex items-center gap-3 px-3 py-2 text-secondary font-bold border-r-4 border-secondary hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm" href="#">
+<span class="material-symbols-outlined">table_chart</span>
+<span>Tables</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm" href="#">
+<span class="material-symbols-outlined">visibility</span>
+<span>Views</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm" href="#">
+<span class="material-symbols-outlined">category</span>
+<span>Types</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span>Relations</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm" href="#">
+<span class="material-symbols-outlined">list_alt</span>
+<span>Logs</span>
+</a>
+</nav>
+<div class="px-4 mt-auto">
+<button class="w-full flex justify-center items-center gap-2 border border-outline-variant py-2 rounded-md hover:bg-surface-variant transition-colors text-primary font-body-md font-medium mb-4">
+<span class="material-symbols-outlined text-sm">add</span> Add Table
+                </button>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm text-sm" href="#">
+<span class="material-symbols-outlined text-sm">menu_book</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 transition-transform rounded-sm text-sm" href="#">
+<span class="material-symbols-outlined text-sm">contact_support</span>
+<span>Support</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Canvas Area -->
+<main class="flex-1 relative bg-[#F8FAFC] canvas-bg overflow-auto z-10" id="canvas-area">
+<!-- SVG for connections (absolute positioned covering canvas) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="min-width: 1200px; min-height: 800px;">
+<!-- orders.id -> order_items.order_id -->
+<path class="connection-line" d="M 400 160 L 450 160 Q 460 160 460 170 L 460 210 Q 460 220 470 220 L 520 220"></path>
+<!-- orders.customer -> customer_profiles.name -->
+<path class="connection-line" d="M 400 232 L 430 232 Q 440 232 440 300 Q 440 370 450 370 L 520 370"></path>
+<!-- orders.id -> order_tags.order_id -->
+<path class="connection-line" d="M 400 160 L 420 160 Q 430 160 430 460 Q 430 520 440 520 L 520 520"></path>
+<!-- tags.id -> order_tags.tag_id -->
+<path class="connection-line" d="M 770 520 L 800 520 Q 810 520 810 500 Q 810 480 820 480 L 850 480"></path>
+</svg>
+<!-- Draggable Area Wrapper -->
+<div class="relative w-full h-full p-margin-edge" style="min-width: 1200px; min-height: 800px;">
+<!-- Table Card 1: orders -->
+<div class="absolute top-[100px] left-[100px] w-[300px] bg-surface-container-lowest border border-[#CBD5E1] rounded-md table-card flex flex-col z-20">
+<div class="bg-primary text-on-primary h-[40px] px-4 flex items-center justify-between rounded-t-md cursor-move">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+<span class="font-headline-md font-bold text-sm">orders</span>
+</div>
+<span class="font-body-md text-xs opacity-80">订单主表</span>
+</div>
+<div class="flex flex-col py-1">
+<!-- Field -->
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-slate-500">key</span>
+<span class="font-body-md text-sm truncate">id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (PK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">order_no</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">VARCHAR</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-blue-600">link</span>
+<span class="font-body-md text-sm truncate">customer</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (FK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">amount</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">DECIMAL</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">status</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT</span>
+</div>
+</div>
+</div>
+<!-- Table Card 2: order_items -->
+<div class="absolute top-[120px] left-[520px] w-[280px] bg-surface-container-lowest border border-[#CBD5E1] rounded-md table-card flex flex-col z-20">
+<div class="bg-primary text-on-primary h-[40px] px-4 flex items-center justify-between rounded-t-md cursor-move">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+<span class="font-headline-md font-bold text-sm">order_items</span>
+</div>
+<span class="font-body-md text-xs opacity-80">订单明细表</span>
+</div>
+<div class="flex flex-col py-1">
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-slate-500">key</span>
+<span class="font-body-md text-sm truncate">id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (PK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-blue-600">link</span>
+<span class="font-body-md text-sm truncate">order_id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (FK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">product_name</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">VARCHAR</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">qty</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT</span>
+</div>
+</div>
+</div>
+<!-- Table Card 3: customer_profiles -->
+<div class="absolute top-[320px] left-[520px] w-[280px] bg-surface-container-lowest border border-[#CBD5E1] rounded-md table-card flex flex-col z-20">
+<div class="bg-primary text-on-primary h-[40px] px-4 flex items-center justify-between rounded-t-md cursor-move">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+<span class="font-headline-md font-bold text-sm">customer_profiles</span>
+</div>
+<span class="font-body-md text-xs opacity-80">客户扩展表</span>
+</div>
+<div class="flex flex-col py-1">
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-slate-500">key</span>
+<span class="font-body-md text-sm truncate">id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (PK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-blue-600">link</span>
+<span class="font-body-md text-sm truncate">name</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">VARCHAR</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">level</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT</span>
+</div>
+</div>
+</div>
+<!-- Table Card 4: order_tags -->
+<div class="absolute top-[480px] left-[520px] w-[250px] bg-surface-container-lowest border border-[#CBD5E1] rounded-md table-card flex flex-col z-20">
+<div class="bg-primary text-on-primary h-[40px] px-4 flex items-center justify-between rounded-t-md cursor-move">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+<span class="font-headline-md font-bold text-sm">order_tags</span>
+</div>
+<span class="font-body-md text-xs opacity-80">订单标签表</span>
+</div>
+<div class="flex flex-col py-1">
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-slate-500">key</span>
+<span class="font-body-md text-sm truncate">id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (PK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-blue-600">link</span>
+<span class="font-body-md text-sm truncate">order_id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (FK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-blue-600">link</span>
+<span class="font-body-md text-sm truncate">tag_id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (FK)</span>
+</div>
+</div>
+</div>
+<!-- Table Card 5: tags -->
+<div class="absolute top-[440px] left-[850px] w-[200px] bg-surface-container-lowest border border-[#CBD5E1] rounded-md table-card flex flex-col z-20">
+<div class="bg-primary text-on-primary h-[40px] px-4 flex items-center justify-between rounded-t-md cursor-move">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+<span class="font-headline-md font-bold text-sm">tags</span>
+</div>
+<span class="font-body-md text-xs opacity-80">标签表</span>
+</div>
+<div class="flex flex-col py-1">
+<div class="h-row-height px-4 flex items-center justify-between border-b border-[#F1F5F9] hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] text-slate-500">key</span>
+<span class="font-body-md text-sm truncate">id</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">INT (PK)</span>
+</div>
+<div class="h-row-height px-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+<div class="flex items-center gap-2 w-1/2">
+<span class="material-symbols-outlined text-[14px] opacity-0">key</span>
+<span class="font-body-md text-sm truncate">name</span>
+</div>
+<span class="font-label-mono text-label-mono bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">VARCHAR</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Floating Controls for Canvas) -->
+<nav class="bg-surface-container-low dark:bg-surface-container-low docked bottom-8 left-1/2 -translate-x-1/2 rounded-full px-6 py-2 border border-outline-variant dark:border-outline shadow-md fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-gutter-md">
+<button class="flex items-center gap-2 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer active:scale-90 transition-transform font-label-mono text-label-mono">
+<span class="material-symbols-outlined">zoom_in</span>
+<span class="hidden md:inline">Zoom In</span>
+</button>
+<button class="flex items-center gap-2 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer active:scale-90 transition-transform font-label-mono text-label-mono">
+<span class="material-symbols-outlined">zoom_out</span>
+<span class="hidden md:inline">Zoom Out</span>
+</button>
+<button class="flex items-center gap-2 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer active:scale-90 transition-transform font-label-mono text-label-mono">
+<span class="material-symbols-outlined">fullscreen_exit</span>
+<span class="hidden md:inline">Fit Screen</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-2"></div>
+<button class="flex items-center gap-2 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer active:scale-90 transition-transform font-label-mono text-label-mono">
+<span class="material-symbols-outlined">download</span>
+<span class="hidden md:inline">Export</span>
+</button>
+</nav>
+</body></html>

@@ -39,7 +39,7 @@ public class PermissionResolver {
     private Map<Long, Integer> loadConfigMap(String moduleId, String roleCode) {
         return dsl.select(DSL.field("field_meta_id", Long.class),
                           DSL.field("perm_value", Integer.class))
-                  .from(DSL.table(DSL.name("field_permission")))
+                  .from(DSL.table(DSL.name("module_field_config")))
                   .where(DSL.field(DSL.name("module_id")).eq(moduleId)
                      .and(DSL.field(DSL.name("role_code")).eq(roleCode)))
                   .fetchMap(

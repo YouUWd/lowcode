@@ -1117,5 +1117,52 @@ public class ModuleControllerTest {
                         .content(restoreJson))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testGlobalSchemaLoadAndSave() throws Exception {
+        // 1. 获取当前项目的完整 Schema 信息
+        String schemaStr = mockMvc.perform(get("/api/meta/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.datasources", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.data.relations", hasSize(greaterThan(0))))
+                .andReturn().getResponse().getContentAsString();
+
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        Map<String, Object> schemaMap = mapper.readValue(
+                mapper.readTree(schemaStr).get("data").toString(),
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
+        );
+
+        // 2. 更改 table_meta 的 display_name 标签并提交保存
+        List<Map<String, Object>> datasources = (List<Map<String, Object>>) schemaMap.get("datasources");
+        List<Map<String, Object>> tables = (List<Map<String, Object>>) datasources.get(0).get("tables");
+        Map<String, Object> orderTable = tables.stream()
+                .filter(t -> "orders".equals(t.get("tableName")))
+                .findFirst().orElseThrow();
+
+        String originalDisplayName = (String) orderTable.get("displayName");
+        orderTable.put("displayName", "协同设计新表名");
+
+        String saveJson = mapper.writeValueAsString(schemaMap);
+        mockMvc.perform(post("/api/meta/schema")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(saveJson))
+                .andExpect(status().isOk());
+
+        // 3. 重新拉取并验证更新成功且缓存刷新
+        mockMvc.perform(get("/api/meta/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.datasources[0].tables[0].displayName").value("协同设计新表名"));
+
+        // 4. 数据还原
+        orderTable.put("displayName", originalDisplayName);
+        String restoreJson = mapper.writeValueAsString(schemaMap);
+        mockMvc.perform(post("/api/meta/schema")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(restoreJson))
+                .andExpect(status().isOk());
+    }
 }
 

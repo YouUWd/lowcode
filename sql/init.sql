@@ -4,9 +4,15 @@
 
 USE `low_code`;
 
+-- 彻底清理所有旧对象以保证重装数据幂等
+DROP ALL OBJECTS;
+CREATE SCHEMA IF NOT EXISTS `low_code`;
+USE `low_code`;
+
 -- ============================================================
 -- 清理旧表（顺序：从表及关联表 -> 主表及元数据表）
 -- ============================================================
+DROP TABLE IF EXISTS `module_field_config`;
 DROP TABLE IF EXISTS `field_permission`;
 DROP TABLE IF EXISTS `sys_role`;
 DROP TABLE IF EXISTS `order_tags`;
@@ -14,9 +20,11 @@ DROP TABLE IF EXISTS `order_items`;
 DROP TABLE IF EXISTS `orders`;
 DROP TABLE IF EXISTS `tags`;
 DROP TABLE IF EXISTS `customer_profiles`;
-DROP TABLE IF EXISTS `field_meta`;
 DROP TABLE IF EXISTS `relation_meta`;
+DROP TABLE IF EXISTS `field_meta`;
+DROP TABLE IF EXISTS `module_table_ref`;
 DROP TABLE IF EXISTS `table_meta`;
+DROP TABLE IF EXISTS `datasource_meta`;
 DROP TABLE IF EXISTS `module_meta`;
 
 -- ============================================================
@@ -32,44 +40,70 @@ CREATE TABLE IF NOT EXISTS `module_meta` (
     `updated_at`  DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='模块元数据';
 
--- 表元数据表
+-- 数据源配置表
+CREATE TABLE IF NOT EXISTS `datasource_meta` (
+    `id`           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    `name`         VARCHAR(64)  NOT NULL COMMENT '数据源名称',
+    `db_type`      VARCHAR(16)  NOT NULL DEFAULT 'MYSQL',
+    `host`         VARCHAR(128) NOT NULL,
+    `port`         INT          NOT NULL,
+    `schema_name`  VARCHAR(64)  NOT NULL,
+    `username`     VARCHAR(64)  NOT NULL,
+    `password_enc` VARCHAR(512) NOT NULL COMMENT 'AES加密密文',
+    `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_name` (`name`)
+) ENGINE=InnoDB COMMENT='数据源连接配置';
+
+-- 全局物理表定义
 CREATE TABLE IF NOT EXISTS `table_meta` (
-    `id`          BIGINT       PRIMARY KEY AUTO_INCREMENT,
-    `module_id`   VARCHAR(64)  NOT NULL COMMENT '模块ID',
-    `table_name`  VARCHAR(128) NOT NULL COMMENT '数据库表名',
-    `query_type`  VARCHAR(16)  NOT NULL COMMENT '查询类型: MAIN(主表)/SUB(一对多从表)/JOIN(一对一或多对一关联表)',
-    `join_type`   VARCHAR(16)  COMMENT 'JOIN类型: LEFT/INNER/RIGHT JOIN',
-    `join_on`     VARCHAR(256) COMMENT 'JOIN连接条件',
-    `foreign_key` VARCHAR(64)  COMMENT '从表外键列名',
-    `sort_order`  INT          DEFAULT 0 COMMENT '排序权重',
-    INDEX `idx_table_meta_module` (`module_id`)
-) ENGINE=InnoDB COMMENT='表元数据';
+    `id`             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    `datasource_id`  BIGINT UNSIGNED NOT NULL,
+    `table_name`     VARCHAR(64)  NOT NULL COMMENT '物理表名',
+    `display_name`   VARCHAR(128) COMMENT '展示名，人工补充',
+    `primary_column` VARCHAR(64)  COMMENT '主键列名，逻辑关联field_meta.column_name，不建外键',
+    `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_ds_table` (`datasource_id`, `table_name`),
+    CONSTRAINT `fk_table_datasource` FOREIGN KEY (`datasource_id`) REFERENCES `datasource_meta` (`id`)
+) ENGINE=InnoDB COMMENT='全局物理表定义';
 
--- 字段元数据表
-CREATE TABLE IF NOT EXISTS `field_meta` (
-    `id`            BIGINT       PRIMARY KEY AUTO_INCREMENT,
-    `table_meta_id` BIGINT       NOT NULL COMMENT '表元数据ID',
-    `column_name`   VARCHAR(128) NOT NULL COMMENT '数据库列名',
-    `label`         VARCHAR(128) COMMENT '前端显示标签',
-    `data_type`     VARCHAR(32)  NOT NULL DEFAULT 'VARCHAR' COMMENT '数据类型',
-    `query_op`      VARCHAR(16)  DEFAULT 'EQ' COMMENT '查询操作符: EQ/LIKE/GT/LT/GTE/LTE/IN/BETWEEN',
-    INDEX `idx_table` (`table_meta_id`)
-) ENGINE=InnoDB COMMENT='字段元数据';
-
--- N:M 关联元数据表
-CREATE TABLE IF NOT EXISTS `relation_meta` (
-    `id`             BIGINT       PRIMARY KEY AUTO_INCREMENT,
+-- 模块表绑定关系
+CREATE TABLE IF NOT EXISTS `module_table_ref` (
+    `id`             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     `module_id`      VARCHAR(64)  NOT NULL COMMENT '模块ID',
-    `name`           VARCHAR(64)  NOT NULL COMMENT '关联别名（API请求/响应的Key）',
-    `left_table`     VARCHAR(128) NOT NULL COMMENT '左表名',
-    `left_join_column` VARCHAR(64)  COMMENT '左表被关联列名',
-    `left_fk`        VARCHAR(64)  NOT NULL COMMENT '中间表关联左表外键',
-    `junction_table` VARCHAR(128) NOT NULL COMMENT '关系中间表名',
-    `right_fk`       VARCHAR(64)  NOT NULL COMMENT '中间表关联右表外键',
-    `right_table`    VARCHAR(128) NOT NULL COMMENT '右表名',
-    `right_join_column` VARCHAR(64) COMMENT '右表被关联列名',
-    INDEX `idx_relation_meta_module` (`module_id`)
-) ENGINE=InnoDB COMMENT='N:M多对多关联元数据';
+    `table_meta_id`  BIGINT UNSIGNED NOT NULL COMMENT '物理表元数据ID',
+    `sort_order`     INT          NOT NULL DEFAULT 0 COMMENT '排序权重',
+    UNIQUE KEY `uk_module_table` (`module_id`, `table_meta_id`),
+    CONSTRAINT `fk_ref_module` FOREIGN KEY (`module_id`) REFERENCES `module_meta` (`id`),
+    CONSTRAINT `fk_ref_table` FOREIGN KEY (`table_meta_id`) REFERENCES `table_meta` (`id`)
+) ENGINE=InnoDB COMMENT='模块表绑定关系';
+
+-- 全局字段定义
+CREATE TABLE IF NOT EXISTS `field_meta` (
+    `id`            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    `table_meta_id` BIGINT UNSIGNED NOT NULL,
+    `column_name`   VARCHAR(64)  NOT NULL COMMENT '物理列名',
+    `label`         VARCHAR(64)  COMMENT '展示名，为空时前端回退显示column_name',
+    `data_type`     VARCHAR(32)  NOT NULL COMMENT '平台标准类型：STRING/NUMBER/DECIMAL/DATE/DATETIME/BOOLEAN/TEXT',
+    `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_table_col` (`table_meta_id`, `column_name`),
+    KEY `idx_table` (`table_meta_id`),
+    CONSTRAINT `fk_field_table` FOREIGN KEY (`table_meta_id`) REFERENCES `table_meta` (`id`)
+) ENGINE=InnoDB COMMENT='全局字段定义';
+
+-- 全局关系定义
+CREATE TABLE IF NOT EXISTS `relation_meta` (
+    `id`              BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    `name`            VARCHAR(64)  NOT NULL COMMENT '关系名称，如"订单关联客户档案"',
+    `source_field_id` BIGINT UNSIGNED NOT NULL COMMENT '关系表达式左侧字段',
+    `target_field_id` BIGINT UNSIGNED NOT NULL COMMENT '关系表达式右侧字段',
+    `relation_type`   VARCHAR(4)   NOT NULL COMMENT '>多对一 <一对多 -一对一，创建时人工指定或由反向工程预填',
+    `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_relation` (`source_field_id`, `target_field_id`),
+    CONSTRAINT `fk_rel_source_field` FOREIGN KEY (`source_field_id`) REFERENCES `field_meta` (`id`),
+    CONSTRAINT `fk_rel_target_field` FOREIGN KEY (`target_field_id`) REFERENCES `field_meta` (`id`)
+) ENGINE=InnoDB COMMENT='全局字段级关系定义';
 
 -- ============================================================
 -- 权限管理表结构
@@ -82,8 +116,8 @@ CREATE TABLE IF NOT EXISTS `sys_role` (
     `name` VARCHAR(128) COMMENT '角色名称'
 ) ENGINE=InnoDB COMMENT='系统角色表';
 
--- 字段级权限表 (白名单)
-CREATE TABLE IF NOT EXISTS `field_permission` (
+-- 模块字段配置及权限表
+CREATE TABLE IF NOT EXISTS `module_field_config` (
     `id`            BIGINT       PRIMARY KEY AUTO_INCREMENT,
     `module_id`     VARCHAR(64)  NOT NULL COMMENT '模块ID',
     `field_meta_id` BIGINT       NOT NULL COMMENT '字段元数据ID',
@@ -91,7 +125,7 @@ CREATE TABLE IF NOT EXISTS `field_permission` (
     `perm_value`    TINYINT(1)   NOT NULL COMMENT '权限值(0-7)',
     UNIQUE KEY `uk_field_role` (`field_meta_id`, `role_code`),
     INDEX `idx_module_role` (`module_id`, `role_code`)
-) ENGINE=InnoDB COMMENT='字段级权限控制表';
+) ENGINE=InnoDB COMMENT='模块字段配置及权限表';
 
 -- ============================================================
 -- 业务数据表结构
@@ -151,52 +185,71 @@ CREATE TABLE IF NOT EXISTS `order_tags` (
 INSERT INTO `module_meta` (`id`, `name`, `description`) VALUES
 ('order', '订单模块', '包含订单主表、订单明细从表及标签多对多关联的演示模块');
 
+-- 导入默认数据源
+INSERT INTO `datasource_meta` (`id`, `name`, `db_type`, `host`, `port`, `schema_name`, `username`, `password_enc`) VALUES
+(1, 'local_h2', 'H2', 'localhost', 3306, 'low_code', 'sa', '');
+
 -- 导入表元数据
-INSERT INTO `table_meta` (`module_id`, `table_name`, `query_type`, `join_type`, `join_on`, `foreign_key`, `sort_order`) VALUES
-('order', 'orders',            'MAIN', NULL,   NULL,                                       NULL,       1),
-('order', 'order_items',       'SUB',  NULL,   NULL,                                       'order_id', 2),
-('order', 'customer_profiles', 'JOIN', 'LEFT', 'customer_profiles.name = orders.customer', NULL,       3);
+INSERT INTO `table_meta` (`id`, `datasource_id`, `table_name`, `display_name`, `primary_column`) VALUES
+(1, 1, 'orders',            '订单主表',   'id'),
+(2, 1, 'order_items',       '订单明细表', 'id'),
+(3, 1, 'customer_profiles', '客户扩展表', 'id'),
+(4, 1, 'tags',              '标签表',     'id'),
+(5, 1, 'order_tags',        '订单标签表', 'id');
+
+-- 绑定模块表
+INSERT INTO `module_table_ref` (`module_id`, `table_meta_id`, `sort_order`) VALUES
+('order', 1, 1),
+('order', 2, 2),
+('order', 3, 3),
+('order', 4, 4),
+('order', 5, 5);
 
 -- 导入字段元数据
-SET @main_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='orders');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
-(@main_table_id, 'id',         '编号',     'BIGINT',   'EQ'),
-(@main_table_id, 'order_no',   '订单号',   'VARCHAR',  'LIKE'),
-(@main_table_id, 'customer',   '客户名',   'VARCHAR',  'LIKE'),
-(@main_table_id, 'amount',     '金额',     'DECIMAL',  'GTE'),
-(@main_table_id, 'status',     '状态',     'VARCHAR',  'EQ'),
-(@main_table_id, 'remark',     '备注',     'VARCHAR',  'EQ'),
-(@main_table_id, 'created_at', '创建时间', 'DATETIME', 'BETWEEN'),
-(@main_table_id, 'updated_at', '更新时间', 'DATETIME', 'EQ');
+-- orders
+INSERT INTO `field_meta` (`id`, `table_meta_id`, `column_name`, `label`, `data_type`) VALUES
+(1, 1, 'id',         '编号',     'NUMBER'),
+(2, 1, 'order_no',   '订单号',   'STRING'),
+(3, 1, 'customer',   '客户名',   'STRING'),
+(4, 1, 'amount',     '金额',     'DECIMAL'),
+(5, 1, 'status',     '状态',     'STRING'),
+(6, 1, 'remark',     '备注',     'STRING'),
+(7, 1, 'created_at', '创建时间', 'DATETIME'),
+(8, 1, 'updated_at', '更新时间', 'DATETIME');
 
-SET @sub_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='order_items');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
-(@sub_table_id, 'id',           '编号',     'BIGINT',   'EQ'),
-(@sub_table_id, 'order_id',     '订单ID',   'BIGINT',   'EQ'),
-(@sub_table_id, 'product_name', '商品名称', 'VARCHAR',  'LIKE'),
-(@sub_table_id, 'qty',          '数量',     'INT',      'EQ'),
-(@sub_table_id, 'price',        '单价',     'DECIMAL',  'EQ'),
-(@sub_table_id, 'created_at',   '创建时间', 'DATETIME', 'EQ');
+-- order_items
+INSERT INTO `field_meta` (`id`, `table_meta_id`, `column_name`, `label`, `data_type`) VALUES
+(9,  2, 'id',           '编号',     'NUMBER'),
+(10, 2, 'order_id',     '订单ID',   'NUMBER'),
+(11, 2, 'product_name', '商品名称', 'STRING'),
+(12, 2, 'qty',          '数量',     'NUMBER'),
+(13, 2, 'price',        '单价',     'DECIMAL'),
+(14, 2, 'created_at',   '创建时间', 'DATETIME');
 
-SET @join_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='customer_profiles');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
-(@join_table_id, 'id',            '档案ID',   'BIGINT',   'EQ'),
-(@join_table_id, 'name',          '客户姓名', 'VARCHAR',  'EQ'),
-(@join_table_id, 'level',         '客户级别', 'VARCHAR',  'EQ'),
-(@join_table_id, 'contact_phone', '联系电话', 'VARCHAR',  'EQ');
+-- customer_profiles
+INSERT INTO `field_meta` (`id`, `table_meta_id`, `column_name`, `label`, `data_type`) VALUES
+(15, 3, 'id',            '档案ID',   'NUMBER'),
+(16, 3, 'name',          '客户姓名', 'STRING'),
+(17, 3, 'level',         '客户级别', 'STRING'),
+(18, 3, 'contact_phone', '联系电话', 'STRING');
 
--- 注册 N:M 多对多关联右表元数据 (表及字段)
-INSERT INTO `table_meta` (`module_id`, `table_name`, `query_type`, `join_type`, `join_on`, `foreign_key`, `sort_order`) VALUES
-('order', 'tags',              'RELATION', NULL, NULL,                                     NULL,       4);
+-- tags
+INSERT INTO `field_meta` (`id`, `table_meta_id`, `column_name`, `label`, `data_type`) VALUES
+(19, 4, 'id',   '标签ID',   'NUMBER'),
+(20, 4, 'name', '标签名称', 'STRING');
 
-SET @tags_table_id = (SELECT id FROM table_meta WHERE module_id='order' AND table_name='tags');
-INSERT INTO `field_meta` (`table_meta_id`, `column_name`, `label`, `data_type`, `query_op`) VALUES
-(@tags_table_id, 'id',   '标签ID',   'BIGINT',   'EQ'),
-(@tags_table_id, 'name', '标签名称', 'VARCHAR',  'LIKE');
+-- order_tags
+INSERT INTO `field_meta` (`id`, `table_meta_id`, `column_name`, `label`, `data_type`) VALUES
+(21, 5, 'id',       '主键ID',   'NUMBER'),
+(22, 5, 'order_id', '订单ID',   'NUMBER'),
+(23, 5, 'tag_id',   '标签ID',   'NUMBER');
 
--- 导入关联元数据
-INSERT INTO `relation_meta` (`module_id`, `name`, `left_table`, `left_join_column`, `left_fk`, `junction_table`, `right_fk`, `right_table`, `right_join_column`) VALUES
-('order', 'tags', 'orders', 'id', 'order_id', 'order_tags', 'tag_id', 'tags', 'id');
+-- 导入关系元数据
+INSERT INTO `relation_meta` (`id`, `name`, `source_field_id`, `target_field_id`, `relation_type`) VALUES
+(1, 'orders->order_items',       1,  10, '<'), -- orders.id < order_items.order_id
+(2, 'orders->customer_profiles', 3,  16, '>'), -- orders.customer > customer_profiles.name
+(3, 'orders->order_tags',        1,  22, '<'), -- orders.id < order_tags.order_id
+(4, 'tags->order_tags',          19, 23, '<'); -- tags.id < order_tags.tag_id
 
 -- ============================================================
 -- 权限初始化数据导入 (白名单)
@@ -208,34 +261,34 @@ INSERT INTO `sys_role` (`code`, `name`) VALUES
 ('viewer', '查看员');
 
 -- 1. admin 角色配置所有字段 7 (rwu) 权限
-INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+INSERT INTO `module_field_config` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
 SELECT 'order', `id`, 'admin', 7 FROM `field_meta`;
 
 -- 2. editor 角色配置权限
 -- orders 表、order_items 表与 tags 表配置可写列 7 (rwu)
-INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+INSERT INTO `module_field_config` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
 SELECT 'order', `id`, 'editor', 7 FROM `field_meta` 
-WHERE `table_meta_id` IN (SELECT `id` FROM `table_meta` WHERE `table_name` IN ('orders', 'order_items', 'tags'))
+WHERE `table_meta_id` IN (1, 2, 4)
   AND `column_name` NOT IN ('id', 'order_id', 'amount', 'status', 'created_at', 'updated_at');
 
 -- 特殊字段权限
-INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`) VALUES
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='id' AND `table_meta_id`=@main_table_id), 'editor', 4),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='amount' AND `table_meta_id`=@main_table_id), 'editor', 6),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='status' AND `table_meta_id`=@main_table_id), 'editor', 5),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='created_at' AND `table_meta_id`=@main_table_id), 'editor', 4),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='updated_at' AND `table_meta_id`=@main_table_id), 'editor', 4),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='id' AND `table_meta_id`=@sub_table_id), 'editor', 4),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='order_id' AND `table_meta_id`=@sub_table_id), 'editor', 4),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='created_at' AND `table_meta_id`=@sub_table_id), 'editor', 4),
-('order', (SELECT `id` FROM `field_meta` WHERE `column_name`='id' AND `table_meta_id`=@tags_table_id), 'editor', 4);
+INSERT INTO `module_field_config` (`module_id`, `field_meta_id`, `role_code`, `perm_value`) VALUES
+('order', 1, 'editor', 4),
+('order', 4, 'editor', 6),
+('order', 5, 'editor', 5),
+('order', 7, 'editor', 4),
+('order', 8, 'editor', 4),
+('order', 9, 'editor', 4),
+('order', 10, 'editor', 4),
+('order', 14, 'editor', 4),
+('order', 19, 'editor', 4);
 
 -- customer_profiles (JOIN 表) 全只读 (4)
-INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
-SELECT 'order', `id`, 'editor', 4 FROM `field_meta` WHERE `table_meta_id` = @join_table_id;
+INSERT INTO `module_field_config` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+SELECT 'order', `id`, 'editor', 4 FROM `field_meta` WHERE `table_meta_id` = 3;
 
 -- 3. viewer 角色配置权限 (所有字段只读 4，除 remark 字段不做配置，使其默认无权限)
-INSERT INTO `field_permission` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
+INSERT INTO `module_field_config` (`module_id`, `field_meta_id`, `role_code`, `perm_value`)
 SELECT 'order', `id`, 'viewer', 4 FROM `field_meta`
 WHERE `column_name` != 'remark';
 

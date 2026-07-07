@@ -1,22 +1,23 @@
 package com.lowcode.meta.repository;
 
+import com.lowcode.api.dto.SchemaDTO;
 import com.lowcode.meta.domain.FieldMeta;
 import com.lowcode.meta.domain.ModuleMeta;
 import com.lowcode.meta.domain.RelationMeta;
 import com.lowcode.meta.domain.TableMeta;
+import com.lowcode.engine.TopologyHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Objects;
+import java.util.*;
 
 /**
- * 元数据仓库 — 从元数据表加载并组装 ModuleMeta 聚合对象
+ * 元数据仓库 — 从元数据表加载并组装 ModuleMeta 及全局 Schema 拓扑
  */
 @Slf4j
 @Repository
@@ -24,7 +25,7 @@ import java.util.Objects;
 public class MetaRepository {
 
     private final DSLContext dsl;
-
+    private final TopologyHelper topologyHelper;
 
     /**
      * 加载完整的模块元数据
@@ -45,97 +46,93 @@ public class MetaRepository {
         meta.setName(moduleRecord.get(DSL.field("name", String.class)));
         meta.setDescription(moduleRecord.get(DSL.field("description", String.class)));
 
-        // 2. 查询该模块下所有表配置
-        List<TableMeta> tables = dsl.select()
-            .from(DSL.table("table_meta"))
-            .where(DSL.field("module_id").eq(moduleId))
-            .orderBy(DSL.field("sort_order").asc())
-            .fetch(this::mapToTableMeta);
+        // 2. 根据 module_table_ref 加载绑定的全局表元数据
+        List<TableMeta> tables = dsl.select(
+                DSL.field("t.id").as("id"),
+                DSL.field("t.table_name").as("table_name"),
+                DSL.field("t.display_name").as("display_name"),
+                DSL.field("t.primary_column").as("primary_column")
+            )
+            .from(DSL.table("module_table_ref").as("ref"))
+            .join(DSL.table("table_meta").as("t")).on(DSL.field("ref.table_meta_id").eq(DSL.field("t.id")))
+            .where(DSL.field("ref.module_id").eq(moduleId))
+            .orderBy(DSL.field("ref.sort_order").asc())
+            .fetch(r -> {
+                TableMeta t = new TableMeta();
+                t.setId(r.get("id", Long.class));
+                t.setTableName(r.get("table_name", String.class));
+                t.setDisplayName(r.get("display_name", String.class));
+                t.setPrimaryColumn(r.get("primary_column", String.class));
+                return t;
+            });
+        
+        meta.setTables(tables);
 
-        // 3. 为每张表加载字段白名单
+        // 3. 为每张表加载全局字段配置
+        List<Long> fieldIds = new ArrayList<>();
         for (TableMeta table : tables) {
-            List<FieldMeta> fields = dsl.select()
+            List<FieldMeta> fields = dsl.select(
+                    DSL.field("id", Long.class),
+                    DSL.field("table_meta_id", Long.class),
+                    DSL.field("column_name", String.class),
+                    DSL.field("label", String.class),
+                    DSL.field("data_type", String.class)
+                )
                 .from(DSL.table("field_meta"))
                 .where(DSL.field("table_meta_id").eq(table.getId()))
                 .orderBy(DSL.field("id").asc())
-                .fetch(this::mapToFieldMeta);
+                .fetch(r -> {
+                    FieldMeta f = new FieldMeta();
+                    f.setId(r.get("id", Long.class));
+                    f.setTableMetaId(r.get("table_meta_id", Long.class));
+                    f.setColumnName(r.get("column_name", String.class));
+                    f.setLabel(r.get("label", String.class));
+                    f.setDataType(r.get("data_type", String.class));
+                    return f;
+                });
             table.setFields(fields);
-        }
-
-        // 4. 按 queryType 分组填充
-        for (TableMeta table : tables) {
-            switch (table.getQueryType()) {
-                case "MAIN" -> meta.setMainTable(table);
-                case "LIST" -> meta.getListTables().add(table);
-                case "SUB"  -> meta.getSubTables().add(table);
-                case "JOIN" -> meta.getJoinTables().add(table);
-                case "RELATION" -> meta.getRelationTables().add(table);
+            for (FieldMeta f : fields) {
+                fieldIds.add(f.getId());
             }
         }
 
-        // 如果没有单独的 LIST 类型表，主表同时作为 LIST 表
-        if (meta.getListTables().isEmpty() && meta.getMainTable() != null) {
-            meta.getListTables().add(meta.getMainTable());
+        // 4. 查询该模块字段所关联的所有全局关系
+        List<RelationMeta> relations = new ArrayList<>();
+        if (!fieldIds.isEmpty()) {
+            relations = dsl.select(
+                    DSL.field("id", Long.class),
+                    DSL.field("name", String.class),
+                    DSL.field("source_field_id", Long.class),
+                    DSL.field("target_field_id", Long.class),
+                    DSL.field("relation_type", String.class)
+                )
+                .from(DSL.table("relation_meta"))
+                .where(DSL.field("source_field_id").in(fieldIds))
+                .and(DSL.field("target_field_id").in(fieldIds))
+                .fetch(r -> {
+                    RelationMeta rel = new RelationMeta();
+                    rel.setId(r.get("id", Long.class));
+                    rel.setName(r.get("name", String.class));
+                    rel.setSourceFieldId(r.get("source_field_id", Long.class));
+                    rel.setTargetFieldId(r.get("target_field_id", Long.class));
+                    rel.setRelationType(r.get("relation_type", String.class));
+                    return rel;
+                });
         }
-
-        // 5. 查询 N:M 关联配置
-        List<RelationMeta> relations = dsl.select()
-            .from(DSL.table("relation_meta"))
-            .where(DSL.field("module_id").eq(moduleId))
-            .fetch(this::mapToRelationMeta);
         meta.setRelations(relations);
 
-        log.info("加载模块元数据: {} ({}), 表数={}, 关联数={}",
+        // 5. 调用拓扑装配引擎动态推导主从表、JOIN表等架构
+        topologyHelper.inferAndAssemble(meta);
+
+        log.info("加载并装配模块元数据: {} ({}), 表数={}, 关联数={}",
             meta.getName(), meta.getId(), tables.size(), relations.size());
 
         return meta;
     }
 
-    private TableMeta mapToTableMeta(Record r) {
-        TableMeta t = new TableMeta();
-        t.setId(r.get(DSL.field("id", Long.class)));
-        t.setTableName(r.get(DSL.field("table_name", String.class)));
-        t.setQueryType(r.get(DSL.field("query_type", String.class)));
-        t.setJoinType(r.get(DSL.field("join_type", String.class)));
-        t.setJoinOn(r.get(DSL.field("join_on", String.class)));
-        t.setForeignKey(r.get(DSL.field("foreign_key", String.class)));
-        return t;
-    }
-
-    private FieldMeta mapToFieldMeta(Record r) {
-        FieldMeta f = new FieldMeta();
-        f.setId(r.get(DSL.field("id", Long.class)));
-        f.setColumnName(r.get(DSL.field("column_name", String.class)));
-        f.setLabel(r.get(DSL.field("label", String.class)));
-        f.setDataType(r.get(DSL.field("data_type", String.class)));
-        f.setQueryOp(r.get(DSL.field("query_op", String.class)));
-        return f;
-    }
-
-    private RelationMeta mapToRelationMeta(Record r) {
-        RelationMeta rel = new RelationMeta();
-        rel.setId(r.get(DSL.field("id", Long.class)));
-        rel.setName(r.get(DSL.field("name", String.class)));
-        rel.setLeftTable(r.get(DSL.field("left_table", String.class)));
-        rel.setRightTable(r.get(DSL.field("right_table", String.class)));
-        rel.setJunctionTable(r.get(DSL.field("junction_table", String.class)));
-        rel.setLeftFk(r.get(DSL.field("left_fk", String.class)));
-        rel.setRightFk(r.get(DSL.field("right_fk", String.class)));
-        rel.setLeftJoinColumn(r.get(DSL.field("left_join_column", String.class)));
-        rel.setRightJoinColumn(r.get(DSL.field("right_join_column", String.class)));
-        return rel;
-    }
-
-    private boolean toBoolean(Object val) {
-        if (val == null) return false;
-        if (val instanceof Boolean b) return b;
-        if (val instanceof Number n) return n.intValue() == 1;
-        return "1".equals(val.toString()) || "true".equalsIgnoreCase(val.toString());
-    }
-
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveModuleMeta(ModuleMeta meta) {
-        // 1. 保存/更新 module_meta
+        // 保存/更新 module_meta 基本信息
         boolean exists = dsl.fetchExists(
             dsl.selectFrom(DSL.table("module_meta")).where(DSL.field("id").eq(meta.getId()))
         );
@@ -151,202 +148,294 @@ public class MetaRepository {
                 .values(meta.getId(), meta.getName(), meta.getDescription())
                 .execute();
         }
+    }
 
-        // 收集本次传入的所有 TableMeta
-        List<TableMeta> incomingTables = new ArrayList<>();
-        if (meta.getMainTable() != null) {
-            meta.getMainTable().setQueryType("MAIN");
-            incomingTables.add(meta.getMainTable());
-        }
-        for (TableMeta t : meta.getSubTables()) {
-            t.setQueryType("SUB");
-            incomingTables.add(t);
-        }
-        for (TableMeta t : meta.getListTables()) {
-            if (meta.getMainTable() != null && t.getTableName().equals(meta.getMainTable().getTableName())) {
-                continue;
-            }
-            t.setQueryType("LIST");
-            incomingTables.add(t);
-        }
-        for (TableMeta t : meta.getJoinTables()) {
-            t.setQueryType("JOIN");
-            incomingTables.add(t);
-        }
-        for (TableMeta t : meta.getRelationTables()) {
-            t.setQueryType("RELATION");
-            incomingTables.add(t);
+    /**
+     * 获取全局元数据拓扑 Schema
+     */
+    public SchemaDTO loadGlobalSchema() {
+        SchemaDTO schema = new SchemaDTO();
+
+        // 1. 加载所有数据源
+        List<SchemaDTO.DatasourceDTO> datasources = dsl.select(
+                DSL.field("id", Long.class),
+                DSL.field("name", String.class),
+                DSL.field("db_type", String.class)
+            )
+            .from(DSL.table("datasource_meta"))
+            .fetch(r -> {
+                SchemaDTO.DatasourceDTO ds = new SchemaDTO.DatasourceDTO();
+                ds.setId(r.get("id", Long.class));
+                ds.setName(r.get("name", String.class));
+                ds.setDbType(r.get("db_type", String.class));
+                ds.setTables(new ArrayList<>());
+                return ds;
+            });
+        schema.setDatasources(datasources);
+
+        // 2. 加载物理表，并按数据源分组
+        Map<Long, SchemaDTO.DatasourceDTO> dsMap = new HashMap<>();
+        for (var ds : datasources) {
+            dsMap.put(ds.getId(), ds);
         }
 
-        // 2. 获取并删除库中存在但 incoming 里没有的 table_meta 及其 fields
-        List<Long> existingTableIds = dsl.select(DSL.field("id", Long.class))
+        List<SchemaDTO.TableDTO> tables = dsl.select(
+                DSL.field("id", Long.class),
+                DSL.field("datasource_id", Long.class),
+                DSL.field("table_name", String.class),
+                DSL.field("display_name", String.class),
+                DSL.field("primary_column", String.class)
+            )
             .from(DSL.table("table_meta"))
-            .where(DSL.field("module_id").eq(meta.getId()))
-            .fetchInto(Long.class);
+            .fetch(r -> {
+                SchemaDTO.TableDTO t = new SchemaDTO.TableDTO();
+                t.setId(r.get("id", Long.class));
+                t.setTableName(r.get("table_name", String.class));
+                t.setDisplayName(r.get("display_name", String.class));
+                t.setPrimaryColumn(r.get("primary_column", String.class));
+                t.setFields(new ArrayList<>());
 
-        List<Long> incomingTableIds = incomingTables.stream()
-            .map(TableMeta::getId)
-            .filter(Objects::nonNull)
-            .toList();
+                Long dsId = r.get("datasource_id", Long.class);
+                if (dsMap.containsKey(dsId)) {
+                    dsMap.get(dsId).getTables().add(t);
+                }
+                return t;
+            });
 
-        List<Long> tableIdsToDelete = existingTableIds.stream()
-            .filter(id -> !incomingTableIds.contains(id))
-            .toList();
-
-        if (!tableIdsToDelete.isEmpty()) {
-            // 删除这些表下的字段
-            dsl.deleteFrom(DSL.table("field_meta"))
-                .where(DSL.field("table_meta_id").in(tableIdsToDelete))
-                .execute();
-            // 删除这些表
-            dsl.deleteFrom(DSL.table("table_meta"))
-                .where(DSL.field("id").in(tableIdsToDelete))
-                .execute();
+        // 3. 加载所有字段，并按表分组
+        Map<Long, SchemaDTO.TableDTO> tableMap = new HashMap<>();
+        for (var t : tables) {
+            tableMap.put(t.getId(), t);
         }
 
-        // 3. 循环保存/更新 table_meta 和 field_meta
-        int tableOrder = 0;
-        for (TableMeta t : incomingTables) {
-            Long tableId = t.getId();
-            boolean tExists = tableId != null && dsl.fetchExists(
-                dsl.selectFrom(DSL.table("table_meta")).where(DSL.field("id").eq(tableId))
-            );
+        dsl.select(
+                DSL.field("id", Long.class),
+                DSL.field("table_meta_id", Long.class),
+                DSL.field("column_name", String.class),
+                DSL.field("label", String.class),
+                DSL.field("data_type", String.class)
+            )
+            .from(DSL.table("field_meta"))
+            .fetch(r -> {
+                SchemaDTO.FieldDTO f = new SchemaDTO.FieldDTO();
+                f.setId(r.get("id", Long.class));
+                f.setColumnName(r.get("column_name", String.class));
+                f.setLabel(r.get("label", String.class));
+                f.setDataType(r.get("data_type", String.class));
 
-            if (tExists) {
-                dsl.update(DSL.table("table_meta"))
-                    .set(DSL.field("table_name"), t.getTableName())
-                    .set(DSL.field("query_type"), t.getQueryType())
-                    .set(DSL.field("join_type"), t.getJoinType())
-                    .set(DSL.field("join_on"), t.getJoinOn())
-                    .set(DSL.field("foreign_key"), t.getForeignKey())
-                    .set(DSL.field("sort_order"), tableOrder++)
-                    .where(DSL.field("id").eq(tableId))
-                    .execute();
-            } else {
-                Record record = dsl.insertInto(DSL.table("table_meta"))
-                    .columns(
-                        DSL.field("module_id"), DSL.field("table_name"), DSL.field("query_type"),
-                        DSL.field("join_type"), DSL.field("join_on"), DSL.field("foreign_key"),
-                        DSL.field("sort_order")
-                    )
-                    .values(meta.getId(), t.getTableName(), t.getQueryType(), t.getJoinType(), t.getJoinOn(), t.getForeignKey(), tableOrder++)
-                    .returning(DSL.field("id"))
-                    .fetchOne();
-                if (record != null) {
-                    tableId = record.get(DSL.field("id", Long.class));
-                    t.setId(tableId);
+                Long tId = r.get("table_meta_id", Long.class);
+                if (tableMap.containsKey(tId)) {
+                    tableMap.get(tId).getFields().add(f);
+                }
+                return f;
+            });
+
+        // 4. 加载所有全局字段级连线，并补充表名和列名
+        List<SchemaDTO.RelationDTO> relations = dsl.select(
+                DSL.field("r.id").as("id"),
+                DSL.field("r.name").as("name"),
+                DSL.field("r.source_field_id").as("source_field_id"),
+                DSL.field("ts.table_name").as("source_table"),
+                DSL.field("fs.column_name").as("source_column"),
+                DSL.field("r.target_field_id").as("target_field_id"),
+                DSL.field("tt.table_name").as("target_table"),
+                DSL.field("ft.column_name").as("target_column"),
+                DSL.field("r.relation_type").as("relation_type")
+            )
+            .from(DSL.table("relation_meta").as("r"))
+            .join(DSL.table("field_meta").as("fs")).on(DSL.field("r.source_field_id").eq(DSL.field("fs.id")))
+            .join(DSL.table("table_meta").as("ts")).on(DSL.field("fs.table_meta_id").eq(DSL.field("ts.id")))
+            .join(DSL.table("field_meta").as("ft")).on(DSL.field("r.target_field_id").eq(DSL.field("ft.id")))
+            .join(DSL.table("table_meta").as("tt")).on(DSL.field("ft.table_meta_id").eq(DSL.field("tt.id")))
+            .fetch(r -> {
+                SchemaDTO.RelationDTO rel = new SchemaDTO.RelationDTO();
+                rel.setId(r.get("id", Long.class));
+                rel.setName(r.get("name", String.class));
+                rel.setSourceFieldId(r.get("source_field_id", Long.class));
+                rel.setSourceTable(r.get("source_table", String.class));
+                rel.setSourceColumn(r.get("source_column", String.class));
+                rel.setTargetFieldId(r.get("target_field_id", Long.class));
+                rel.setTargetTable(r.get("target_table", String.class));
+                rel.setTargetColumn(r.get("target_column", String.class));
+                rel.setRelationType(r.get("relation_type", String.class));
+                return rel;
+            });
+        schema.setRelations(relations);
+
+        return schema;
+    }
+
+    /**
+     * 声明式保存/更新全局元数据拓扑 Schema (事务保护)
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveGlobalSchema(SchemaDTO schema) {
+        if (schema == null) return;
+
+        // 1. 保存/更新数据源及下属物理表与字段
+        if (schema.getDatasources() != null) {
+            for (var ds : schema.getDatasources()) {
+                // 保存数据源基本信息
+                boolean dsExists = dsl.fetchExists(
+                    dsl.selectFrom(DSL.table("datasource_meta")).where(DSL.field("id").eq(ds.getId()))
+                );
+                if (!dsExists && ds.getId() != null) {
+                    dsl.insertInto(DSL.table("datasource_meta"))
+                        .columns(DSL.field("id"), DSL.field("name"), DSL.field("db_type"), DSL.field("host"), DSL.field("port"), DSL.field("schema_name"), DSL.field("username"), DSL.field("password_enc"))
+                        .values(ds.getId(), ds.getName(), ds.getDbType() != null ? ds.getDbType() : "MYSQL", "localhost", 3306, "low_code", "sa", "")
+                        .execute();
+                }
+
+                if (ds.getTables() != null) {
+                    for (var t : ds.getTables()) {
+                        Long tableId = t.getId();
+                        if (tableId == null) {
+                            // 查重
+                            Record tr = dsl.select(DSL.field("id"))
+                                .from(DSL.table("table_meta"))
+                                .where(DSL.field("datasource_id").eq(ds.getId())
+                                    .and(DSL.field("table_name").eq(t.getTableName())))
+                                .fetchOne();
+                            if (tr != null) {
+                                tableId = tr.get(DSL.field("id", Long.class));
+                            }
+                        }
+
+                        if (tableId != null) {
+                            dsl.update(DSL.table("table_meta"))
+                                .set(DSL.field("display_name"), t.getDisplayName())
+                                .set(DSL.field("primary_column"), t.getPrimaryColumn())
+                                .where(DSL.field("id").eq(tableId))
+                                .execute();
+                        } else {
+                            // 插入新表
+                            Record insertRec = dsl.insertInto(DSL.table("table_meta"))
+                                .columns(DSL.field("datasource_id"), DSL.field("table_name"), DSL.field("display_name"), DSL.field("primary_column"))
+                                .values(ds.getId(), t.getTableName(), t.getDisplayName(), t.getPrimaryColumn() != null ? t.getPrimaryColumn() : "id")
+                                .returning(DSL.field("id"))
+                                .fetchOne();
+                            tableId = insertRec != null ? insertRec.get(DSL.field("id", Long.class)) : null;
+                        }
+                        t.setId(tableId);
+
+                        // 遍历物理字段
+                        if (t.getFields() != null && tableId != null) {
+                            for (var f : t.getFields()) {
+                                Long fieldId = f.getId();
+                                if (fieldId == null) {
+                                    Record fr = dsl.select(DSL.field("id"))
+                                        .from(DSL.table("field_meta"))
+                                        .where(DSL.field("table_meta_id").eq(t.getId())
+                                            .and(DSL.field("column_name").eq(f.getColumnName())))
+                                        .fetchOne();
+                                    if (fr != null) {
+                                        fieldId = fr.get(DSL.field("id", Long.class));
+                                    }
+                                }
+
+                                if (fieldId != null) {
+                                    dsl.update(DSL.table("field_meta"))
+                                        .set(DSL.field("label"), f.getLabel())
+                                        .set(DSL.field("data_type"), f.getDataType())
+                                        .where(DSL.field("id").eq(fieldId))
+                                        .execute();
+                                } else {
+                                    Record insertField = dsl.insertInto(DSL.table("field_meta"))
+                                        .columns(DSL.field("table_meta_id"), DSL.field("column_name"), DSL.field("label"), DSL.field("data_type"))
+                                        .values(t.getId(), f.getColumnName(), f.getLabel(), f.getDataType() != null ? f.getDataType() : "STRING")
+                                        .returning(DSL.field("id"))
+                                        .fetchOne();
+                                    fieldId = insertField != null ? insertField.get(DSL.field("id", Long.class)) : null;
+                                }
+                                f.setId(fieldId);
+                            }
+                        }
+                    }
                 }
             }
+        }
 
-            // 处理该表下的字段 fields
-            List<FieldMeta> incomingFields = t.getFields();
-            List<Long> existingFieldIds = dsl.select(DSL.field("id", Long.class))
-                .from(DSL.table("field_meta"))
-                .where(DSL.field("table_meta_id").eq(tableId))
+        // 2. 差异同步物理连线关系
+        if (schema.getRelations() != null) {
+            // 获取数据库中现有的连线关系
+            List<Long> existingIds = dsl.select(DSL.field("id", Long.class))
+                .from(DSL.table("relation_meta"))
                 .fetchInto(Long.class);
 
-            List<Long> incomingFieldIds = incomingFields.stream()
-                .map(FieldMeta::getId)
-                .filter(Objects::nonNull)
-                .toList();
+            Set<Long> keepIds = new HashSet<>();
+            for (var rel : schema.getRelations()) {
+                // 如果前端连线因为物理表/字段刚刚新建，导致其 sourceFieldId/targetFieldId 为空，
+                // 我们通过表名与列名动态检索它们最新的真实全局字段 ID。
+                if (rel.getSourceFieldId() == null && rel.getSourceTable() != null && rel.getSourceColumn() != null) {
+                    Record fr = dsl.select(DSL.field("f.id"))
+                        .from(DSL.table("field_meta").as("f"))
+                        .join(DSL.table("table_meta").as("t")).on(DSL.field("f.table_meta_id").eq(DSL.field("t.id")))
+                        .where(DSL.field("t.table_name").eq(rel.getSourceTable())
+                            .and(DSL.field("f.column_name").eq(rel.getSourceColumn())))
+                        .fetchOne();
+                    if (fr != null) rel.setSourceFieldId(fr.get(DSL.field("id", Long.class)));
+                }
 
-            List<Long> fieldIdsToDelete = existingFieldIds.stream()
-                .filter(id -> !incomingFieldIds.contains(id))
-                .toList();
+                if (rel.getTargetFieldId() == null && rel.getTargetTable() != null && rel.getTargetColumn() != null) {
+                    Record fr = dsl.select(DSL.field("f.id"))
+                        .from(DSL.table("field_meta").as("f"))
+                        .join(DSL.table("table_meta").as("t")).on(DSL.field("f.table_meta_id").eq(DSL.field("t.id")))
+                        .where(DSL.field("t.table_name").eq(rel.getTargetTable())
+                            .and(DSL.field("f.column_name").eq(rel.getTargetColumn())))
+                        .fetchOne();
+                    if (fr != null) rel.setTargetFieldId(fr.get(DSL.field("id", Long.class)));
+                }
 
-            if (!fieldIdsToDelete.isEmpty()) {
-                dsl.deleteFrom(DSL.table("field_meta"))
-                    .where(DSL.field("id").in(fieldIdsToDelete))
-                    .execute();
-                // 同时也删除对应的权限记录，防止脏数据
-                dsl.deleteFrom(DSL.table("field_permission"))
-                    .where(DSL.field("field_meta_id").in(fieldIdsToDelete))
-                    .execute();
-            }
+                if (rel.getSourceFieldId() == null || rel.getTargetFieldId() == null) {
+                    log.warn("跳过不完整的连线保存: {}", rel.getName());
+                    continue;
+                }
 
-            int fieldOrder = 0;
-            for (FieldMeta f : incomingFields) {
-                Long fieldId = f.getId();
-                boolean fExists = fieldId != null && dsl.fetchExists(
-                    dsl.selectFrom(DSL.table("field_meta")).where(DSL.field("id").eq(fieldId))
-                );
+                boolean relExists = false;
+                if (rel.getId() != null && existingIds.contains(rel.getId())) {
+                    relExists = true;
+                    keepIds.add(rel.getId());
+                } else {
+                    // 通过字段对查重
+                    Record rr = dsl.select(DSL.field("id"))
+                        .from(DSL.table("relation_meta"))
+                        .where(DSL.field("source_field_id").eq(rel.getSourceFieldId())
+                            .and(DSL.field("target_field_id").eq(rel.getTargetFieldId())))
+                        .fetchOne();
+                    if (rr != null) {
+                        relExists = true;
+                        rel.setId(rr.get(DSL.field("id", Long.class)));
+                        keepIds.add(rel.getId());
+                    }
+                }
 
-                if (fExists) {
-                    dsl.update(DSL.table("field_meta"))
-                        .set(DSL.field("column_name"), f.getColumnName())
-                        .set(DSL.field("label"), f.getLabel())
-                        .set(DSL.field("data_type"), f.getDataType())
-                        .set(DSL.field("query_op"), f.getQueryOp())
-                        .where(DSL.field("id").eq(fieldId))
+                if (relExists) {
+                    dsl.update(DSL.table("relation_meta"))
+                        .set(DSL.field("name"), rel.getName())
+                        .set(DSL.field("relation_type"), rel.getRelationType())
+                        .where(DSL.field("id").eq(rel.getId()))
                         .execute();
                 } else {
-                    dsl.insertInto(DSL.table("field_meta"))
-                        .columns(
-                            DSL.field("table_meta_id"), DSL.field("column_name"), DSL.field("label"),
-                            DSL.field("data_type"), DSL.field("query_op")
-                        )
-                        .values(
-                            tableId, f.getColumnName(), f.getLabel(), f.getDataType(),
-                            f.getQueryOp()
-                        )
-                        .execute();
+                    Record insertRel = dsl.insertInto(DSL.table("relation_meta"))
+                        .columns(DSL.field("name"), DSL.field("source_field_id"), DSL.field("target_field_id"), DSL.field("relation_type"))
+                        .values(rel.getName(), rel.getSourceFieldId(), rel.getTargetFieldId(), rel.getRelationType() != null ? rel.getRelationType() : "<")
+                        .returning(DSL.field("id"))
+                        .fetchOne();
+                    if (insertRel != null) {
+                        Long newId = insertRel.get(DSL.field("id", Long.class));
+                        rel.setId(newId);
+                        keepIds.add(newId);
+                    }
                 }
             }
-        }
 
-        // 4. 处理 relations
-        List<RelationMeta> incomingRelations = meta.getRelations();
-        List<Long> existingRelationIds = dsl.select(DSL.field("id", Long.class))
-            .from(DSL.table("relation_meta"))
-            .where(DSL.field("module_id").eq(meta.getId()))
-            .fetchInto(Long.class);
-
-        List<Long> incomingRelationIds = incomingRelations.stream()
-            .map(RelationMeta::getId)
-            .filter(Objects::nonNull)
-            .toList();
-
-        List<Long> relationIdsToDelete = existingRelationIds.stream()
-            .filter(id -> !incomingRelationIds.contains(id))
-            .toList();
-
-        if (!relationIdsToDelete.isEmpty()) {
-            dsl.deleteFrom(DSL.table("relation_meta"))
-                .where(DSL.field("id").in(relationIdsToDelete))
-                .execute();
-        }
-
-        for (RelationMeta rel : incomingRelations) {
-            Long relId = rel.getId();
-            boolean rExists = relId != null && dsl.fetchExists(
-                dsl.selectFrom(DSL.table("relation_meta")).where(DSL.field("id").eq(relId))
-            );
-
-            if (rExists) {
-                dsl.update(DSL.table("relation_meta"))
-                    .set(DSL.field("name"), rel.getName())
-                    .set(DSL.field("left_table"), rel.getLeftTable())
-                    .set(DSL.field("right_table"), rel.getRightTable())
-                    .set(DSL.field("junction_table"), rel.getJunctionTable())
-                    .set(DSL.field("left_fk"), rel.getLeftFk())
-                    .set(DSL.field("right_fk"), rel.getRightFk())
-                    .set(DSL.field("left_join_column"), rel.getLeftJoinColumn())
-                    .set(DSL.field("right_join_column"), rel.getRightJoinColumn())
-                    .where(DSL.field("id").eq(relId))
-                    .execute();
-            } else {
-                dsl.insertInto(DSL.table("relation_meta"))
-                    .columns(
-                        DSL.field("module_id"), DSL.field("name"), DSL.field("left_table"),
-                        DSL.field("right_table"), DSL.field("junction_table"), DSL.field("left_fk"),
-                        DSL.field("right_fk"), DSL.field("left_join_column"), DSL.field("right_join_column")
-                    )
-                    .values(
-                        meta.getId(), rel.getName(), rel.getLeftTable(), rel.getRightTable(),
-                        rel.getJunctionTable(), rel.getLeftFk(), rel.getRightFk(),
-                        rel.getLeftJoinColumn(), rel.getRightJoinColumn()
-                    )
-                    .execute();
+            // 物理删除所有已在画布中被去掉的连线
+            for (Long exId : existingIds) {
+                if (!keepIds.contains(exId)) {
+                    dsl.deleteFrom(DSL.table("relation_meta"))
+                        .where(DSL.field("id").eq(exId))
+                        .execute();
+                }
             }
         }
     }

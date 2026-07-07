@@ -15,6 +15,9 @@ public class ModuleMeta {
     private String name;
     private String description;
 
+    /** 模块包含的所有物理表 */
+    private List<TableMeta> tables = new ArrayList<>();
+
     /** 主表（queryType=MAIN） */
     private TableMeta mainTable;
     /** 从表列表（queryType=SUB），保存时跟随主表 upsert */

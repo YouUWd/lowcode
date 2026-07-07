@@ -93,10 +93,12 @@ public class ModuleEngine {
                 }
             }
             meta.getRelations().forEach(rel -> {
-                if (fetchAllRelations || withMap.containsKey(rel.getName())) {
-                    result.put(rel.getName(),
-                            relationHandler.queryRight(rel, req.getId(), withMap.get(rel.getName()),
-                                    meta.getTableByName(rel.getRightTable()), perms));
+                if (rel.getLeftTable() != null && rel.getLeftTable().equals(meta.getMainTable().getTableName())) {
+                    if (fetchAllRelations || withMap.containsKey(rel.getRightTable())) {
+                        result.put(rel.getRightTable(),
+                                relationHandler.queryRight(rel, req.getId(), withMap.get(rel.getRightTable()),
+                                        meta.getTableByName(rel.getRightTable()), perms));
+                    }
                 }
             });
         }
@@ -169,18 +171,20 @@ public class ModuleEngine {
 
         // 保存 N:M 关联
         meta.getRelations().forEach(rel -> {
-            if (reqData.containsKey(rel.getName())) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> rightDataList = (List<Map<String, Object>>) reqData.get(rel.getName());
-                if (rightDataList == null) rightDataList = Collections.emptyList();
+            if (rel.getLeftTable() != null && rel.getLeftTable().equals(meta.getMainTable().getTableName())) {
+                if (reqData.containsKey(rel.getRightTable())) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> rightDataList = (List<Map<String, Object>>) reqData.get(rel.getRightTable());
+                    if (rightDataList == null) rightDataList = Collections.emptyList();
 
-                List<Long> rightIds = rightDataList.stream()
-                        .map(d -> d.get("id"))
-                        .filter(Objects::nonNull)
-                        .map(idObj -> ((Number) idObj).longValue())
-                        .toList();
+                    List<Long> rightIds = rightDataList.stream()
+                            .map(d -> d.get("id"))
+                            .filter(Objects::nonNull)
+                            .map(idObj -> ((Number) idObj).longValue())
+                            .toList();
 
-                relationHandler.saveRelations(rel, finalMainId, rightIds);
+                    relationHandler.saveRelations(rel, finalMainId, rightIds);
+                }
             }
         });
 
@@ -195,8 +199,11 @@ public class ModuleEngine {
         ModuleMeta meta = metaCache.get(moduleId);
 
         // 1. 清除 N:M 关联
-        meta.getRelations().forEach(rel ->
-                relationHandler.saveRelations(rel, id, List.of()));
+        meta.getRelations().forEach(rel -> {
+            if (rel.getLeftTable() != null && rel.getLeftTable().equals(meta.getMainTable().getTableName())) {
+                relationHandler.saveRelations(rel, id, List.of());
+            }
+        });
 
         // 2. 删除从表
         for (TableMeta sub : meta.getSubTables()) {
@@ -232,7 +239,11 @@ public class ModuleEngine {
         Set<String> validNames = new HashSet<>();
         meta.getJoinTables().forEach(jt -> validNames.add(jt.getTableName()));
         meta.getSubTables().forEach(st -> validNames.add(st.getTableName()));
-        meta.getRelations().forEach(rel -> validNames.add(rel.getName()));
+        meta.getRelations().forEach(rel -> {
+            if (rel.getLeftTable() != null && rel.getLeftTable().equals(meta.getMainTable().getTableName())) {
+                validNames.add(rel.getRightTable());
+            }
+        });
 
         for (QueryRequest.With w : req.getWith()) {
             String tName = w.getTableName();
@@ -290,17 +301,19 @@ public class ModuleEngine {
 
         // 批量查询 N:M 关联
         for (var rel : meta.getRelations()) {
-            if (!withMap.containsKey(rel.getName())) continue;
+            if (rel.getLeftTable() != null && rel.getLeftTable().equals(meta.getMainTable().getTableName())) {
+                if (!withMap.containsKey(rel.getRightTable())) continue;
 
-             Map<Long, List<Map<String, Object>>> grouped =
-                    relationHandler.queryRightBatch(rel, mainIds, withMap.get(rel.getName()),
-                            meta.getTableByName(rel.getRightTable()), perms);
+                Map<Long, List<Map<String, Object>>> grouped =
+                        relationHandler.queryRightBatch(rel, mainIds, withMap.get(rel.getRightTable()),
+                                meta.getTableByName(rel.getRightTable()), perms);
 
-            for (Map<String, Object> row : rows) {
-                Map<String, Object> mainData = (Map<String, Object>) row.get(listTable.getTableName());
-                if (mainData == null || mainData.get("id") == null) continue;
-                Long rowId = ((Number) mainData.get("id")).longValue();
-                row.put(rel.getName(), grouped.getOrDefault(rowId, Collections.emptyList()));
+                for (Map<String, Object> row : rows) {
+                    Map<String, Object> mainData = (Map<String, Object>) row.get(listTable.getTableName());
+                    if (mainData == null || mainData.get("id") == null) continue;
+                    Long rowId = ((Number) mainData.get("id")).longValue();
+                    row.put(rel.getRightTable(), grouped.getOrDefault(rowId, Collections.emptyList()));
+                }
             }
         }
     }

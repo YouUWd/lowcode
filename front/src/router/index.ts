@@ -22,6 +22,12 @@ const router = createRouter({
       component: () => import('../views/PermissionConfig.vue'),
       meta: { title: '字段权限配置' },
     },
+    {
+      path: '/schema',
+      name: 'schema',
+      component: () => import('../views/ErDiagram.vue'),
+      meta: { title: 'ER 图管理' },
+    },
   ],
 })
 

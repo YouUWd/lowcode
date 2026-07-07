@@ -122,3 +122,18 @@ export async function savePermissionBatch(req: PermBatchRequest): Promise<Result
     body: JSON.stringify(req)
   })
 }
+
+/* ================= 四、全局拓扑元数据 API ================= */
+
+/** GET /api/meta/schema — 加载全量 Schema 拓扑 */
+export async function fetchMetaSchema(): Promise<Result<any>> {
+  return request<any>('/api/meta/schema')
+}
+
+/** POST /api/meta/schema — 声明式差异同步保存全量 Schema */
+export async function saveMetaSchema(payload: any): Promise<Result<any>> {
+  return request<any>('/api/meta/schema', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+}
