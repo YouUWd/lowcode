@@ -257,530 +257,186 @@ export class DatabaseService {
    * - enrollment: 选课表（用于学生课程模块）
    */
   private async createBusinessTables() {
-    // 班级表
-    if (!(await this.businessDb.schema.hasTable('class'))) {
-      await this.businessDb.schema.createTable('class', (table) => {
+    if (!(await this.businessDb.schema.hasTable('customer_profiles'))) {
+      await this.businessDb.schema.createTable('customer_profiles', (table) => {
         table.increments('id').primary();
-        table.string('class_code', 20).unique().notNullable();
-        table.string('class_name', 100).notNullable();
-        table.string('grade_level', 20).notNullable();
-        table.integer('head_teacher_id');
-        table.integer('student_count').defaultTo(0);
-        table.integer('capacity').defaultTo(50);
+        table.string('name', 128).notNullable().unique();
+        table.string('level', 32).defaultTo('REGULAR');
+        table.string('contact_phone', 32);
+      });
+    }
+
+    if (!(await this.businessDb.schema.hasTable('orders'))) {
+      await this.businessDb.schema.createTable('orders', (table) => {
+        table.increments('id').primary();
+        table.string('order_no', 64).notNullable();
+        table.string('customer', 128).references('name').inTable('customer_profiles');
+        table.decimal('amount', 12, 2).defaultTo(0);
+        table.string('status', 32).defaultTo('PENDING');
+        table.string('remark', 512);
         table.timestamps(true, true);
       });
     }
 
-    // 教师表
-    if (!(await this.businessDb.schema.hasTable('teacher'))) {
-      await this.businessDb.schema.createTable('teacher', (table) => {
+    if (!(await this.businessDb.schema.hasTable('order_items'))) {
+      await this.businessDb.schema.createTable('order_items', (table) => {
         table.increments('id').primary();
-        table.string('teacher_code', 20).unique().notNullable();
-        table.string('first_name', 50).notNullable();
-        table.string('last_name', 50).notNullable();
-        table.string('subject', 50);
-        table.string('phone', 20);
-        table.string('email', 100);
-        table.date('hire_date');
-        table.integer('department_id');
+        table.integer('order_id').notNullable().references('id').inTable('orders');
+        table.string('product_name', 128).notNullable();
+        table.integer('qty').defaultTo(1);
+        table.decimal('price', 10, 2).defaultTo(0);
         table.timestamps(true, true);
       });
     }
 
-    // 学生表
-    if (!(await this.businessDb.schema.hasTable('student'))) {
-      await this.businessDb.schema.createTable('student', (table) => {
+    if (!(await this.businessDb.schema.hasTable('tags'))) {
+      await this.businessDb.schema.createTable('tags', (table) => {
         table.increments('id').primary();
-        table.string('student_no', 20).unique().notNullable();
-        table.string('first_name', 50).notNullable();
-        table.string('last_name', 50).notNullable();
-        table.integer('gender');
-        table.date('birth_date');
-        table.date('enrollment_date');
-        table.integer('status').defaultTo(1);
-        table.integer('class_id');
-        table.string('contact_phone', 20);
-        table.timestamps(true, true);
+        table.string('name', 64).notNullable();
       });
     }
 
-    // 课程表
-    if (!(await this.businessDb.schema.hasTable('course'))) {
-      await this.businessDb.schema.createTable('course', (table) => {
+    if (!(await this.businessDb.schema.hasTable('order_tags'))) {
+      await this.businessDb.schema.createTable('order_tags', (table) => {
         table.increments('id').primary();
-        table.string('course_code', 20).unique().notNullable();
-        table.string('course_name', 100).notNullable();
-        table.decimal('credits', 3, 1);
-        table.timestamps(true, true);
-      });
-    }
-
-    // 成绩表
-    if (!(await this.businessDb.schema.hasTable('score'))) {
-      await this.businessDb.schema.createTable('score', (table) => {
-        table.increments('id').primary();
-        table.integer('student_id').notNullable();
-        table.integer('course_id').notNullable();
-        table.string('semester', 20);
-        table.decimal('score', 5, 2);
-        table.string('grade_level', 10);
-        table.date('exam_date');
-        table.timestamps(true, true);
-      });
-    }
-
-    // 部门表（用于教师档案模块）
-    if (!(await this.businessDb.schema.hasTable('department'))) {
-      await this.businessDb.schema.createTable('department', (table) => {
-        table.increments('id').primary();
-        table.string('department_code', 20).unique().notNullable();
-        table.string('department_name', 100).notNullable();
-        table.string('location', 100);
-        table.timestamps(true, true);
-      });
-    }
-
-    // 选课表（用于学生课程模块）
-    if (!(await this.businessDb.schema.hasTable('enrollment'))) {
-      await this.businessDb.schema.createTable('enrollment', (table) => {
-        table.increments('id').primary();
-        table.integer('student_id').notNullable();
-        table.integer('course_id').notNullable();
-        table.date('enrollment_date');
-        table.integer('status').defaultTo(1);
-        table.timestamps(true, true);
+        table.integer('order_id').notNullable().references('id').inTable('orders');
+        table.integer('tag_id').notNullable().references('id').inTable('tags');
       });
     }
   }
 
-  /**
-   * 插入配置数据库样本数据
-   * 
-   * 学生管理系统配置数据：
-   * 1. 模块基本信息 (sys_module): 5 个模块
-   * 2. 模块关联表 (sys_module_entity): 7 条记录
-   * 3. 模块字段配置 (sys_module_field): 28 个字段（包含 source_mapping JSON）
-   * 4. 权限配置 (sys_permission_config): 自动生成
-   */
   private async seedConfigData() {
     try {
       console.log('[数据库服务] 开始清空并重新插入配置数据...');
-
-      // 清空所有表
       await this.configDb('sys_permission_config').del();
       await this.configDb('sys_module_field').del();
       await this.configDb('sys_module_entity').del();
       await this.configDb('sys_module').del();
-      
-      // 添加清空审批链模板数据
       await this.configDb('sys_approval_chain_config').del();
-      
-      // 重要：清空所有在途流程实例、任务和日志，防止主外键引用失效或出现“脏数据”
       await this.configDb('sys_approval_task').del();
       await this.configDb('sys_approval_log').del();
       await this.configDb('sys_approval_instance').del();
       
-      console.log('[数据库服务] 配置与工作流历史数据清空完成');
-
-      // --- 工作流 DEMO 种子数据 ---
-      const [node1Id] = await this.configDb('sys_approval_chain_config').insert({
-        module_id: 'MOD-SCORE-DETAIL',
-        up_id: 0,
-        node_name: '教研组长初审',
-        node_type: 'user_task',
-        role_target: 'head_teacher'
-      }).returning('id');
-
-      const [node2Id] = await this.configDb('sys_approval_chain_config').insert({
-        module_id: 'MOD-SCORE-DETAIL',
-        up_id: node1Id.id || node1Id, // Handle both object and raw number return formats
-        node_name: '跨部门并联交接',
-        node_type: 'parallel_group',
-        parallel_branches: JSON.stringify([
-          { branch_id: 'b1', name: '教务处核准', role_target: 'academic_admin' },
-          { branch_id: 'b2', name: '财务处退费复核', role_target: 'finance' }
-        ]),
-        re_approval_strategy: 'smart_rollback'
-      }).returning('id');
-
-      const [node3Id] = await this.configDb('sys_approval_chain_config').insert({
-        module_id: 'MOD-SCORE-DETAIL',
-        up_id: node2Id.id || node2Id,
-        node_name: '校长终审',
-        node_type: 'user_task',
-        role_target: 'principal'
-      }).returning('id');
-
-      // 更新 next_id 链接 (双向链表)
-      await this.configDb('sys_approval_chain_config').where({ id: node1Id.id || node1Id }).update({ next_id: node2Id.id || node2Id });
-      await this.configDb('sys_approval_chain_config').where({ id: node2Id.id || node2Id }).update({ next_id: node3Id.id || node3Id });
-
-      console.log('[数据库服务] 审批流模板配置插入完成');
-
-      // 1. 插入模块基本信息
+      // 插入基础模块信息 (仅为了保证不报错)
       await this.configDb('sys_module').insert([
         {
           id: 1,
-          module_id: 'MOD-CLASS-SIMPLE',
-          module_name: '班级简单信息',
-          module_desc: '班级简单信息 - 只有主实体',
-          primary_entity: 'class',
-          primary_entity_desc: '班级主表',
+          module_id: 'order',
+          module_name: '订单模块',
+          module_desc: '包含订单主表、明细表',
+          primary_entity: 'orders',
+          primary_entity_desc: '订单主表',
           record_count: 3,
           is_active: 1,
           sort_order: 1,
-        },
-        {
-          id: 2,
-          module_id: 'MOD-STUDENT-BASIC',
-          module_name: '学生基本信息',
-          module_desc: '学生基本信息 - 1:1 关联实体（学生 N:1 班级）',
-          primary_entity: 'student',
-          primary_entity_desc: '学生主表',
-          record_count: 10,
-          is_active: 1,
-          sort_order: 2,
-        },
-        {
-          id: 3,
-          module_id: 'MOD-CLASS-STUDENTS',
-          module_name: '班级学生列表',
-          module_desc: '班级学生列表 - 1:N 关联实体（班级 1:N 学生）',
-          primary_entity: 'class',
-          primary_entity_desc: '班级主表',
-          record_count: 3,
-          is_active: 1,
-          sort_order: 3,
-        },
-        {
-          id: 4,
-          module_id: 'MOD-SCORE-DETAIL',
-          module_name: '成绩详情',
-          module_desc: '成绩详情 - N:1 关联实体（成绩 N:1 学生、课程）',
-          primary_entity: 'score',
-          primary_entity_desc: '成绩主表',
-          record_count: 30,
-          is_active: 1,
-          sort_order: 4,
-        },
-        {
-          id: 5,
-          module_id: 'MOD-STUDENT-FULL',
-          module_name: '学生完整信息',
-          module_desc: '学生完整信息 - 混合 1:1、1:N、N:1 关联',
-          primary_entity: 'student',
-          primary_entity_desc: '学生主表',
-          record_count: 10,
-          is_active: 1,
-          sort_order: 5,
-        },
-      ]);
-      console.log('[数据库服务] 模块基本信息插入完成');
-
-      // 2. 插入模块关联表信息
-      await this.configDb('sys_module_entity').insert([
-        // MOD-STUDENT-BASIC 的关联表
-        {
-          id: 1,
-          module_id: 'MOD-STUDENT-BASIC',
-          entity_id: '1',
-          entity_name: 'class',
-          entity_desc: '班级信息',
-          join_left_field: 'id',
-          join_right_field: 'class_id',
-          entity_status: '正常',
-          relation_type: 'N:1',
-          sort_order: 1,
-        },
-        // MOD-CLASS-STUDENTS 的关联表
-        {
-          id: 2,
-          module_id: 'MOD-CLASS-STUDENTS',
-          entity_id: '2',
-          entity_name: 'student',
-          entity_desc: '学生列表',
-          join_left_field: 'class_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:N',
-          sort_order: 1,
-        },
-        // MOD-SCORE-DETAIL 的关联表
-        {
-          id: 3,
-          module_id: 'MOD-SCORE-DETAIL',
-          entity_id: '3',
-          entity_name: 'student',
-          entity_desc: '学生信息',
-          join_left_field: 'id',
-          join_right_field: 'student_id',
-          entity_status: '正常',
-          relation_type: 'N:1',
-          sort_order: 1,
-        },
-        {
-          id: 4,
-          module_id: 'MOD-SCORE-DETAIL',
-          entity_id: '4',
-          entity_name: 'course',
-          entity_desc: '课程信息',
-          join_left_field: 'id',
-          join_right_field: 'course_id',
-          entity_status: '正常',
-          relation_type: 'N:1',
-          sort_order: 2,
-        },
-        // MOD-STUDENT-FULL 的关联表
-        {
-          id: 5,
-          module_id: 'MOD-STUDENT-FULL',
-          entity_id: '5',
-          entity_name: 'class',
-          entity_desc: '班级信息',
-          join_left_field: 'id',
-          join_right_field: 'class_id',
-          entity_status: '正常',
-          relation_type: 'N:1',
-          sort_order: 1,
-        },
-        {
-          id: 7,
-          module_id: 'MOD-STUDENT-FULL',
-          entity_id: '7',
-          entity_name: 'score',
-          entity_desc: '成绩记录',
-          join_left_field: 'student_id',
-          join_right_field: 'id',
-          entity_status: '正常',
-          relation_type: '1:N',
-          sort_order: 2,
-        },
-      ]);
-      console.log('[数据库服务] 模块关联表信息插入完成');
-
-      // 3. 插入模块字段配置 - 包含物理字段映射（JSON 格式）
-      await this.configDb('sys_module_field').insert([
-        // ========== MOD-CLASS-SIMPLE 字段（模块1：只有主实体）==========
-        { id: 1, module_id: 'MOD-CLASS-SIMPLE', display_name: '班级编号', logical_field: 'classCode', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_code', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
-        { id: 2, module_id: 'MOD-CLASS-SIMPLE', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 2, is_visible: 1 },
-        { id: 3, module_id: 'MOD-CLASS-SIMPLE', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 3, is_visible: 1 },
-        { id: 4, module_id: 'MOD-CLASS-SIMPLE', display_name: '学生人数', logical_field: 'studentCount', source_mapping: JSON.stringify([{ entity: 'class', field: 'student_count', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-users', render_type: 'number', sort_order: 4, is_visible: 1 },
-
-        // ========== MOD-STUDENT-BASIC 字段（模块2：1:1关联）==========
-        { id: 5, module_id: 'MOD-STUDENT-BASIC', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
-        { id: 6, module_id: 'MOD-STUDENT-BASIC', display_name: '姓名', logical_field: 'fullName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 2, is_visible: 1 },
-        { id: 7, module_id: 'MOD-STUDENT-BASIC', display_name: '性别', logical_field: 'genderText', source_mapping: JSON.stringify([{ entity: 'student', field: 'gender', sort_order: 1 }]), transformer: 'DICT_MAP("GENDER", ${gender})', transformer_env: 'frontend', render_icon: 'icon-gender', render_type: 'text', sort_order: 3, is_visible: 1 },
-        { id: 8, module_id: 'MOD-STUDENT-BASIC', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 4, is_visible: 1 },
-        { id: 9, module_id: 'MOD-STUDENT-BASIC', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 5, is_visible: 1 },
-
-        // ========== MOD-CLASS-STUDENTS 字段（模块3：1:N关联）==========
-        { id: 10, module_id: 'MOD-CLASS-STUDENTS', display_name: '班级编号', logical_field: 'classCode', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_code', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
-        { id: 11, module_id: 'MOD-CLASS-STUDENTS', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 2, is_visible: 1 },
-        { id: 12, module_id: 'MOD-CLASS-STUDENTS', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 3, is_visible: 1 },
-        { id: 13, module_id: 'MOD-CLASS-STUDENTS', display_name: '学生人数', logical_field: 'studentCount', source_mapping: JSON.stringify([{ entity: 'class', field: 'student_count', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-users', render_type: 'number', sort_order: 4, is_visible: 1 },
-        // 1:N 嵌套字段（属于 student 实体）
-        { id: 14, module_id: 'MOD-CLASS-STUDENTS', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 5, is_visible: 1 },
-        { id: 15, module_id: 'MOD-CLASS-STUDENTS', display_name: '学生姓名', logical_field: 'fullName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 6, is_visible: 1 },
-        { id: 16, module_id: 'MOD-CLASS-STUDENTS', display_name: '学生性别', logical_field: 'genderText', source_mapping: JSON.stringify([{ entity: 'student', field: 'gender', sort_order: 1 }]), transformer: 'DICT_MAP("GENDER", ${gender})', transformer_env: 'frontend', render_icon: 'icon-gender', render_type: 'text', sort_order: 7, is_visible: 1 },
-
-        // ========== MOD-SCORE-DETAIL 字段（模块4：N:1关联）==========
-        { id: 17, module_id: 'MOD-SCORE-DETAIL', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
-        { id: 18, module_id: 'MOD-SCORE-DETAIL', display_name: '学生姓名', logical_field: 'studentName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 2, is_visible: 1 },
-        { id: 19, module_id: 'MOD-SCORE-DETAIL', display_name: '课程名称', logical_field: 'courseName', source_mapping: JSON.stringify([{ entity: 'course', field: 'course_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-book', render_type: 'text', sort_order: 3, is_visible: 1 },
-        { id: 20, module_id: 'MOD-SCORE-DETAIL', display_name: '学分', logical_field: 'credits', source_mapping: JSON.stringify([{ entity: 'course', field: 'credits', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-star', render_type: 'number', sort_order: 4, is_visible: 1 },
-        { id: 21, module_id: 'MOD-SCORE-DETAIL', display_name: '学期', logical_field: 'semester', source_mapping: JSON.stringify([{ entity: 'score', field: 'semester', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-calendar', render_type: 'text', sort_order: 5, is_visible: 1 },
-        { id: 22, module_id: 'MOD-SCORE-DETAIL', display_name: '分数', logical_field: 'scoreValue', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-score', render_type: 'number', sort_order: 6, is_visible: 1 },
-        { id: 23, module_id: 'MOD-SCORE-DETAIL', display_name: '等级', logical_field: 'scoreGrade', source_mapping: JSON.stringify([{ entity: 'score', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 7, is_visible: 1 },
-        { id: 24, module_id: 'MOD-SCORE-DETAIL', display_name: '成绩显示', logical_field: 'scoreDisplay', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }, { entity: 'score', field: 'grade_level', sort_order: 2 }]), transformer: 'CONCAT(${score}, "分 (", ${grade_level}, ")")', transformer_env: 'frontend', render_icon: 'icon-score', render_type: 'text', sort_order: 8, is_visible: 1 },
-        { id: 25, module_id: 'MOD-SCORE-DETAIL', display_name: '考试日期', logical_field: 'examDate', source_mapping: JSON.stringify([{ entity: 'score', field: 'exam_date', sort_order: 1 }]), transformer: 'DATE_FORMAT(exam_date, "%Y-%m-%d")', transformer_env: 'database', render_icon: 'icon-calendar', render_type: 'date', sort_order: 9, is_visible: 1 },
-
-        // ========== MOD-STUDENT-FULL 字段（模块5：混合关联）==========
-        { id: 26, module_id: 'MOD-STUDENT-FULL', display_name: '学号', logical_field: 'studentNo', source_mapping: JSON.stringify([{ entity: 'student', field: 'student_no', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-id', render_type: 'text', sort_order: 1, is_visible: 1 },
-        { id: 27, module_id: 'MOD-STUDENT-FULL', display_name: '姓名', logical_field: 'fullName', source_mapping: JSON.stringify([{ entity: 'student', field: 'last_name', sort_order: 1 }, { entity: 'student', field: 'first_name', sort_order: 2 }]), transformer: 'CONCAT(${last_name}, ${first_name})', transformer_env: 'frontend', render_icon: 'icon-user', render_type: 'text', sort_order: 2, is_visible: 1 },
-        { id: 28, module_id: 'MOD-STUDENT-FULL', display_name: '性别', logical_field: 'genderText', source_mapping: JSON.stringify([{ entity: 'student', field: 'gender', sort_order: 1 }]), transformer: 'DICT_MAP("GENDER", ${gender})', transformer_env: 'frontend', render_icon: 'icon-gender', render_type: 'text', sort_order: 3, is_visible: 1 },
-        { id: 29, module_id: 'MOD-STUDENT-FULL', display_name: '出生日期', logical_field: 'birthDate', source_mapping: JSON.stringify([{ entity: 'student', field: 'birth_date', sort_order: 1 }]), transformer: 'DATE_FORMAT(birth_date, "%Y年%m月%d日")', transformer_env: 'database', render_icon: 'icon-calendar', render_type: 'date', sort_order: 4, is_visible: 1 },
-        { id: 30, module_id: 'MOD-STUDENT-FULL', display_name: '年龄', logical_field: 'age', source_mapping: JSON.stringify([{ entity: 'student', field: 'birth_date', sort_order: 1 }]), transformer: 'TIMESTAMPDIFF(YEAR, birth_date, NOW())', transformer_env: 'database', render_icon: 'icon-age', render_type: 'number', sort_order: 5, is_visible: 1 },
-        { id: 31, module_id: 'MOD-STUDENT-FULL', display_name: '班级名称', logical_field: 'className', source_mapping: JSON.stringify([{ entity: 'class', field: 'class_name', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-class', render_type: 'text', sort_order: 6, is_visible: 1 },
-        { id: 32, module_id: 'MOD-STUDENT-FULL', display_name: '年级', logical_field: 'gradeLevel', source_mapping: JSON.stringify([{ entity: 'class', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 7, is_visible: 1 },
-        // 1:N 嵌套字段（属于 score 实体）
-        { id: 37, module_id: 'MOD-STUDENT-FULL', display_name: '学期', logical_field: 'semester', source_mapping: JSON.stringify([{ entity: 'score', field: 'semester', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-calendar', render_type: 'text', sort_order: 8, is_visible: 1 },
-        { id: 38, module_id: 'MOD-STUDENT-FULL', display_name: '分数', logical_field: 'scoreValue', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-score', render_type: 'number', sort_order: 9, is_visible: 1 },
-        { id: 39, module_id: 'MOD-STUDENT-FULL', display_name: '等级', logical_field: 'scoreGrade', source_mapping: JSON.stringify([{ entity: 'score', field: 'grade_level', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-grade', render_type: 'text', sort_order: 10, is_visible: 1 },
-        { id: 40, module_id: 'MOD-STUDENT-FULL', display_name: '成绩显示', logical_field: 'scoreDisplay', source_mapping: JSON.stringify([{ entity: 'score', field: 'score', sort_order: 1 }, { entity: 'score', field: 'grade_level', sort_order: 2 }]), transformer: 'CONCAT(${score}, "分 (", ${grade_level}, ")")', transformer_env: 'frontend', render_icon: 'icon-score', render_type: 'text', sort_order: 11, is_visible: 1 },
-        { id: 41, module_id: 'MOD-STUDENT-FULL', display_name: '考试日期', logical_field: 'examDate', source_mapping: JSON.stringify([{ entity: 'score', field: 'exam_date', sort_order: 1 }]), transformer: null, transformer_env: 'none', render_icon: 'icon-calendar', render_type: 'date', sort_order: 12, is_visible: 1 },
-      ]);
-      console.log('[数据库服务] 模块字段配置插入完成');
-
-      // 4. 生成权限配置 - 基于物理实体和物理字段生成权限节点
-      // 权限节点格式简洁：entity.field.operation_type
-      // 但需要为每个 module 保存一条记录，以便区分不同 module 下的权限
-      const fields = await this.configDb('sys_module_field').select('*');
-      const operationTypes = ['READ', 'CREATE', 'UPDATE'];
-      const uniquePermissions = new Map<string, any>();
-      const permissionsByModule = new Map<string, any[]>(); // 按 module 分组
-      let permissionId = 1;
-      
-      fields.forEach((field) => {
-        if (field.source_mapping) {
-          const sources = JSON.parse(field.source_mapping);
-          sources.forEach((source: any) => {
-            operationTypes.forEach((opType) => {
-              // 权限节点格式：entity.field.operation_type（简洁格式）
-              const permissionNode = `${source.entity}.${source.field}.${opType}`;
-              
-              // 为每个 module 保存一条权限记录
-              const moduleKey = `${field.module_id}`;
-              if (!permissionsByModule.has(moduleKey)) {
-                permissionsByModule.set(moduleKey, []);
-              }
-              
-              // 检查该 module 是否已经有这个权限节点
-              const modulePermissions = permissionsByModule.get(moduleKey)!;
-              const existingPermission = modulePermissions.find(p => p.permission_node === permissionNode);
-              
-              if (!existingPermission) {
-                const permission = {
-                  id: permissionId++,
-                  permission_node: permissionNode,
-                  entity: source.entity,
-                  field_name: source.field,
-                  operation_type: opType,
-                  enabled: true,
-                  module_id: field.module_id,
-                  logical_field: field.logical_field,
-                  description: `${source.entity}.${source.field} - ${opType}`,
-                };
-                modulePermissions.push(permission);
-                uniquePermissions.set(`${moduleKey}.${permissionNode}`, permission);
-              }
-            });
-          });
         }
-      });
+      ]);
 
-      const permissionData = Array.from(uniquePermissions.values());
-      if (permissionData.length > 0) {
-        await this.configDb('sys_permission_config').insert(permissionData);
-        console.log('[数据库服务] 权限配置数据插入完成，共', permissionData.length, '条记录');
-      }
+      // ========== 显式插入 ER 图元数据 ==========
+      await this.configDb('er_relation_meta').del();
+      await this.configDb('er_field_meta').del();
+      await this.configDb('er_table_meta').del();
 
-      console.log('[数据库服务] 配置数据插入完成');
+      await this.configDb('er_table_meta').insert([
+        { id: 1, table_name: 'orders', display_name: '订单主表', primary_column: 'id' },
+        { id: 2, table_name: 'order_items', display_name: '订单明细表', primary_column: 'id' },
+        { id: 3, table_name: 'customer_profiles', display_name: '客户扩展表', primary_column: 'id' },
+        { id: 4, table_name: 'tags', display_name: '标签表', primary_column: 'id' },
+        { id: 5, table_name: 'order_tags', display_name: '订单标签表', primary_column: 'id' }
+      ]);
+
+      await this.configDb('er_field_meta').insert([
+        { id: 1, table_id: 1, column_name: 'id', label: '编号', data_type: 'NUMBER' },
+        { id: 2, table_id: 1, column_name: 'order_no', label: '订单号', data_type: 'STRING' },
+        { id: 3, table_id: 1, column_name: 'customer', label: '客户名', data_type: 'STRING' },
+        { id: 4, table_id: 1, column_name: 'amount', label: '金额', data_type: 'DECIMAL' },
+        { id: 5, table_id: 1, column_name: 'status', label: '状态', data_type: 'STRING' },
+        { id: 6, table_id: 1, column_name: 'remark', label: '备注', data_type: 'STRING' },
+        { id: 7, table_id: 1, column_name: 'created_at', label: '创建时间', data_type: 'DATETIME' },
+        { id: 8, table_id: 1, column_name: 'updated_at', label: '更新时间', data_type: 'DATETIME' },
+        { id: 9, table_id: 2, column_name: 'id', label: '编号', data_type: 'NUMBER' },
+        { id: 10, table_id: 2, column_name: 'order_id', label: '订单ID', data_type: 'NUMBER' },
+        { id: 11, table_id: 2, column_name: 'product_name', label: '商品名称', data_type: 'STRING' },
+        { id: 12, table_id: 2, column_name: 'qty', label: '数量', data_type: 'NUMBER' },
+        { id: 13, table_id: 2, column_name: 'price', label: '单价', data_type: 'DECIMAL' },
+        { id: 14, table_id: 2, column_name: 'created_at', label: '创建时间', data_type: 'DATETIME' },
+        { id: 15, table_id: 3, column_name: 'id', label: '档案ID', data_type: 'NUMBER' },
+        { id: 16, table_id: 3, column_name: 'name', label: '客户姓名', data_type: 'STRING' },
+        { id: 17, table_id: 3, column_name: 'level', label: '客户级别', data_type: 'STRING' },
+        { id: 18, table_id: 3, column_name: 'contact_phone', label: '联系电话', data_type: 'STRING' },
+        { id: 19, table_id: 4, column_name: 'id', label: '标签ID', data_type: 'NUMBER' },
+        { id: 20, table_id: 4, column_name: 'name', label: '标签名称', data_type: 'STRING' },
+        { id: 21, table_id: 5, column_name: 'id', label: '主键ID', data_type: 'NUMBER' },
+        { id: 22, table_id: 5, column_name: 'order_id', label: '订单ID', data_type: 'NUMBER' },
+        { id: 23, table_id: 5, column_name: 'tag_id', label: '标签ID', data_type: 'NUMBER' }
+      ]);
+
+      await this.configDb('er_relation_meta').insert([
+        { id: 1, name: 'orders->order_items', source_table: 'orders', source_column: 'id', target_table: 'order_items', target_column: 'order_id', relation_type: '1:N' },
+        { id: 2, name: 'orders->customer_profiles', source_table: 'orders', source_column: 'customer', target_table: 'customer_profiles', target_column: 'name', relation_type: 'N:1' },
+        { id: 3, name: 'orders->order_tags', source_table: 'orders', source_column: 'id', target_table: 'order_tags', target_column: 'order_id', relation_type: '1:N' },
+        { id: 4, name: 'tags->order_tags', source_table: 'tags', source_column: 'id', target_table: 'order_tags', target_column: 'tag_id', relation_type: '1:N' }
+      ]);
+      console.log('[数据库服务] 配置数据与 ER 元数据插入完成');
     } catch (error) {
       console.error('[数据库服务] 配置数据插入失败:', error);
       throw error;
     }
   }
 
-  /**
-   * 插入业务数据库样本数据
-   * 
-   * 学生管理系统数据：
-   * - teacher: 3 个教师
-   * - class: 3 个班级
-   * - student: 10 个学生
-   * - course: 5 门课程
-   * - score: 30 条成绩记录
-   */
   private async seedBusinessData() {
     try {
       console.log('[数据库服务] 开始清空并重新插入业务数据...');
-
-      // 清空所有业务表
-      console.log('[数据库服务] 清空现有业务数据...');
-      await this.businessDb('score').del();
-      await this.businessDb('course').del();
-      await this.businessDb('student').del();
-      await this.businessDb('teacher').del();
-      await this.businessDb('class').del();
-      console.log('[数据库服务] 业务数据清空完成');
+      
+      await this.businessDb('order_tags').del();
+      await this.businessDb('tags').del();
+      await this.businessDb('order_items').del();
+      await this.businessDb('orders').del();
+      await this.businessDb('customer_profiles').del();
 
       console.log('[数据库服务] 插入业务数据...');
 
-      // 插入教师
-      await this.businessDb('teacher').insert([
-        { id: 1, teacher_code: 'T001', first_name: '明', last_name: '王', subject: '数学', phone: '13800001111', email: 'wang.ming@school.edu', hire_date: '2020-09-01' },
-        { id: 2, teacher_code: 'T002', first_name: '芳', last_name: '李', subject: '语文', phone: '13800002222', email: 'li.fang@school.edu', hire_date: '2020-09-01' },
-        { id: 3, teacher_code: 'T003', first_name: '强', last_name: '张', subject: '英语', phone: '13800003333', email: 'zhang.qiang@school.edu', hire_date: '2021-09-01' },
+      await this.businessDb('customer_profiles').insert([
+        { id: 1, name: '张三', level: 'VIP', contact_phone: '13800138000' },
+        { id: 2, name: '李四', level: 'GOLD', contact_phone: '13900139000' },
+        { id: 3, name: '王五', level: 'REGULAR', contact_phone: '13700137000' },
       ]);
 
-      // 插入班级
-      await this.businessDb('class').insert([
-        { id: 1, class_code: '2024-01', class_name: '高一(1)班', grade_level: '高一', head_teacher_id: 1, student_count: 5 },
-        { id: 2, class_code: '2024-02', class_name: '高一(2)班', grade_level: '高一', head_teacher_id: 2, student_count: 3 },
-        { id: 3, class_code: '2023-01', class_name: '高二(1)班', grade_level: '高二', head_teacher_id: 3, student_count: 2 },
+      await this.businessDb('tags').insert([
+        { id: 1, name: 'VIP' },
+        { id: 2, name: '加急' },
+        { id: 3, name: '退货' },
+        { id: 4, name: '特价' },
+        { id: 5, name: '赠品' },
       ]);
 
-      // 插入学生
-      await this.businessDb('student').insert([
-        { id: 1, student_no: '2024001', first_name: '伟', last_name: '张', gender: 1, birth_date: '2008-03-15', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13812345678' },
-        { id: 2, student_no: '2024002', first_name: '丽', last_name: '李', gender: 2, birth_date: '2008-05-20', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13887654321' },
-        { id: 3, student_no: '2024003', first_name: '明', last_name: '王', gender: 1, birth_date: '2008-04-10', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13898765432' },
-        { id: 4, student_no: '2024004', first_name: '芳', last_name: '刘', gender: 2, birth_date: '2008-06-25', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13876543210' },
-        { id: 5, student_no: '2024005', first_name: '强', last_name: '陈', gender: 1, birth_date: '2008-07-30', enrollment_date: '2024-09-01', status: 1, class_id: 1, contact_phone: '13865432109' },
-        { id: 6, student_no: '2024006', first_name: '娟', last_name: '杨', gender: 2, birth_date: '2008-08-15', enrollment_date: '2024-09-01', status: 1, class_id: 2, contact_phone: '13854321098' },
-        { id: 7, student_no: '2024007', first_name: '涛', last_name: '黄', gender: 1, birth_date: '2008-09-20', enrollment_date: '2024-09-01', status: 1, class_id: 2, contact_phone: '13843210987' },
-        { id: 8, student_no: '2024008', first_name: '红', last_name: '周', gender: 2, birth_date: '2008-10-05', enrollment_date: '2024-09-01', status: 1, class_id: 2, contact_phone: '13832109876' },
-        { id: 9, student_no: '2023001', first_name: '军', last_name: '吴', gender: 1, birth_date: '2007-03-15', enrollment_date: '2023-09-01', status: 1, class_id: 3, contact_phone: '13821098765' },
-        { id: 10, student_no: '2023002', first_name: '敏', last_name: '郑', gender: 2, birth_date: '2007-05-20', enrollment_date: '2023-09-01', status: 1, class_id: 3, contact_phone: '13810987654' },
+      await this.businessDb('orders').insert([
+        { id: 1, order_no: 'ORD-20240101-001', customer: '张三', amount: 1500.00, status: 'PAID', remark: '首单客户' },
+        { id: 2, order_no: 'ORD-20240101-002', customer: '李四', amount: 3200.50, status: 'SHIPPED', remark: '加急' },
+        { id: 3, order_no: 'ORD-20240102-003', customer: '王五', amount: 800.00, status: 'PENDING', remark: null },
       ]);
 
-      // 插入课程
-      await this.businessDb('course').insert([
-        { id: 1, course_code: 'C001', course_name: '数学', credits: 4.0 },
-        { id: 2, course_code: 'C002', course_name: '语文', credits: 4.0 },
-        { id: 3, course_code: 'C003', course_name: '英语', credits: 4.0 },
-        { id: 4, course_code: 'C004', course_name: '物理', credits: 3.0 },
-        { id: 5, course_code: 'C005', course_name: '化学', credits: 3.0 },
+      await this.businessDb('order_items').insert([
+        { id: 1, order_id: 1, product_name: '鼠标', qty: 1, price: 500.00 },
+        { id: 2, order_id: 1, product_name: '键盘', qty: 1, price: 1000.00 },
+        { id: 3, order_id: 2, product_name: '笔记本', qty: 1, price: 3200.50 },
+        { id: 4, order_id: 3, product_name: '鼠标', qty: 2, price: 150.00 },
+        { id: 5, order_id: 3, product_name: '鼠标垫', qty: 1, price: 50.00 },
       ]);
 
-      // 插入成绩
-      await this.businessDb('score').insert([
-        // 学生 1 的成绩
-        { id: 1, student_id: 1, course_id: 1, semester: '2024-1', score: 95.5, grade_level: 'A', exam_date: '2024-11-15' },
-        { id: 2, student_id: 1, course_id: 2, semester: '2024-1', score: 88.0, grade_level: 'B', exam_date: '2024-11-16' },
-        { id: 3, student_id: 1, course_id: 3, semester: '2024-1', score: 92.0, grade_level: 'A', exam_date: '2024-11-17' },
-        // 学生 2 的成绩
-        { id: 4, student_id: 2, course_id: 1, semester: '2024-1', score: 87.5, grade_level: 'B', exam_date: '2024-11-15' },
-        { id: 5, student_id: 2, course_id: 2, semester: '2024-1', score: 91.0, grade_level: 'A', exam_date: '2024-11-16' },
-        { id: 6, student_id: 2, course_id: 3, semester: '2024-1', score: 85.5, grade_level: 'B', exam_date: '2024-11-17' },
-        // 学生 3 的成绩
-        { id: 7, student_id: 3, course_id: 1, semester: '2024-1', score: 78.0, grade_level: 'C', exam_date: '2024-11-15' },
-        { id: 8, student_id: 3, course_id: 2, semester: '2024-1', score: 82.5, grade_level: 'B', exam_date: '2024-11-16' },
-        { id: 9, student_id: 3, course_id: 3, semester: '2024-1', score: 80.0, grade_level: 'B', exam_date: '2024-11-17' },
-        // 学生 4 的成绩
-        { id: 10, student_id: 4, course_id: 1, semester: '2024-1', score: 93.0, grade_level: 'A', exam_date: '2024-11-15' },
-        { id: 11, student_id: 4, course_id: 2, semester: '2024-1', score: 89.5, grade_level: 'B', exam_date: '2024-11-16' },
-        { id: 12, student_id: 4, course_id: 3, semester: '2024-1', score: 94.0, grade_level: 'A', exam_date: '2024-11-17' },
-        // 学生 5 的成绩
-        { id: 13, student_id: 5, course_id: 1, semester: '2024-1', score: 76.5, grade_level: 'C', exam_date: '2024-11-15' },
-        { id: 14, student_id: 5, course_id: 2, semester: '2024-1', score: 79.0, grade_level: 'C', exam_date: '2024-11-16' },
-        { id: 15, student_id: 5, course_id: 3, semester: '2024-1', score: 81.5, grade_level: 'B', exam_date: '2024-11-17' },
-        // 学生 6 的成绩
-        { id: 16, student_id: 6, course_id: 1, semester: '2024-1', score: 88.5, grade_level: 'B', exam_date: '2024-11-15' },
-        { id: 17, student_id: 6, course_id: 2, semester: '2024-1', score: 90.0, grade_level: 'A', exam_date: '2024-11-16' },
-        { id: 18, student_id: 6, course_id: 3, semester: '2024-1', score: 86.5, grade_level: 'B', exam_date: '2024-11-17' },
-        // 学生 7 的成绩
-        { id: 19, student_id: 7, course_id: 1, semester: '2024-1', score: 91.0, grade_level: 'A', exam_date: '2024-11-15' },
-        { id: 20, student_id: 7, course_id: 2, semester: '2024-1', score: 87.5, grade_level: 'B', exam_date: '2024-11-16' },
-        { id: 21, student_id: 7, course_id: 3, semester: '2024-1', score: 89.0, grade_level: 'B', exam_date: '2024-11-17' },
-        // 学生 8 的成绩
-        { id: 22, student_id: 8, course_id: 1, semester: '2024-1', score: 84.0, grade_level: 'B', exam_date: '2024-11-15' },
-        { id: 23, student_id: 8, course_id: 2, semester: '2024-1', score: 86.5, grade_level: 'B', exam_date: '2024-11-16' },
-        { id: 24, student_id: 8, course_id: 3, semester: '2024-1', score: 88.0, grade_level: 'B', exam_date: '2024-11-17' },
-        // 学生 9 的成绩
-        { id: 25, student_id: 9, course_id: 1, semester: '2024-1', score: 92.5, grade_level: 'A', exam_date: '2024-11-15' },
-        { id: 26, student_id: 9, course_id: 2, semester: '2024-1', score: 90.0, grade_level: 'A', exam_date: '2024-11-16' },
-        { id: 27, student_id: 9, course_id: 3, semester: '2024-1', score: 93.5, grade_level: 'A', exam_date: '2024-11-17' },
-        // 学生 10 的成绩
-        { id: 28, student_id: 10, course_id: 1, semester: '2024-1', score: 85.5, grade_level: 'B', exam_date: '2024-11-15' },
-        { id: 29, student_id: 10, course_id: 2, semester: '2024-1', score: 88.0, grade_level: 'B', exam_date: '2024-11-16' },
-        { id: 30, student_id: 10, course_id: 3, semester: '2024-1', score: 87.0, grade_level: 'B', exam_date: '2024-11-17' },
+      await this.businessDb('order_tags').insert([
+        { id: 1, order_id: 1, tag_id: 1 },
+        { id: 2, order_id: 1, tag_id: 4 },
+        { id: 3, order_id: 2, tag_id: 2 },
+        { id: 4, order_id: 3, tag_id: 3 },
+        { id: 5, order_id: 3, tag_id: 5 },
       ]);
-
+      
       console.log('[数据库服务] 业务数据插入完成');
     } catch (error) {
       console.error('[数据库服务] 业务数据插入失败:', error);
       throw error;
     }
+  }
   }
 }

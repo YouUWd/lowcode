@@ -5,6 +5,7 @@ import ModulePermissions from '../components/modules/ModulePermissions.vue';
 import WorkflowList from '../components/workflow/WorkflowList.vue';
 import LightweightWorkflowBuilder from '../components/workflow/LightweightWorkflowBuilder.vue';
 import WorkflowDetail from '../components/workflow/WorkflowDetail.vue';
+import ErDiagram from '../views/ErDiagram.vue';
 import { updateView } from '../store/index';
 
 const routes = [
@@ -140,6 +141,24 @@ const routes = [
     beforeEnter: async (to, from, next) => {
       const bizNo = to.params.id;
       await updateView('workflow-detail', { id: bizNo });
+      next();
+    }
+  },
+  {
+    path: '/er-diagram',
+    name: 'er-diagram',
+    component: ErDiagram,
+    meta: {
+      title: 'ER 图模型',
+      icon: 'Database',
+      sidebar: true,
+      breadcrumb: {
+        title: 'ER 图模型',
+        description: '直观地管理和配置系统实体关系模型'
+      }
+    },
+    beforeEnter: (to, from, next) => {
+      updateView('er-diagram');
       next();
     }
   }
