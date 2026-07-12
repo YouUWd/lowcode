@@ -76,8 +76,8 @@ const isMenuItemActive = (item) => {
   if (item.name === 'workflow-list') {
     return ['workflow-list', 'workflow-designer', 'workflow-detail'].includes(appState.currentView);
   }
-  if (item.name === 'er-diagram') {
-    return appState.currentView === 'er-diagram';
+  if (item.name === 'diagram') {
+    return appState.currentView === 'diagram';
   }
   return route.path.startsWith(item.path);
 };

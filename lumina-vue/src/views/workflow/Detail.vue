@@ -174,7 +174,7 @@ import { ref, onMounted, shallowRef, markRaw, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { VueFlow, MarkerType } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
-import FlowNodes from './parts/FlowNodes.vue';
+import FlowNodes from './components/FlowNodes.vue';
 import { 
   fetchWorkflowDetail, 
   submitWorkflowTask,

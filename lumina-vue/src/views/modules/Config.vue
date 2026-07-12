@@ -64,8 +64,8 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Settings, Shield, Code, CheckCheck, Terminal, X, Copy } from 'lucide-vue-next';
-import AggregationSetup from './parts/AggregationSetup.vue';
-import FieldMappingTable from './parts/FieldMappingTable.vue';
+import AggregationSetup from './components/AggregationSetup.vue';
+import FieldMappingTable from './components/FieldMappingTable.vue';
 import { modulesState, currentConfig } from '../../store/modules';
 
 const showSqlPreview = ref(false);

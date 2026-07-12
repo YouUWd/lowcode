@@ -1,106 +1,125 @@
 <template>
-  <div class="er-diagram">
+  <div class="flex flex-col h-full w-full overflow-hidden bg-white">
+    <div class="p-8 flex flex-col flex-1 overflow-hidden w-full animate-in fade-in duration-500 text-on-surface">
+      
+      <!-- ══ Header Action Section ════════════════════════════════════════════════════════ -->
+      <div class="flex justify-between items-center mb-6 mt-[-1rem] shrink-0">
+        <div class="flex items-center">
+          <h2 class="font-headline text-lg font-bold flex items-center text-on-surface mr-8">
+            <Database class="mr-2 text-primary w-5 h-5" />
+            ER 图模型
+          </h2>
+          
+          <div class="flex gap-3 items-center flex-1 min-w-0" v-if="allTables.length">
+            <!-- 表列表选择框 -->
+            <div class="relative w-52 flex items-center rounded-lg bg-surface-container-lowest border border-outline-variant/50 py-1.5 pl-3 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-primary focus-within:border-primary sm:text-sm transition-shadow z-20 cursor-pointer" v-click-outside="() => tableDropdownOpen = false" @click="tableDropdownOpen = !tableDropdownOpen">
+              <div class="flex items-center min-w-0 mr-2 flex-shrink-0">
+                <span class="text-xs text-on-surface-variant font-medium whitespace-nowrap">{{ allTables.length }} 表</span>
+                <div class="w-px h-3 bg-outline-variant/30 mx-2"></div>
+              </div>
+              <div class="relative flex-1 flex items-center min-w-0">
+                <span class="block truncate text-[13px] text-on-surface font-medium flex-1 text-left">
+                  {{ selectedTableName || '定位表...' }}
+                </span>
+                <ChevronDown class="h-4 w-4 text-on-surface-variant transition-transform ml-1 flex-shrink-0" :class="{'rotate-180': tableDropdownOpen}" aria-hidden="true" />
 
-    <!-- ══ 工具栏 ════════════════════════════════════════════════════════ -->
-    <div class="er-toolbar">
-      <div class="toolbar-left">
-        <!-- 侧栏折叠切换 -->
-        <el-tooltip :content="showSidebar ? '收起侧栏' : '展开侧栏'" placement="bottom">
-          <button class="sidebar-toggle-btn" @click="showSidebar = !showSidebar">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
-              <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="1.8"/>
-              <path v-if="showSidebar" d="M6 10l-2 2 2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path v-else d="M6 10l2 2-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+                <transition enter-active-class="transition duration-100 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-75 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+                  <div v-if="tableDropdownOpen" class="absolute top-full left-0 mt-3 max-h-60 min-w-[14rem] overflow-auto rounded-xl bg-surface-container-lowest p-1.5 shadow-[0px_8px_24px_rgba(25,28,29,0.12)] border border-outline-variant/20 focus:outline-none sm:text-sm custom-scrollbar z-50" @click.stop>
+                    <div
+                      v-for="(table, idx) in allTables"
+                      :key="table.tableName"
+                      @click="selectedTableName = table.tableName; onSidebarTableClick(table.tableName); tableDropdownOpen = false"
+                      class="relative cursor-pointer select-none py-2 px-3 rounded-lg flex items-center justify-between gap-2 transition-colors hover:bg-primary/5 hover:text-primary text-on-surface"
+                      :class="{'bg-primary/5 text-primary font-bold': selectedTableName === table.tableName}"
+                    >
+                      <div class="flex items-center min-w-0">
+                        <span class="w-2 h-2 rounded-sm shrink-0 mr-2" :style="{ background: TABLE_COLORS[idx % TABLE_COLORS.length] }"></span>
+                        <span class="block truncate text-[13px]">{{ table.tableName }}</span>
+                      </div>
+                      <span class="text-[11px] shrink-0 opacity-70">{{ table.fields.length }} 字段</span>
+                    </div>
+                  </div>
+                </transition>
+              </div>
+            </div>
+
+            <!-- 关系列表选择框 -->
+            <div class="relative w-64 flex items-center rounded-lg bg-surface-container-lowest border border-outline-variant/50 py-1.5 pl-3 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-primary focus-within:border-primary sm:text-sm transition-shadow z-20 cursor-pointer" v-click-outside="() => relDropdownOpen = false" @click="relDropdownOpen = !relDropdownOpen">
+              <div class="flex items-center min-w-0 mr-2 flex-shrink-0">
+                <span class="text-xs text-on-surface-variant font-medium whitespace-nowrap">{{ schema.relations?.length ?? 0 }} 关系</span>
+                <div class="w-px h-3 bg-outline-variant/30 mx-2"></div>
+              </div>
+              <div class="relative flex-1 flex items-center min-w-0">
+                <span class="block truncate text-[13px] text-on-surface font-medium flex-1 text-left">
+                  {{ activeRelationId ? schema.relations.find(r => r.id === activeRelationId)?.name : '定位关系...' }}
+                </span>
+                <ChevronDown class="h-4 w-4 text-on-surface-variant transition-transform ml-1 flex-shrink-0" :class="{'rotate-180': relDropdownOpen}" aria-hidden="true" />
+
+                <transition enter-active-class="transition duration-100 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-75 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+                  <div v-if="relDropdownOpen" class="absolute top-full left-0 mt-3 max-h-60 min-w-[18rem] overflow-auto rounded-xl bg-surface-container-lowest p-1.5 shadow-[0px_8px_24px_rgba(25,28,29,0.12)] border border-outline-variant/20 focus:outline-none sm:text-sm custom-scrollbar z-50" @click.stop>
+                    <div
+                      v-for="rel in schema.relations"
+                      :key="rel.id"
+                      @click="activeRelationId = rel.id; onFocusRelation(rel.id); relDropdownOpen = false"
+                      class="relative cursor-pointer select-none py-2 px-3 rounded-lg flex items-center justify-between gap-3 transition-colors hover:bg-primary/5 hover:text-primary text-on-surface"
+                      :class="{'bg-primary/5 text-primary font-bold': activeRelationId === rel.id}"
+                    >
+                      <span class="block truncate text-[13px] flex-1">{{ rel.name }}</span>
+                      <span class="text-[11px] font-mono shrink-0 opacity-70">{{ rel.nodes?.[0]?.tableName }} → {{ rel.nodes?.[1]?.tableName }}</span>
+                    </div>
+                  </div>
+                </transition>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- 模式切换 -->
+          <button
+            @click="isEditMode = !isEditMode"
+            class="px-4 py-2 text-sm font-medium rounded-xl transition-all flex items-center cursor-pointer"
+            :class="isEditMode ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'"
+            :title="isEditMode ? '切换到只读模式' : '切换到编辑模式'"
+          >
+            <component :is="isEditMode ? Pencil : Eye" class="w-4 h-4 mr-2" />
+            {{ isEditMode ? '编辑模式' : '只读模式' }}
           </button>
-        </el-tooltip>
-        <el-divider direction="vertical" style="height:16px;margin:0 4px" />
-        <el-icon color="#6366F1" :size="18"><Connection /></el-icon>
-        <span class="toolbar-title">ER 图管理</span>
-        <div class="meta-pills" v-if="allTables.length">
-          <span class="meta-pill">{{ allTables.length }} 张表</span>
-          <span class="meta-pill">{{ schema.relations?.length ?? 0 }} 条关系</span>
+
+          <div class="w-px bg-outline-variant/30 h-5 mx-2"></div>
+
+          <button @click="runAutoLayout" class="px-4 py-2 text-sm font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded-xl transition-all flex items-center cursor-pointer">
+            <LayoutTemplate class="w-4 h-4 mr-2" />
+            自动排版
+          </button>
+
+          <button @click="onRefresh" :disabled="loading" class="px-4 py-2 text-sm font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded-xl transition-all flex items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+            <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': loading }" />
+            刷新
+          </button>
+
+          <div class="w-px bg-outline-variant/30 h-5 mx-2"></div>
+
+          <button @click="onExportPng" class="px-4 py-2 text-sm font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded-xl transition-all flex items-center cursor-pointer">
+            <ImageIcon class="w-4 h-4 mr-2" />
+            导出 PNG
+          </button>
         </div>
       </div>
 
-      <div class="toolbar-right">
-        <!-- 模式切换 -->
-        <el-tooltip :content="isEditMode ? '切换到只读模式' : '切换到编辑模式'">
-          <el-button
-            size="small"
-            :type="isEditMode ? 'primary' : 'default'"
-            @click="isEditMode = !isEditMode"
-          >
-            <el-icon style="margin-right:4px">
-              <Edit v-if="isEditMode" />
-              <View v-else />
-            </el-icon>
-            {{ isEditMode ? '编辑模式' : '只读模式' }}
-          </el-button>
-        </el-tooltip>
-
-        <el-divider direction="vertical" />
-
-        <el-button size="small" @click="runAutoLayout">
-          <el-icon style="margin-right:4px"><Coordinate /></el-icon>
-          自动排版
-        </el-button>
-
-        <el-button size="small" :loading="loading" @click="onRefresh">
-          <el-icon style="margin-right:4px"><Refresh /></el-icon>
-          刷新
-        </el-button>
-
-        <el-divider direction="vertical" />
-
-        <el-button size="small" @click="onExportPng">
-          <el-icon style="margin-right:4px"><Picture /></el-icon>
-          导出 PNG
-        </el-button>
-      </div>
-    </div>
-
-    <!-- ══ 主体（左侧边栏 + 画布 + Inspector）═════════════════════════════ -->
-    <div class="er-main">
-
-      <!-- 左侧：表列表导航 -->
-      <div class="er-sidebar" :class="{ collapsed: !showSidebar }">
-        <template v-if="showSidebar">
-          <div class="sidebar-search">
-            <el-input v-model="tableSearch" size="small" placeholder="搜索表名..." clearable>
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-          </div>
-          <div class="sidebar-list">
-            <div
-              v-for="(table, idx) in filteredTables"
-              :key="table.tableName"
-              class="sidebar-item"
-              :class="{ 'sidebar-item-active': selectedTableName === table.tableName }"
-              @click="onSidebarTableClick(table.tableName)"
-            >
-              <span class="sidebar-dot" :style="{ background: TABLE_COLORS[idx % TABLE_COLORS.length] }"></span>
-              <div class="sidebar-item-info">
-                <span class="sidebar-table-name">{{ table.tableName }}</span>
-                <span class="sidebar-field-count">{{ table.fields.length }} 字段</span>
-              </div>
-            </div>
-            <div v-if="!filteredTables.length" class="sidebar-empty">无匹配表</div>
-          </div>
-        </template>
-      </div>
-
-      <!-- 中央：Vue Flow 画布 -->
+      <!-- ══ 主体（画布 + Inspector）═════════════════════════════ -->
+      <div class="bg-surface-container-low rounded-2xl shadow-sm overflow-hidden border border-outline-variant/15 flex-1 relative flex">
+        
+        <!-- 中央：Vue Flow 画布 -->
       <div class="er-canvas-wrap" ref="canvasWrapRef">
         <div v-if="loading" class="loading-overlay">
-          <el-icon class="loading-spin" :size="32"><Loading /></el-icon>
+          <Loader2 class="w-8 h-8 text-primary animate-spin" />
           <span>加载中...</span>
         </div>
 
         <!-- 编辑模式提示条 -->
         <div v-if="isEditMode" class="edit-hint">
-          <el-icon><InfoFilled /></el-icon>
+          <Info class="w-4 h-4" />
           编辑模式：从字段右侧的 ● 拖向目标字段左侧的 ● 可建立关系连线
         </div>
 
@@ -121,8 +140,8 @@
           @node-click="onNodeClick"
           @pane-click="onPaneClick"
         >
-          <Background :variant="BackgroundVariant.Dots" :gap="24" :size="1.2" color="#D1D5DB" />
-          <MiniMap :node-color="miniMapNodeColor" position="bottom-right" class="er-minimap" />
+          <Background :variant="BackgroundVariant.Dots" :gap="24" :size="1.2" color="#005daa" class="opacity-30" />
+          <MiniMap :node-color="miniMapNodeColor" position="bottom-right" class="er-minimap" pannable zoomable />
           <Controls position="top-right" class="er-controls" />
         </VueFlow>
       </div>
@@ -140,6 +159,8 @@
         @add-relation="onInspectorAddRelation"
         @focus-relation="onFocusRelation"
         @delete-relation="onDeleteRelation"
+        @update-relation-type="onUpdateRelationType"
+        @update-relation="onUpdateRelation"
       />
     </div>
 
@@ -153,26 +174,43 @@
       @cancel="pendingConnection = null"
     />
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, markRaw, provide, nextTick } from 'vue'
+import { hoveredTableId, hoveredFieldId } from '../../composables/useHoverState'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import type { Connection, NodeMouseEvent } from '@vue-flow/core'
 import { Background, BackgroundVariant } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import { Controls } from '@vue-flow/controls'
 import { ElMessage } from 'element-plus'
+import { ChevronDown, Database, Pencil, Eye, LayoutTemplate, RefreshCw, Image as ImageIcon, Loader2, Info } from 'lucide-vue-next'
 
-import TableNode from '../components/er/TableNode.vue'
-import RelationEdge from '../components/er/RelationEdge.vue'
-import RelationPopover from '../components/er/RelationPopover.vue'
-import type { PendingConnection } from '../components/er/RelationPopover.vue'
-import InspectorPanel from '../components/er/InspectorPanel.vue'
+import TableNode from './components/TableNode.vue'
+import RelationEdge from './components/RelationEdge.vue'
+import RelationPopover from './components/RelationPopover.vue'
+import type { PendingConnection } from './components/RelationPopover.vue'
+import InspectorPanel from './components/InspectorPanel.vue'
 
-import { useErData, TABLE_COLORS } from '../composables/useErData'
-import { applyDagreLayout } from '../composables/useErLayout'
-import type { ErTable } from '../composables/useErData'
+import { useErData, TABLE_COLORS } from '../../composables/useErData'
+
+const vClickOutside = {
+  mounted(el: any, binding: any) {
+    el.clickOutsideEvent = (event: Event) => {
+      if (!(el === event.target || el.contains(event.target))) {
+        binding.value(event)
+      }
+    }
+    document.body.addEventListener('click', el.clickOutsideEvent)
+  },
+  unmounted(el: any) {
+    document.body.removeEventListener('click', el.clickOutsideEvent)
+  }
+}
+import { applyDagreLayout } from '../../composables/useErLayout'
+import type { ErTable } from '../../composables/useErData'
 
 // ── Vue Flow 节点/边类型（markRaw 防止被 Vue 响应式包裹）────────────────────
 const nodeTypes = { tableNode: markRaw(TableNode) }
@@ -196,16 +234,17 @@ const {
 } = useErData()
 
 // ── UI 状态 ───────────────────────────────────────────────────────────────
-// 默认开启编辑模式，让用户一进来就能拖拽和建立关系
-const isEditMode        = ref(true)
-const showSidebar       = ref(true)
-const tableSearch       = ref('')
+const isEditMode        = ref(false)
 const selectedTableName = ref<string | null>(null)
+const tableDropdownOpen = ref(false)
+const relDropdownOpen   = ref(false)
+const activeRelationId  = ref<number | null>(null)
 const canvasWrapRef     = ref<HTMLElement | null>(null)
 
 // 激活的 Edge ID（provide 给 RelationEdge 使用）
 const activeEdgeId = ref<string | null>(null)
 provide('activeEdgeId', activeEdgeId)
+provide('activeTableId', selectedTableName)
 
 // 关键：把 isEditMode 注入给所有 TableNode（控制 Handle 显隐）
 provide('erEditMode', isEditMode)
@@ -216,12 +255,7 @@ const pendingConnection = ref<PendingConnection | null>(null)
 const relError          = ref<string | null>(null)
 
 // ── 计算属性 ──────────────────────────────────────────────────────────────
-const filteredTables = computed(() => {
-  const q = tableSearch.value.toLowerCase()
-  return q
-    ? allTables.value.filter(t => t.tableName.toLowerCase().includes(q))
-    : allTables.value
-})
+const filteredTables = computed(() => allTables.value)
 
 const selectedTable = computed<ErTable | null>(() =>
   selectedTableName.value ? (tablesMap.value[selectedTableName.value] ?? null) : null
@@ -267,14 +301,15 @@ async function onRefresh() {
 function onNodeClick({ node }: NodeMouseEvent) {
   selectedTableName.value = node.id
   activeEdgeId.value = null
-}
+  }
 
 // ── 点击画布空白 → 关闭选中 ───────────────────────────────────────────────
 function onPaneClick() {
   if (!showRelPopover.value) {
     selectedTableName.value = null
     activeEdgeId.value = null
-  }
+    activeRelationId.value = null
+      }
 }
 
 // ── 左侧导航点击 → 定位到节点 ─────────────────────────────────────────────
@@ -386,6 +421,23 @@ function onFocusRelation(relId: number) {
 }
 
 // ── 删除关系 ──────────────────────────────────────────────────────────────
+
+async function onUpdateRelation(payload: { relId: number; sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string; relationType: string; name: string }) {
+  const ok = await updateRelation(payload.relId, payload)
+  if (ok) {
+    edges.value = toVfEdges()
+    ElMessage.success('关系已更新')
+  }
+}
+
+async function onUpdateRelationType(payload: { relId: number, relationType: string }) {
+  const ok = await updateRelationType(payload.relId, payload.relationType)
+  if (ok) {
+    edges.value = toVfEdges()
+    ElMessage.success('关系类型已更新')
+  }
+}
+
 async function onDeleteRelation(relId: number) {
   const ok = await removeRelation(relId)
   if (ok) {
@@ -402,7 +454,7 @@ async function onExportPng() {
     if (!el) return
     const canvas = await html2canvas(el, { scale: 2, useCORS: true })
     const link = document.createElement('a')
-    link.download = `er-diagram-${Date.now()}.png`
+    link.download = `diagram-${Date.now()}.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
     ElMessage.success('PNG 导出成功')
@@ -416,7 +468,7 @@ init()
 </script>
 
 <style scoped>
-.er-diagram {
+.diagram {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 110px);
@@ -428,23 +480,6 @@ init()
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
-/* ── 工具栏 ───────────────────────────────────────────────────────── */
-.er-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 18px;
-  background: #fff;
-  border-bottom: 1px solid #E2E8F0;
-  flex-shrink: 0;
-  gap: 12px;
-}
-.toolbar-left  { display: flex; align-items: center; gap: 10px; }
-.toolbar-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-
-.toolbar-title { font-weight: 700; font-size: 14px; color: #1E293B; }
-
-.meta-pills { display: flex; gap: 6px; }
 .meta-pill {
   font-size: 11px; color: #475569;
   background: #F1F5F9; border: 1px solid #E2E8F0;
@@ -454,40 +489,7 @@ init()
 /* ── 主体 ─────────────────────────────────────────────────────────── */
 .er-main { display: flex; flex: 1; overflow: hidden; }
 
-/* ── 左侧导航栏 ─────────────────────────────────────────────────────── */
-.er-sidebar {
-  width: 200px;
-  flex-shrink: 0;
-  border-right: 1px solid #E2E8F0;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.er-sidebar.collapsed { width: 0; border-right: none; }
-
-/* 工具栏折叠按钮 */
-.sidebar-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-  color: #64748B;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
-  padding: 0;
-}
-.sidebar-toggle-btn:hover {
-  background: #EEF2FF;
-  color: #6366F1;
-  border-color: #C7D2FE;
-}
+/* ── 工具栏折叠按钮 ─────────────────────────────────────────────────────── */
 .sidebar-search { padding: 10px 10px 6px; flex-shrink: 0; }
 .sidebar-list { flex: 1; overflow-y: auto; padding: 0 6px 10px; }
 .sidebar-item {

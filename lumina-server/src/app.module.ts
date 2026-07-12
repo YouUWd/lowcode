@@ -9,7 +9,7 @@ import { MetadataModule } from './metadata/metadata.module';
 import { DatabaseService } from './database/database.service';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { WorkflowModule } from './workflow/workflow.module';
-import { ErSchemaModule } from './er-schema/er-schema.module';
+import { DiagramModule } from './diagram/diagram.module';
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { ErSchemaModule } from './er-schema/er-schema.module';
     ModulesModule,
     MetadataModule,
     WorkflowModule,
-    ErSchemaModule,
+    DiagramModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -59,7 +59,7 @@ import { Shield, Settings, CheckCheck, Eraser, Check, Info } from 'lucide-vue-ne
 import { appState } from '../../store/app';
 import { modulesState } from '../../store/modules';
 import { permissionsState, fetchDetailedPermissions, updatePermissions } from '../../store/permissions';
-import PermissionMatrix from './parts/PermissionMatrix.vue';
+import PermissionMatrix from './components/PermissionMatrix.vue';
 
 import { useRouter } from 'vue-router';
 

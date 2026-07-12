@@ -1,11 +1,11 @@
 import client from './client';
 
 export const fetchMetaSchema = () => {
-  return client.get('/er-schema');
+  return client.get('/diagram');
 };
 
 export const saveMetaSchema = (schema) => {
-  return client.post('/er-schema', schema);
+  return client.post('/diagram', schema);
 };
 
 export class ApiError extends Error {

@@ -1,11 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import ModuleList from '../components/modules/ModuleList.vue';
-import ModuleConfig from '../components/modules/ModuleConfig.vue';
-import ModulePermissions from '../components/modules/ModulePermissions.vue';
-import WorkflowList from '../components/workflow/WorkflowList.vue';
-import LightweightWorkflowBuilder from '../components/workflow/LightweightWorkflowBuilder.vue';
-import WorkflowDetail from '../components/workflow/WorkflowDetail.vue';
-import ErDiagram from '../views/ErDiagram.vue';
+import ModuleList from '../views/modules/index.vue';
+import ModuleConfig from '../views/modules/Config.vue';
+import ModulePermissions from '../views/modules/Permissions.vue';
+import WorkflowList from '../views/workflow/index.vue';
+import LightweightWorkflowBuilder from '../views/workflow/Designer.vue';
+import WorkflowDetail from '../views/workflow/Detail.vue';
+import ErDiagram from '../views/diagram/index.vue';
 import { updateView } from '../store/index';
 
 const routes = [
@@ -145,8 +145,8 @@ const routes = [
     }
   },
   {
-    path: '/er-diagram',
-    name: 'er-diagram',
+    path: '/diagram',
+    name: 'diagram',
     component: ErDiagram,
     meta: {
       title: 'ER 图模型',
@@ -158,7 +158,7 @@ const routes = [
       }
     },
     beforeEnter: (to, from, next) => {
-      updateView('er-diagram');
+      updateView('diagram');
       next();
     }
   }

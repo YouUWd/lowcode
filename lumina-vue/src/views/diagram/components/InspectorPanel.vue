@@ -21,9 +21,9 @@
             <div class="title-sub">{{ table.fields.length + newFields.length }} 个字段</div>
           </div>
         </div>
-        <el-button text size="small" @click="emit('close')">
-          <el-icon :size="16"><CloseBold /></el-icon>
-        </el-button>
+        <button class="p-1 hover:bg-surface-container-highest rounded-lg transition-colors cursor-pointer" @click="emit('close')">
+          <X class="w-4 h-4 text-on-surface-variant"/>
+        </button>
       </div>
 
       <!-- ── 可滚动内容区 ── -->
@@ -34,22 +34,17 @@
           <div class="section-title">基本信息</div>
           <div class="form-row">
             <label>物理表名</label>
-            <el-input :value="table.tableName" disabled size="small" class="mono-input"/>
+            <input :value="table.tableName" disabled class="w-full rounded-md border border-outline-variant/30 bg-surface-container-low text-on-surface-variant text-[13px] py-1.5 px-2.5 font-mono cursor-not-allowed focus:outline-none"/>
           </div>
           <div class="form-row">
             <label>显示名称</label>
-            <el-input v-model="editDisplayName" size="small" placeholder="中文名，如：订单表"/>
+            <input v-model="editDisplayName" class="w-full rounded-md border border-outline-variant/30 bg-surface text-sm focus:border-primary focus:ring-1 focus:ring-primary py-1.5 px-2.5 outline-none transition-shadow" placeholder="中文名，如：订单表"/>
           </div>
           <div class="form-row">
             <label>主键字段</label>
-            <el-select v-model="editPrimaryColumn" size="small" style="width:100%">
-              <el-option
-                v-for="f in table.fields"
-                :key="f.columnName"
-                :value="f.columnName"
-                :label="f.columnName"
-              />
-            </el-select>
+            <select v-model="editPrimaryColumn" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none">
+              <option v-for="f in table.fields" :key="f.columnName" :value="f.columnName">{{ f.columnName }}</option>
+            </select>
           </div>
         </div>
 
@@ -57,13 +52,13 @@
         <div class="section section-fields">
           <div class="section-title-row">
             <span class="section-title">字段列表</span>
-            <el-button
-              text size="small" class="add-btn"
+            <button
+              class="text-primary hover:bg-primary/10 px-2.5 py-1.5 flex items-center text-xs font-medium rounded-lg transition-colors cursor-pointer outline-none"
               title="添加新字段"
               @click="addNewFieldRow"
             >
-              <el-icon><Plus /></el-icon> 添加字段
-            </el-button>
+              <Plus class="w-3.5 h-3.5 mr-1" /> 添加字段
+            </button>
           </div>
 
           <!-- 列头 -->
@@ -100,15 +95,15 @@
               </svg>
               {{ field.columnName }}
             </span>
-            <el-input
+            <input
               v-model="editFields[field.columnName].label"
-              size="small" placeholder="标签"
-              class="fi-input"
+              placeholder="标签"
+              class="w-full text-xs rounded-md border border-outline-variant/30 bg-surface focus:border-primary focus:ring-1 focus:ring-primary py-1 px-2 outline-none transition-shadow"
             />
-            <el-input
+            <input
               v-model="editFields[field.columnName].dataType"
-              size="small" placeholder="类型"
-              class="fi-input fi-type"
+              placeholder="类型"
+              class="w-full text-xs rounded-md border border-outline-variant/30 bg-surface focus:border-primary focus:ring-1 focus:ring-primary py-1 px-2 outline-none transition-shadow font-mono"
             />
             <span class="fi-act"></span>
           </div>
@@ -119,31 +114,27 @@
             :key="`new-${idx}`"
             class="field-item field-item-new"
           >
-            <el-input
+            <input
               v-model="nf.columnName"
-              size="small"
               placeholder="列名*"
-              class="fi-col-input"
+              class="w-full text-xs rounded-md border border-outline-variant/40 bg-surface focus:border-primary focus:ring-1 focus:ring-primary py-1 px-2 outline-none transition-shadow font-mono text-primary font-medium"
             />
-            <el-input
+            <input
               v-model="nf.label"
-              size="small"
               placeholder="标签"
-              class="fi-input"
+              class="w-full text-xs rounded-md border border-outline-variant/30 bg-surface focus:border-primary focus:ring-1 focus:ring-primary py-1 px-2 outline-none transition-shadow"
             />
-            <el-input
+            <input
               v-model="nf.dataType"
-              size="small"
               placeholder="VARCHAR"
-              class="fi-input fi-type"
+              class="w-full text-xs rounded-md border border-outline-variant/30 bg-surface focus:border-primary focus:ring-1 focus:ring-primary py-1 px-2 outline-none transition-shadow font-mono"
             />
-            <el-button
-              text size="small" type="danger"
-              class="fi-del-btn"
+            <button
+              class="text-error/70 hover:text-error hover:bg-error/10 p-1 rounded-md transition-colors cursor-pointer outline-none flex items-center justify-center h-[26px] w-[26px]"
               @click="removeNewField(idx)"
             >
-              <el-icon><Close /></el-icon>
-            </el-button>
+              <X class="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -156,13 +147,13 @@
                 ({{ relatedRelations.length }})
               </span>
             </span>
-            <el-button
-              text size="small" class="add-btn"
+            <button
+              class="text-primary hover:bg-primary/10 px-2.5 py-1.5 flex items-center text-xs font-medium rounded-lg transition-colors cursor-pointer outline-none"
               title="新增关系"
               @click="showAddRel = !showAddRel"
             >
-              <el-icon><Plus /></el-icon> 新增关系
-            </el-button>
+              <Plus class="w-3.5 h-3.5 mr-1" /> 新增关系
+            </button>
           </div>
 
           <!-- 新增关系表单 -->
@@ -172,85 +163,71 @@
 
               <div class="form-row">
                 <label>源字段（本表）</label>
-                <el-select v-model="newRel.sourceColumn" size="small" style="width:100%" placeholder="选择源字段">
-                  <el-option
-                    v-for="f in table.fields"
-                    :key="f.columnName"
-                    :value="f.columnName"
-                    :label="f.columnName"
-                  />
-                </el-select>
+                <select v-model="newRel.sourceColumn" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none">
+                  <option value="" disabled>选择源字段</option>
+                  <option v-for="f in table.fields" :key="f.columnName" :value="f.columnName">{{ f.columnName }}</option>
+                </select>
               </div>
 
               <div class="form-row">
                 <label>关系类型</label>
-                <el-select v-model="newRel.relationType" size="small" style="width:100%">
-                  <el-option label="一对多 (1:N)" value="ONE_TO_MANY" />
-                  <el-option label="一对一 (1:1)" value="ONE_TO_ONE" />
-                  <el-option label="多对一 (N:1)" value="MANY_TO_ONE" />
-                </el-select>
+                <select v-model="newRel.relationType" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none">
+                  <option value="ONE_TO_MANY">一对多 (1:N)</option>
+                  <option value="ONE_TO_ONE">一对一 (1:1)</option>
+                  <option value="MANY_TO_ONE">多对一 (N:1)</option>
+                </select>
               </div>
 
               <div class="form-row">
                 <label>目标表</label>
-                <el-select
+                <select
                   v-model="newRel.targetTable"
-                  size="small"
-                  style="width:100%"
-                  placeholder="选择目标表"
-                  filterable
+                  class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none"
                   @change="newRel.targetColumn = ''"
                 >
-                  <el-option
-                    v-for="t in otherTables"
-                    :key="t.tableName"
-                    :value="t.tableName"
-                    :label="t.tableName"
-                  />
-                </el-select>
+                  <option value="" disabled>选择目标表</option>
+                  <option v-for="t in otherTables" :key="t.tableName" :value="t.tableName">{{ t.tableName }}</option>
+                </select>
               </div>
 
               <div class="form-row">
                 <label>目标字段</label>
-                <el-select
+                <select
                   v-model="newRel.targetColumn"
-                  size="small"
-                  style="width:100%"
-                  placeholder="先选目标表"
+                  class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none disabled:bg-surface-container-low disabled:cursor-not-allowed"
                   :disabled="!newRel.targetTable"
                 >
-                  <el-option
-                    v-for="f in targetTableFields"
-                    :key="f.columnName"
-                    :value="f.columnName"
-                    :label="f.columnName"
-                  />
-                </el-select>
+                  <option value="" disabled>先选目标表</option>
+                  <option v-for="f in targetTableFields" :key="f.columnName" :value="f.columnName">{{ f.columnName }}</option>
+                </select>
               </div>
 
               <div class="form-row">
                 <label>关系名称 <span class="optional">（可选）</span></label>
-                <el-input v-model="newRel.name" size="small" placeholder="如：orders→items" />
+                <input v-model="newRel.name" class="w-full rounded-md border border-outline-variant/30 bg-surface text-sm focus:border-primary focus:ring-1 focus:ring-primary py-1.5 px-2.5 outline-none transition-shadow" placeholder="如：orders→items" />
               </div>
 
-              <el-alert
+              <div
                 v-if="addRelError"
-                :title="addRelError"
-                type="error"
-                :closable="false"
-                style="margin-bottom:8px"
-              />
+                class="bg-error/10 text-error text-[13px] px-3 py-2 rounded-lg mb-2 flex items-center gap-2"
+              >
+                <Info class="w-4 h-4" />
+                {{ addRelError }}
+              </div>
 
-              <div class="add-rel-actions">
-                <el-button size="small" @click="cancelAddRel">取消</el-button>
-                <el-button
-                  size="small" type="primary"
-                  :loading="props.saving"
-                  :disabled="!newRel.sourceColumn || !newRel.targetTable || !newRel.targetColumn"
+              <div class="flex items-center justify-end gap-2 mt-4">
+                <button
+                  class="px-3 py-1.5 text-xs font-medium rounded-lg text-on-surface-variant bg-surface-container-high hover:bg-surface-container-highest transition-colors cursor-pointer outline-none"
+                  @click="cancelAddRel"
+                >取消</button>
+                <button
+                  class="px-3 py-1.5 text-xs font-medium rounded-lg text-white bg-primary hover:bg-primary/90 transition-colors cursor-pointer outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  :disabled="!newRel.sourceColumn || !newRel.targetTable || !newRel.targetColumn || props.saving"
                   @click="onAddRelConfirm"
                 >
+                  <Loader2 v-if="props.saving" class="w-3.5 h-3.5 mr-1 animate-spin" />
                   确认新增
-                </el-button>
+                </button>
               </div>
             </div>
           </transition>
@@ -259,38 +236,110 @@
           <div v-if="!relatedRelations.length && !showAddRel" class="rel-empty">
             暂无关系，点击"新增关系"建立
           </div>
+          
           <div
             v-for="rel in relatedRelations"
             :key="rel.id"
-            class="rel-item"
-            @click="emit('focus-relation', rel.id)"
+            class="rel-item-container"
           >
-            <div class="rel-item-left">
-              <span class="rel-endpoint">{{ rel.sourceTable }}.{{ rel.sourceColumn }}</span>
-              <span class="rel-type-badge">{{ relTypeLabel(rel.relationType) }}</span>
-              <span class="rel-endpoint">{{ rel.targetTable }}.{{ rel.targetColumn }}</span>
+            <!-- 正常显示模式 -->
+            <div v-if="editingRelId !== rel.id" class="rel-item" @click="emit('focus-relation', rel.id)">
+              <div class="rel-item-left">
+                <span class="rel-endpoint">{{ getSource(rel)?.tableName }}.{{ getSource(rel)?.columnName }}</span>
+                <select class="rel-type-select" :value="getRelTypeKey(rel)" @change="(e) => emit('update-relation-type', { relId: rel.id, relationType: (e.target as HTMLSelectElement).value })" @click.stop>
+                  <option value="ONE_TO_MANY">1:N</option>
+                  <option value="ONE_TO_ONE">1:1</option>
+                  <option value="MANY_TO_ONE">N:1</option>
+                </select>
+                <span class="rel-endpoint">{{ getTarget(rel)?.tableName }}.{{ getTarget(rel)?.columnName }}</span>
+              </div>
+              <div class="flex items-center">
+                <button
+                  class="text-primary/70 hover:text-primary hover:bg-primary/10 p-1.5 rounded-md transition-colors cursor-pointer outline-none flex items-center justify-center mr-1"
+                  title="编辑关系"
+                  @click.stop="startEditRel(rel)"
+                >
+                  <Edit2 class="w-3.5 h-3.5" />
+                </button>
+                <button
+                  class="text-error/70 hover:text-error hover:bg-error/10 p-1.5 rounded-md transition-colors cursor-pointer outline-none flex items-center justify-center"
+                  title="删除关系"
+                  @click.stop="emit('delete-relation', rel.id)"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-            <el-button
-              text size="small" type="danger"
-              @click.stop="emit('delete-relation', rel.id)"
-            >
-              <el-icon><Delete /></el-icon>
-            </el-button>
+
+            <!-- 内联编辑模式 -->
+            <div v-else class="add-rel-form !mt-2 !mb-2 !bg-surface">
+              <div class="add-rel-title text-primary">编辑关系</div>
+              
+              <div class="form-row">
+                <label>源字段（本表）</label>
+                <select v-model="editRel.sourceColumn" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none">
+                  <option v-for="f in table.fields" :key="f.columnName" :value="f.columnName">{{ f.columnName }}</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>关系类型</label>
+                <select v-model="editRel.relationType" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none">
+                  <option value="ONE_TO_MANY">一对多 (1:N)</option>
+                  <option value="ONE_TO_ONE">一对一 (1:1)</option>
+                  <option value="MANY_TO_ONE">多对一 (N:1)</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>目标表</label>
+                <select v-model="editRel.targetTable" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none" @change="editRel.targetColumn = ''">
+                  <option v-for="t in otherTables" :key="t.tableName" :value="t.tableName">{{ t.tableName }}</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>目标字段</label>
+                <select v-model="editRel.targetColumn" class="w-full text-sm rounded-md border border-outline-variant/30 bg-surface focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1.5 pl-2.5 pr-8 appearance-none outline-none disabled:bg-surface-container-low disabled:cursor-not-allowed" :disabled="!editRel.targetTable">
+                  <option v-for="f in editTargetTableFields" :key="f.columnName" :value="f.columnName">{{ f.columnName }}</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>关系名称 <span class="optional">（可选）</span></label>
+                <input v-model="editRel.name" class="w-full rounded-md border border-outline-variant/30 bg-surface text-sm focus:border-primary focus:ring-1 focus:ring-primary py-1.5 px-2.5 outline-none transition-shadow" placeholder="如：orders→items" />
+              </div>
+
+              <div v-if="editRelError" class="bg-error/10 text-error text-[13px] px-3 py-2 rounded-lg mb-2 flex items-center gap-2">
+                <Info class="w-4 h-4" />
+                {{ editRelError }}
+              </div>
+
+              <div class="flex items-center justify-end gap-2 mt-4">
+                <button class="px-3 py-1.5 text-xs font-medium rounded-lg text-on-surface-variant bg-surface-container-high hover:bg-surface-container-highest transition-colors cursor-pointer outline-none" @click="cancelEditRel">取消</button>
+                <button class="px-3 py-1.5 text-xs font-medium rounded-lg text-white bg-primary hover:bg-primary/90 transition-colors cursor-pointer outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center" :disabled="!editRel.sourceColumn || !editRel.targetTable || !editRel.targetColumn || props.saving" @click="onEditRelConfirm">
+                  <Loader2 v-if="props.saving" class="w-3.5 h-3.5 mr-1 animate-spin" />
+                  保存
+                </button>
+              </div>
+            </div>
           </div>
+
         </div>
 
       </div><!-- /inspector-scroll -->
 
       <!-- ── 底部操作按钮 ── -->
       <div class="inspector-footer">
-        <el-button size="small" @click="onReset">重置</el-button>
-        <el-button
-          size="small" type="primary"
-          :loading="props.saving"
+        <button class="px-4 py-2 text-sm font-medium rounded-xl text-on-surface-variant bg-surface-container-high hover:bg-surface-container-highest transition-colors cursor-pointer outline-none" @click="onReset">重置</button>
+        <button
+          class="px-4 py-2 text-sm font-medium rounded-xl text-white bg-primary hover:bg-primary/90 transition-colors cursor-pointer outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          :disabled="props.saving"
           @click="onSave"
         >
+          <Loader2 v-if="props.saving" class="w-4 h-4 mr-2 animate-spin" />
           保存修改
-        </el-button>
+        </button>
       </div>
     </div>
   </div>
@@ -298,8 +347,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { TABLE_COLORS } from '../../composables/useErData'
-import type { ErTable, ErRelation } from '../../composables/useErData'
+import { X, Plus, Trash2, Edit2, Info, Loader2 } from 'lucide-vue-next'
+import { TABLE_COLORS } from '../../../composables/useErData'
+import type { ErTable, ErRelation } from '../../../composables/useErData'
 
 // ── Props ─────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -330,6 +380,8 @@ const emit = defineEmits<{
   }): void
   (e: 'focus-relation', relId: number): void
   (e: 'delete-relation', relId: number): void
+  (e: 'update-relation', payload: { relId: number; sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string; relationType: string; name: string }): void
+  (e: 'update-relation-type', payload: { relId: number, relationType: string }): void
 }>()
 
 // ── 编辑态：基本信息 ──────────────────────────────────────────────────────
@@ -349,6 +401,58 @@ const removeNewField = (idx: number) => {
 }
 
 // ── 新增关系表单 ───────────────────────────────────────────────────────────
+
+const editingRelId = ref<number | null>(null)
+const editRelError = ref<string | null>(null)
+const editRel = ref({
+  sourceColumn: '',
+  targetTable:  '',
+  targetColumn: '',
+  relationType: 'ONE_TO_MANY',
+  name:         '',
+})
+
+const startEditRel = (rel: ErRelation) => {
+  editingRelId.value = rel.id
+  editRelError.value = null
+  const source = getSource(rel)
+  const target = getTarget(rel)
+  editRel.value = {
+    sourceColumn: source?.columnName || '',
+    targetTable:  target?.tableName || '',
+    targetColumn: target?.columnName || '',
+    relationType: getRelTypeKey(rel),
+    name:         rel.name || '',
+  }
+}
+
+const cancelEditRel = () => {
+  editingRelId.value = null
+  editRelError.value = null
+}
+
+const onEditRelConfirm = () => {
+  editRelError.value = null
+  if (!editRel.value.sourceColumn || !editRel.value.targetTable || !editRel.value.targetColumn) {
+    editRelError.value = '请填写源字段、目标表和目标字段'
+    return
+  }
+  emit('update-relation', {
+    relId:        editingRelId.value!,
+    sourceTable:  props.table!.tableName,
+    sourceColumn: editRel.value.sourceColumn,
+    targetTable:  editRel.value.targetTable,
+    targetColumn: editRel.value.targetColumn,
+    relationType: editRel.value.relationType,
+    name:         editRel.value.name,
+  })
+  editingRelId.value = null
+}
+
+const editTargetTableFields = computed(() =>
+  (props.allTables ?? []).find(t => t.tableName === editRel.value.targetTable)?.fields ?? []
+)
+
 const showAddRel  = ref(false)
 const addRelError = ref<string | null>(null)
 const newRel = ref({
@@ -402,11 +506,28 @@ const titleColor = computed(() =>
   TABLE_COLORS[(props.tableIndex ?? 0) % TABLE_COLORS.length]
 )
 
+const getSource = (rel: ErRelation) => rel.nodes?.find(n => n.cardinality === '1') || rel.nodes?.[0]
+const getTarget = (rel: ErRelation) => rel.nodes?.find(n => n !== getSource(rel)) || rel.nodes?.[1]
+const getRelTypeKey = (rel: ErRelation) => {
+  const cards = rel.nodes?.map(n => n.cardinality).sort().join('')
+  if (cards === '1N') return 'ONE_TO_MANY'
+  if (cards === '11') return 'ONE_TO_ONE'
+  if (cards === 'NN') return 'MANY_TO_ONE' // fallback for now
+  return 'ONE_TO_MANY'
+}
+
+const getRelType = (rel: ErRelation) => {
+  const cards = rel.nodes?.map(n => n.cardinality).sort().join('')
+  if (cards === '1N') return '1:N'
+  if (cards === '11') return '1:1'
+  if (cards === 'NN') return 'N:M'
+  return '1:N'
+}
+
 const relatedRelations = computed<ErRelation[]>(() => {
   if (!props.relations || !props.table) return []
   return props.relations.filter(
-    r => r.sourceTable === props.table!.tableName ||
-         r.targetTable === props.table!.tableName
+    r => r.nodes && r.nodes.some(n => n.tableName === props.table!.tableName)
   )
 })
 
@@ -610,4 +731,22 @@ function onSave() {
 .slide-down-leave-to     { max-height: 0; opacity: 0; }
 .slide-down-enter-to,
 .slide-down-leave-from   { max-height: 400px; opacity: 1; }
+</style>
+
+<style scoped>
+.rel-type-select {
+  font-size: 9px; font-weight: 700;
+  background: #EEF2FF; color: #6366F1;
+  padding: 1px 4px; border-radius: 3px;
+  border: 1px solid transparent;
+  outline: none; cursor: pointer;
+  appearance: none; text-align: center;
+  transition: all 0.2s;
+}
+.rel-type-select:hover {
+  border-color: #C7D2FE;
+}
+.rel-type-select:focus {
+  border-color: #6366F1;
+}
 </style>

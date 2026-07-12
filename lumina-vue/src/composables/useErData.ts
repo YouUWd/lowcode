@@ -9,7 +9,7 @@
  */
 import { ref, computed } from 'vue'
 import type { Node, Edge } from '@vue-flow/core'
-import { fetchMetaSchema, saveMetaSchema, ApiError } from '../api/er-schema'
+import { fetchMetaSchema, saveMetaSchema, ApiError } from '../api/diagram'
 
 // ─── 颜色调色盘 ──────────────────────────────────────────────────────────────
 export const TABLE_COLORS = [
@@ -46,14 +46,17 @@ export interface ErTable {
   fields: ErField[]
 }
 
+export interface RelationNode {
+  fieldId: number
+  tableName: string
+  columnName: string
+  cardinality: '1' | 'N'
+}
+
 export interface ErRelation {
   id: number
   name: string
-  sourceTable: string
-  sourceColumn: string
-  targetTable: string
-  targetColumn: string
-  relationType: string // ONE_TO_ONE | ONE_TO_MANY | MANY_TO_ONE
+  nodes: RelationNode[]
 }
 
 export interface ErSchema {
@@ -79,12 +82,11 @@ export function useErData() {
   const fkFieldIds = computed<Set<string>>(() => {
     const s = new Set<string>()
     ;(schema.value.relations || []).forEach(r => {
-      if (r.targetTable && r.targetColumn) {
-        s.add(`${r.targetTable}.${r.targetColumn}`)
-      }
-      if (r.sourceTable && r.sourceColumn) {
-        s.add(`${r.sourceTable}.${r.sourceColumn}`)
-      }
+      (r.nodes || []).forEach(node => {
+        if (node.tableName && node.columnName && node.cardinality === 'N') {
+          s.add(`${node.tableName}.${node.columnName}`)
+        }
+      })
     })
     return s
   })
@@ -116,20 +118,27 @@ export function useErData() {
     return nodes
   }
 
-  // ── 转换为 Vue Flow edges ──────────────────────────────────────────────────
   const toVfEdges = (): Edge[] => {
-    return (schema.value.relations || []).map((rel, i) => ({
-      id: `rel-${rel.id}`,
-      type: 'relationEdge',
-      source: rel.sourceTable,
-      target: rel.targetTable,
-      sourceHandle: `${rel.sourceColumn}__src`,
-      targetHandle: `${rel.targetColumn}__tgt`,
-      data: {
-        rel,
-        color: EDGE_COLORS[i % EDGE_COLORS.length],
-      },
-    }))
+    return (schema.value.relations || []).map((rel, i) => {
+      // 找到源节点（1）和目标节点（N）。如果找不到 1，就拿第一个当源。
+      const sourceNode = rel.nodes.find(n => n.cardinality === '1') || rel.nodes[0]
+      const targetNode = rel.nodes.find(n => n !== sourceNode) || rel.nodes[1]
+      
+      return {
+        id: `rel-${rel.id}`,
+        type: 'relationEdge',
+        source: sourceNode?.tableName,
+        target: targetNode?.tableName,
+        sourceHandle: `${sourceNode?.columnName}__src`,
+        targetHandle: `${targetNode?.columnName}__tgt`,
+        data: {
+          rel,
+          sourceNode,
+          targetNode,
+          color: EDGE_COLORS[i % EDGE_COLORS.length],
+        },
+      }
+    })
   }
 
   // ── 从后端加载 ─────────────────────────────────────────────────────────────
@@ -177,22 +186,58 @@ export function useErData() {
   }
 
   // ── 添加新关系 ─────────────────────────────────────────────────────────────
-  const addRelation = async (rel: Omit<ErRelation, 'id'>): Promise<boolean> => {
-    // 查重（同时检查 A→B 和 B→A）
+  const addRelation = async (relInfo: {
+    name: string;
+    sourceTable: string;
+    sourceColumn: string;
+    targetTable: string;
+    targetColumn: string;
+    relationType: string;
+  }): Promise<boolean> => {
+    // 查重：检查是否已经存在连接这两张表的边
     const exists = schema.value.relations.some(r =>
-      (r.sourceTable === rel.sourceTable && r.sourceColumn === rel.sourceColumn &&
-       r.targetTable  === rel.targetTable  && r.targetColumn  === rel.targetColumn) ||
-      (r.sourceTable === rel.targetTable && r.sourceColumn === rel.targetColumn &&
-       r.targetTable  === rel.sourceTable  && r.targetColumn  === rel.sourceColumn)
+      r.nodes.some(n => n.tableName === relInfo.sourceTable && n.columnName === relInfo.sourceColumn) &&
+      r.nodes.some(n => n.tableName === relInfo.targetTable && n.columnName === relInfo.targetColumn)
     )
     if (exists) {
       error.value = '该字段对之间的关系已存在'
       return false
     }
 
+    // 根据 relationType 决定 cardinality
+    let sourceCard: '1' | 'N' = '1'
+    let targetCard: '1' | 'N' = 'N'
+    if (relInfo.relationType === 'ONE_TO_ONE') {
+      sourceCard = '1'
+      targetCard = '1'
+    } else if (relInfo.relationType === 'MANY_TO_ONE') {
+      sourceCard = 'N'
+      targetCard = '1'
+    }
+
+    // 查找 fieldId
+    const getFieldId = (tableName: string, colName: string) => {
+      const table = schema.value.tables.find(t => t.tableName === tableName)
+      return table?.fields.find(f => f.columnName === colName)?.id || 0
+    }
+
     const newRel: ErRelation = {
-      id: -Date.now(), // 临时 ID，后端保存后会替换
-      ...rel,
+      id: -Date.now(),
+      name: relInfo.name || `${relInfo.sourceTable} → ${relInfo.targetTable}`,
+      nodes: [
+        {
+          fieldId: getFieldId(relInfo.sourceTable, relInfo.sourceColumn),
+          tableName: relInfo.sourceTable,
+          columnName: relInfo.sourceColumn,
+          cardinality: sourceCard
+        },
+        {
+          fieldId: getFieldId(relInfo.targetTable, relInfo.targetColumn),
+          tableName: relInfo.targetTable,
+          columnName: relInfo.targetColumn,
+          cardinality: targetCard
+        }
+      ]
     }
 
     schema.value.relations.push(newRel)
@@ -205,11 +250,72 @@ export function useErData() {
     return saveSchema()
   }
 
+  
+  // ── 完整更新关系 ───────────────────────────────────────────────────────────
+  const updateRelation = async (relId: number, relInfo: {
+    name: string;
+    sourceTable: string;
+    sourceColumn: string;
+    targetTable: string;
+    targetColumn: string;
+    relationType: string;
+  }): Promise<boolean> => {
+    const relIndex = schema.value.relations.findIndex(r => r.id === relId)
+    if (relIndex === -1) return false
+
+    // 根据 relationType 决定 cardinality
+    let sourceCard: '1' | 'N' = '1'
+    let targetCard: '1' | 'N' = 'N'
+    if (relInfo.relationType === 'ONE_TO_ONE') {
+      sourceCard = '1'
+      targetCard = '1'
+    } else if (relInfo.relationType === 'MANY_TO_ONE') {
+      sourceCard = 'N'
+      targetCard = '1'
+    }
+
+    const getFieldId = (tableName: string, colName: string) => {
+      const table = schema.value.tables.find(t => t.tableName === tableName)
+      return table?.fields.find(f => f.columnName === colName)?.id || 0
+    }
+
+    schema.value.relations[relIndex] = {
+      id: relId,
+      name: relInfo.name,
+      nodes: [
+        {
+          fieldId: getFieldId(relInfo.sourceTable, relInfo.sourceColumn),
+          tableName: relInfo.sourceTable,
+          columnName: relInfo.sourceColumn,
+          cardinality: sourceCard
+        },
+        {
+          fieldId: getFieldId(relInfo.targetTable, relInfo.targetColumn),
+          tableName: relInfo.targetTable,
+          columnName: relInfo.targetColumn,
+          cardinality: targetCard
+        }
+      ]
+    }
+    return saveSchema()
+  }
+
   // ── 更新关系类型 ───────────────────────────────────────────────────────────
   const updateRelationType = async (relId: number, relationType: string): Promise<boolean> => {
     const rel = schema.value.relations.find(r => r.id === relId)
-    if (!rel) return false
-    rel.relationType = relationType
+    if (!rel || rel.nodes.length < 2) return false
+    
+    // 这里简单地假设 nodes[0] 是 source，nodes[1] 是 target，根据 relationType 更新 cardinality
+    if (relationType === 'ONE_TO_MANY') {
+      rel.nodes[0].cardinality = '1'
+      rel.nodes[1].cardinality = 'N'
+    } else if (relationType === 'MANY_TO_ONE') {
+      rel.nodes[0].cardinality = 'N'
+      rel.nodes[1].cardinality = '1'
+    } else if (relationType === 'ONE_TO_ONE') {
+      rel.nodes[0].cardinality = '1'
+      rel.nodes[1].cardinality = '1'
+    }
     return saveSchema()
   }
 
@@ -280,6 +386,7 @@ export function useErData() {
     addRelation,
     removeRelation,
     updateRelationType,
+    updateRelation,
     updateTableDisplayName,
     updateField,
     updatePrimaryColumn,

@@ -11,13 +11,15 @@
       'is-edit':     isEditMode,
       'is-selected': props.selected,
     }"
+    @mouseenter="setHoveredTable(props.data.table.tableName)"
+    @mouseleave="setHoveredTable(null)"
   >
     <!-- ── 彩色表头 ── -->
     <div
       class="node-header"
       :style="{ background: TABLE_COLORS[props.data.tableIndex % TABLE_COLORS.length] }"
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="header-icon" aria-hidden="true">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" class="header-icon" aria-hidden="true">
         <rect x="2"  y="2"  width="9" height="9" rx="1.5" fill="rgba(255,255,255,0.9)"/>
         <rect x="13" y="2"  width="9" height="9" rx="1.5" fill="rgba(255,255,255,0.9)"/>
         <rect x="2"  y="13" width="9" height="9" rx="1.5" fill="rgba(255,255,255,0.5)"/>
@@ -34,11 +36,14 @@
       <div
         v-for="field in props.data.table.fields"
         :key="field.id"
-        class="field-row"
+                class="field-row"
         :class="{
           'field-pk': isPk(field),
           'field-fk': isFk(field),
+          'is-hovered-field': hoveredFieldId === `${props.data.table.tableName}.${field.columnName}`
         }"
+        @mouseenter="setHoveredField(`${props.data.table.tableName}.${field.columnName}`)"
+        @mouseleave="setHoveredField(null)"
       >
         <!-- Target Handle（字段左侧，连线终点） -->
         <Handle
@@ -52,13 +57,13 @@
         <!-- 字段图标 -->
         <span class="field-icon-wrap">
           <!-- PK 图标 -->
-          <svg v-if="isPk(field)" width="11" height="11" viewBox="0 0 24 24" fill="none" class="icon-pk" aria-label="主键">
+          <svg v-if="isPk(field)" width="10" height="10" viewBox="0 0 24 24" fill="none" class="icon-pk" aria-label="主键">
             <circle cx="8" cy="12" r="5" stroke="currentColor" stroke-width="2.2"/>
             <path d="M13 12h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
             <path d="M17 9l4 3-4 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <!-- FK 图标 -->
-          <svg v-else-if="isFk(field)" width="11" height="11" viewBox="0 0 24 24" fill="none" class="icon-fk" aria-label="外键">
+          <svg v-else-if="isFk(field)" width="10" height="10" viewBox="0 0 24 24" fill="none" class="icon-fk" aria-label="外键">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
               stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
@@ -94,8 +99,9 @@ import { ref, inject } from 'vue'
 import type { Ref } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import type { NodeProps } from '@vue-flow/core'
-import { TABLE_COLORS } from '../../composables/useErData'
-import type { ErField, ErTable } from '../../composables/useErData'
+import { hoveredTableId, hoveredFieldId } from '../../../composables/useHoverState'
+import { TABLE_COLORS } from '../../../composables/useErData'
+import type { ErField, ErTable } from '../../../composables/useErData'
 
 // ── 自定义节点 data 类型 ──────────────────────────────────────────────────
 interface TableNodeData {
@@ -110,7 +116,11 @@ const props = defineProps<NodeProps<TableNodeData>>()
 
 // ── 从 ErDiagram 注入编辑模式（响应式 ref）────────────────────────────────
 // ErDiagram.vue 中 provide('erEditMode', isEditMode)
+
 const isEditMode = inject<Ref<boolean>>('erEditMode', ref(false))
+
+const setHoveredTable = (id: string | null) => { hoveredTableId.value = id }
+const setHoveredField = (id: string | null) => { hoveredFieldId.value = id }
 
 // ── 辅助函数 ──────────────────────────────────────────────────────────────
 const isPk = (field: ErField): boolean =>
@@ -123,35 +133,37 @@ const isFk = (field: ErField): boolean =>
 <style scoped>
 /* ── 节点容器 ─────────────────────────────────────────────────────── */
 .table-node {
-  min-width: 270px;
-  background: #fff;
-  border: 1.5px solid #CBD5E1;
-  border-radius: 10px;
-  overflow: visible;   /* Handle 需要超出边界 */
-  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  min-width: 200px;
+  background: var(--surface-container-lowest, #fff);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 6px;
+  overflow: visible;
+  box-shadow: 0px 4px 16px rgba(25,28,29,0.04);
   font-family: 'Inter', -apple-system, sans-serif;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
 .table-node:hover {
-  border-color: #94A3B8;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.11);
+  border-color: rgba(0, 93, 170, 0.3);
+  box-shadow: 0px 12px 32px rgba(25,28,29,0.08);
+  transform: translateY(-2px);
 }
 
 .is-selected {
-  border-color: #6366F1 !important;
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.18), 0 6px 24px rgba(0,0,0,0.11) !important;
+  border-color: #005daa !important;
+  box-shadow: 0 0 0 3px rgba(0, 93, 170, 0.15), 0 12px 32px rgba(25,28,29,0.12) !important;
+  transform: translateY(-2px);
 }
 
 /* ── 表头 ─────────────────────────────────────────────────────────── */
 .node-header {
-  height: 40px;
-  padding: 0 12px;
+  height: 28px;
+  padding: 0 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-top-left-radius: 9px;
-  border-top-right-radius: 9px;
+  gap: 4px;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
   cursor: grab;
   user-select: none;
 }
@@ -161,7 +173,7 @@ const isFk = (field: ErField): boolean =>
 
 .table-name {
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 11px;
   color: #fff;
   flex: 1;
   overflow: hidden;
@@ -171,7 +183,7 @@ const isFk = (field: ErField): boolean =>
 }
 
 .display-name {
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(255,255,255,0.65);
   white-space: nowrap;
   max-width: 80px;
@@ -182,16 +194,16 @@ const isFk = (field: ErField): boolean =>
 /* ── 字段列表 ─────────────────────────────────────────────────────── */
 .node-body {
   background: #fff;
-  border-bottom-left-radius: 9px;
-  border-bottom-right-radius: 9px;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
 }
 
 .field-row {
-  height: 30px;
-  padding: 0 10px;
+  height: 22px;
+  padding: 0 6px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   border-bottom: 1px solid #F1F5F9;
   position: relative;  /* Handle 相对于字段行定位 */
   transition: background 0.1s;
@@ -199,11 +211,25 @@ const isFk = (field: ErField): boolean =>
 
 .field-row:last-child {
   border-bottom: none;
-  border-bottom-left-radius: 9px;
-  border-bottom-right-radius: 9px;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
 }
 
-.field-row:hover { background: #F8FAFC; }
+.field-row:hover { 
+  background: rgba(0, 93, 170, 0.08); 
+}
+.field-row:hover .field-name {
+  color: #005daa;
+  font-weight: 700;
+}
+.field-row:hover .field-type {
+  color: #005daa;
+  opacity: 0.8;
+}
+.field-row:hover .field-dot {
+  background: #005daa;
+  transform: scale(1.2);
+}
 
 /* PK 字段：琥珀色左侧线 */
 .field-pk {
@@ -225,31 +251,39 @@ const isFk = (field: ErField): boolean =>
   width: 14px;
 }
 
-.icon-pk { color: #F59E0B; }
-.icon-fk { color: #6366F1; }
+.icon-pk { color: #F59E0B; transition: all 0.1s; }
+.icon-fk { color: #6366F1; transition: all 0.1s; }
+
+.field-row:hover .icon-pk,
+.field-row:hover .icon-fk {
+  color: #005daa;
+  transform: scale(1.2);
+}
 
 .field-dot {
   display: inline-block;
   width: 5px; height: 5px;
   border-radius: 50%;
   background: #CBD5E1;
+  transition: all 0.1s;
 }
 
 .field-name {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11.5px;
+  font-size: 10px;
   color: #1E293B;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.1s;
 }
 
 .pk-bold { font-weight: 700; }
 
 .field-type {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 9px;
   color: #94A3B8;
   flex-shrink: 0;
   max-width: 90px;
@@ -257,6 +291,7 @@ const isFk = (field: ErField): boolean =>
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+  transition: all 0.1s;
 }
 
 /* ── Handle（字段连接点） ────────────────────────────────────────── */
@@ -305,3 +340,11 @@ const isFk = (field: ErField): boolean =>
   z-index: 10;
 }
 </style>
+
+.is-hovered-field {
+  background: #EEF2FF !important;
+  font-weight: bold;
+}
+.is-hovered-field .field-name {
+  color: #2563EB;
+}
