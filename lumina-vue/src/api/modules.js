@@ -37,6 +37,20 @@ export const modulesApi = {
   },
 
   /**
+   * 推断两张表之间的关联关系
+   */
+  inferRelation(source, target) {
+    return client.get('/modules/relations/infer', { params: { source, target } });
+  },
+
+  /**
+   * 同步所有关联实体
+   */
+  syncEntities(moduleId, entities) {
+    return client.put(`/modules/${moduleId}/entities`, { entities });
+  },
+
+  /**
    * 添加关联实体
    */
   addEntity(moduleId, entityData) {

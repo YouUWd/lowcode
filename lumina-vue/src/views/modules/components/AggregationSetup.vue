@@ -5,56 +5,61 @@
       <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 2px 2px, #005daa 1px, transparent 0); background-size: 24px 24px;"></div>
       
       <!-- Top: Main Entity -->
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_8px_24px_rgba(25,28,29,0.06)] z-10 w-80 border-t-4 border-primary relative mb-8 flex flex-col">
-        <div class="flex justify-between items-start mb-4">
-          <span class="text-xs font-bold text-primary uppercase tracking-wider bg-primary-fixed text-on-primary-fixed px-2 py-1 rounded">主实体 (Root)</span>
-          <Database class="w-5 h-5 text-outline" />
+      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_8px_24px_rgba(25,28,29,0.06)] z-10 w-72 border-t-4 border-primary relative mb-8 flex flex-col transition-all hover:shadow-[0px_12px_32px_rgba(25,28,29,0.08)]">
+        <div class="flex justify-between items-start mb-3">
+          <span class="text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">主表 (驱动表)</span>
+          <Database class="w-4 h-4 text-outline mt-0.5" />
         </div>
-        <div class="flex items-end justify-between">
-          <div>
-            <h3 class="font-headline text-xl font-bold text-on-surface">{{ primaryEntity.name }}</h3>
-          </div>
+        <h3 class="font-headline text-xl font-bold text-on-surface">{{ primaryEntity.name }}</h3>
+        <div class="mt-auto pt-4 border-t border-surface-container mt-4 text-xs text-on-surface-variant">
+          {{ primaryEntity.desc }}
         </div>
-        <p class="text-xs text-on-surface-variant mt-3">{{ primaryEntity.desc }}</p>
         
-        <!-- Integrated Add Button -->
-        <button @click="showAddModal = true" class="mt-6 w-full flex items-center justify-center space-x-2 py-2 border border-dashed border-primary/40 text-primary rounded-lg hover:bg-primary/5 hover:border-primary transition-all text-sm font-bold active:scale-95">
-          <Plus class="w-4 h-4 mr-1" />
-          <span>添加关联实体</span>
-        </button>
       </div>
       
       <!-- Bottom: Associated Entities Grid -->
       <div class="z-10 w-full flex flex-wrap justify-center gap-x-6 gap-y-12">
         
         <!-- Generated Cards -->
-        <div v-for="entity in entities" :key="entity.id" class="relative flex flex-col items-center group w-64 mt-4">
+        <div v-for="entity in entities" :key="entity.id" class="relative flex flex-col items-center group w-72 mt-4">
           <!-- Connection Logic Pill -->
-          <div class="absolute -top-5 left-1/2 -translate-x-1/2 border border-outline-variant/40 bg-surface px-3 py-1.5 rounded-full text-[11px] font-mono flex items-center shadow-sm whitespace-nowrap z-20 text-on-surface transition-all group-hover:-translate-y-1 group-hover:shadow-md group-hover:border-primary/50">
-            <span class="text-primary font-medium mr-1">{{ entity.joinCondition.left }}</span>
+          <div class="absolute -top-5 left-1/2 -translate-x-1/2 border border-outline-variant/40 bg-surface px-3 py-1.5 rounded-full text-[11px] font-mono flex items-center shadow-sm whitespace-nowrap z-20 text-on-surface transition-all group-hover:-translate-y-1 group-hover:shadow-md group-hover:border-tertiary/50" title="关联关系由系统自动推断">
+            <Sparkles class="w-3 h-3 text-tertiary mr-1.5" />
+            <span class="text-tertiary font-medium mr-1">{{ entity.joinCondition?.left || 'id' }}</span>
             <div class="flex flex-col items-center mx-1 px-2 border-x border-outline-variant/20">
               <component :is="entity.relationType === '1:1' ? ArrowLeftRight : (entity.relationType === '1:N' ? GitMerge : GitPullRequest)" class="w-3.5 h-3.5 text-outline" />
               <span class="text-[8px] font-bold opacity-50">{{ entity.relationType || '1:1' }}</span>
             </div>
-            <span class="font-medium ml-1 text-on-surface">{{ entity.joinCondition.right }}</span>
+            <span class="font-medium ml-1 text-on-surface">{{ entity.joinCondition?.right || 'id' }}</span>
           </div>
           
           <!-- Associated Card -->
-          <div class="bg-surface-container-lowest p-5 rounded-xl shadow-[0px_4px_16px_rgba(25,28,29,0.04)] w-full h-full border border-outline-variant/15 transition-all group-hover:-translate-y-1 group-hover:shadow-[0px_12px_32px_rgba(25,28,29,0.08)] group-hover:border-primary/30 pt-8 flex flex-col">
+          <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_4px_16px_rgba(25,28,29,0.04)] w-full h-full border border-outline-variant/15 border-t-4 border-t-tertiary/50 transition-all group-hover:-translate-y-1 group-hover:shadow-[0px_12px_32px_rgba(25,28,29,0.08)] group-hover:border-tertiary/70 flex flex-col">
             <div class="flex justify-between items-start mb-3">
-              <span class="text-[10px] font-bold text-secondary uppercase tracking-wider bg-surface-container-high px-2 py-0.5 rounded">关联实体</span>
+              <span class="text-[11px] font-bold text-tertiary bg-tertiary/10 px-2.5 py-1 rounded-md border border-tertiary/20">关联表</span>
               <div class="flex items-center space-x-2">
                 <Link class="w-4 h-4 text-outline" />
-                <button @click="removeEntity(entity.id)" class="text-error/70 hover:text-error hover:bg-error/10 p-1 rounded-full transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer">
+                <button v-if="isEditMode" @click="removeEntity(entity.id)" class="text-error/70 hover:text-error hover:bg-error/10 p-1 rounded-full transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer">
                   <Trash2 class="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <h3 class="font-headline text-lg font-bold text-on-surface">{{ entity.name }}</h3>
-            <div class="mt-auto pt-4 border-t border-surface-container text-xs text-on-surface-variant">
+            <h3 class="font-headline text-xl font-bold text-on-surface">{{ entity.name }}</h3>
+            <div class="mt-auto pt-4 border-t border-surface-container mt-4 text-xs text-on-surface-variant">
               {{ entity.desc }}
             </div>
           </div>
+        </div>
+        
+        <!-- Add New Entity Card (Only in edit mode) -->
+        <div v-if="isEditMode" class="relative flex flex-col items-center group w-72 mt-4">
+          <button @click="showAddModal = true" class="bg-surface-container-lowest/50 p-6 rounded-xl w-full h-full border-2 border-dashed border-outline-variant/40 hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center min-h-[160px] text-on-surface-variant hover:text-primary">
+            <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-4 group-hover:scale-110 transition-transform group-hover:bg-primary/10">
+              <Plus class="w-6 h-6" />
+            </div>
+            <span class="font-bold">添加关联表</span>
+            <span class="text-xs opacity-70 mt-2">将新的关联表拼接到当前模块</span>
+          </button>
         </div>
         
       </div>
@@ -68,7 +73,7 @@
               <div class="px-6 py-4 border-b border-outline-variant/15 flex justify-between items-center bg-surface">
                 <h3 class="font-headline font-bold text-lg text-on-surface flex items-center">
                   <PlusCircle class="mr-2 text-primary w-5 h-5" />
-                  添加关联实体
+                  添加关联表
                 </h3>
                 <button @click="showAddModal = false" class="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 rounded-full hover:bg-surface-variant/50 flex items-center justify-center">
                   <X class="w-5 h-5" />
@@ -84,43 +89,7 @@
                   </select>
                 </div>
 
-                <!-- Cardinality Selection -->
-                <div class="space-y-2">
-                  <label class="text-xs font-bold text-on-surface-variant">关联关系 (Cardinality)</label>
-                  <div class="flex p-1 bg-surface-container-high rounded-xl border border-outline-variant/30">
-                    <button 
-                      v-for="type in ['1:1', '1:N', 'N:1']" 
-                      :key="type"
-                      type="button"
-                      @click="newEntity.cardinality = type"
-                      class="flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
-                      :class="newEntity.cardinality === type 
-                        ? 'bg-primary text-on-primary shadow-sm' 
-                        : 'text-on-surface-variant hover:bg-surface-variant/50'"
-                    >
-                      <component :is="type === '1:1' ? ArrowLeftRight : (type === '1:N' ? GitMerge : GitPullRequest)" class="w-4 h-4" />
-                      {{ type }}
-                    </button>
-                  </div>
-                  <p class="text-[10px] text-on-surface-variant opacity-60 italic px-1">
-                    {{ cardinalityHint }}
-                  </p>
-                </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="space-y-1">
-                    <label class="text-xs font-bold text-on-surface-variant">关联字段 (Left)</label>
-                    <select v-model="newEntity.left" class="w-full text-sm rounded-lg border-outline-variant/40 bg-surface py-2.5">
-                      <option v-for="f in primaryFields" :key="f" :value="f">{{ f }}</option>
-                    </select>
-                  </div>
-                  <div class="space-y-1">
-                    <label class="text-xs font-bold text-on-surface-variant">被关联字段 (Right)</label>
-                    <select v-model="newEntity.right" class="w-full text-sm rounded-lg border-outline-variant/40 bg-surface py-2.5">
-                      <option v-for="f in associatedFields" :key="f" :value="f">{{ f }}</option>
-                    </select>
-                  </div>
-                </div>
 
                 <div class="space-y-1">
                   <label class="text-xs font-bold text-on-surface-variant">业务描述</label>
@@ -153,13 +122,18 @@ import {
   Link, 
   Trash2, 
   PlusCircle, 
-  X 
+  X,
+  Sparkles
 } from 'lucide-vue-next';
+import { useRoute } from 'vue-router';
 import { currentConfig, addEntityToCurrentConfig, removeEntityFromCurrentConfig } from '../../../store/modules';
 import { tableMap } from '../../../store/metadata';
 
 const primaryEntity = computed(() => currentConfig.value.primaryEntity);
 const entities = computed(() => currentConfig.value.entities);
+
+const route = useRoute();
+const isEditMode = computed(() => route.query.mode === 'edit');
 
 // Computed properties for dropdowns
 const availableTables = computed(() => {
@@ -169,61 +143,27 @@ const availableTables = computed(() => {
   }));
 });
 
-const primaryFields = computed(() => {
-  if (!primaryEntity.value?.name) return ['id'];
-  return tableMap.value[primaryEntity.value.name]?.fields || ['id'];
-});
-
-const associatedFields = computed(() => {
-  if (!newEntity.name) return ['id'];
-  return tableMap.value[newEntity.name]?.fields || ['id'];
-});
-
 const showAddModal = ref(false);
 const newEntity = reactive({
   name: '',
-  desc: '',
-  left: '',
-  right: '',
-  cardinality: '1:1'
+  desc: ''
 });
 
-const cardinalityHint = computed(() => {
-  if (newEntity.cardinality === '1:1') return '一个主实体记录对应一个关联实体记录 (如: 员工与其身份证信息)';
-  if (newEntity.cardinality === '1:N') return '一个主实体记录对应多个关联实体记录 (如: 员工与其教育经历)';
-  if (newEntity.cardinality === 'N:1') return '多个主实体记录对应一个关联实体记录 (如: 多个员工属于同一个部门)';
-  return '';
-});
-
-// Auto-fill desc and select default associated field when physical table changes
+// Auto-fill desc when physical table changes
 watch(() => newEntity.name, (newVal) => {
   if (newVal && tableMap.value[newVal]) {
     newEntity.desc = tableMap.value[newVal].desc;
-    newEntity.right = tableMap.value[newVal].fields[0] || 'id';
-    
-    // 智能推断关系：如果是 hr_emp_job 等表通常是 1:1，如果是 education 通常是 1:N
-    if (newVal.includes('education') || newVal.includes('payroll') || newVal.includes('record')) {
-      newEntity.cardinality = '1:N';
-    } else {
-      newEntity.cardinality = '1:1';
-    }
   }
 });
 
 const addEntity = async () => {
-  if (!newEntity.name || !newEntity.left || !newEntity.right) return;
+  if (!newEntity.name) return;
   await addEntityToCurrentConfig({
     name: newEntity.name,
-    desc: newEntity.desc || '新增拓展关联实体',
-    cardinality: newEntity.cardinality,
-    left: newEntity.left,
-    right: newEntity.right
+    desc: newEntity.desc || '新增拓展关联实体'
   });
   newEntity.name = '';
   newEntity.desc = '';
-  newEntity.left = '';
-  newEntity.right = '';
-  newEntity.cardinality = '1:1';
   showAddModal.value = false;
 };
 

@@ -2,44 +2,15 @@
   <header class="bg-[#ffffff] dark:bg-[#191c1d] font-manrope text-sm font-medium tracking-tight flex justify-between items-center px-8 h-16 w-full shrink-0 z-30 shadow-[0px_4px_16px_rgba(25,28,29,0.02)] relative">
     <div class="flex items-center text-on-surface-variant">
       <!-- 数据驱动的自适应面包屑系统 -->
-      <div v-if="breadcrumbData" class="flex items-center">
-        <!-- 1. 父级导航（若存在，如“模块管理”或“工作流管理”） -->
-        <template v-if="breadcrumbData.parent">
-          <span @click="navigateTo(breadcrumbData.parent.name)" class="font-semibold hover:text-primary transition-colors cursor-pointer px-2 py-1 -ml-2 rounded-lg hover:bg-primary/5">
-            {{ breadcrumbData.parent.title }}
-          </span>
-          <ChevronRight class="w-4 h-4 text-outline-variant mx-1" />
-        </template>
-
-        <!-- 2. 根级标题（若是列表页） -->
-        <span v-if="!breadcrumbData.parent" class="font-semibold text-on-surface">
-          {{ breadcrumbData.title }}
+      <div v-if="route.meta" class="flex items-center">
+        <!-- 1. 当前页面标题 -->
+        <span class="font-bold text-on-surface text-base">
+          {{ route.meta.title }}
         </span>
 
-        <!-- 3. 动态激活子对象高亮 & 快速视图切换器 -->
-        <div v-if="breadcrumbData.parent && breadcrumbData.dynamicActive" class="flex items-center bg-surface-container-high p-1 rounded-xl border border-outline-variant/20">
-          <span class="font-semibold text-on-surface px-3 py-1" :class="{'font-mono': isWorkflow}">
-            {{ activeTargetName }}
-          </span>
-          
-          <!-- 子视图标签切换按钮组（配置/权限，处理控制台/流程设计器） -->
-          <template v-if="subViewsList && subViewsList.length > 0">
-            <div class="w-px h-4 bg-outline-variant/40 mx-1"></div>
-            <button 
-              v-for="subView in subViewsList"
-              :key="subView.name"
-              @click="handleSubViewSwitch(subView)"
-              class="px-3 py-1 text-xs font-bold rounded-lg transition-all ml-0.5"
-              :class="isSubViewActive(subView) ? subView.activeClass : 'text-on-surface-variant hover:bg-surface-variant'"
-            >
-              {{ subView.title }}
-            </button>
-          </template>
-        </div>
-
-        <!-- 4. 描述说明 -->
-        <span class="ml-4 px-3 border-l border-outline-variant/40 text-xs font-semibold text-on-surface-variant/80">
-          {{ breadcrumbData.description }}
+        <!-- 2. 描述说明 -->
+        <span v-if="route.meta.breadcrumb?.description" class="ml-4 px-3 border-l border-outline-variant/40 text-xs font-semibold text-on-surface-variant/80">
+          {{ route.meta.breadcrumb.description }}
         </span>
       </div>
     </div>
@@ -181,54 +152,9 @@ const isWorkflow = computed(() => {
   return route.path.startsWith('/workflow');
 });
 
-// 从当前路由元数据提取面包屑定义
-const breadcrumbData = computed(() => {
-  return route.meta?.breadcrumb || null;
-});
-
-// 计算显示目标名称 (业务单号 or 模块名称)
-const activeTargetName = computed(() => {
-  if (isWorkflow.value) {
-    return route.params.id || route.query.bizNo || '';
-  }
-  return modulesState.activeModule?.name || '员工管理';
-});
-
-// 提取当前路由支持的平级标签切换组
-const subViewsList = computed(() => {
-  return route.meta?.subViews || [];
-});
-
-// 判断当前平级视图是否激活
-const isSubViewActive = (subView) => {
-  return route.name === subView.name;
-};
-
 // 父层级面包屑跳转
 const navigateTo = (routeName) => {
   router.push({ name: routeName });
-};
-
-// 视图标签切换路由流转逻辑
-const handleSubViewSwitch = (subView) => {
-  const params = { ...route.params };
-  const query = { ...route.query };
-
-  // 特殊跳转策略
-  if (subView.name === 'workflow-designer') {
-    if (params.id) {
-      router.push(`/workflow/designer?bizNo=${params.id}`);
-      return;
-    }
-  }
-  if (subView.name === 'workflow-detail') {
-    if (!params.id && query.bizNo) {
-      router.push(`/workflow/${query.bizNo}/detail`);
-      return;
-    }
-  }
-
-  router.push({ name: subView.name, params, query });
 };
 
 const showSwitcher = ref(false);

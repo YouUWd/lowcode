@@ -1,110 +1,76 @@
 <template>
   <div class="p-8 space-y-12 w-full">
 
-    <!-- Statistics Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
-        <div class="flex items-center gap-4 mb-4">
-          <div class="p-3 bg-secondary-container rounded-xl text-on-secondary-container flex items-center justify-center">
-            <LayoutGrid class="w-6 h-6" />
-          </div>
-          <span class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">总模块数</span>
-        </div>
-        <div class="flex items-baseline gap-2">
-          <span class="text-3xl font-extrabold font-headline">128</span>
-          <span class="text-sm font-semibold text-primary">+12% vs 上月</span>
-        </div>
-      </div>
-
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
-        <div class="flex items-center gap-4 mb-4">
-          <div class="p-3 bg-primary-container/10 rounded-xl text-primary flex items-center justify-center">
-            <Network class="w-6 h-6" />
-          </div>
-          <span class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">活跃实体</span>
-        </div>
-        <div class="flex items-baseline gap-2">
-          <span class="text-3xl font-extrabold font-headline">2,456</span>
-          <span class="text-sm font-semibold text-tertiary-container">高负载运行中</span>
-        </div>
-      </div>
-
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)] border-b-4 border-primary">
-        <div class="flex items-center gap-4 mb-4">
-          <div class="p-3 bg-tertiary-fixed rounded-xl text-on-tertiary-fixed flex items-center justify-center">
-            <Activity class="w-6 h-6" />
-          </div>
-          <span class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">系统健康度</span>
-        </div>
-        <div class="flex items-baseline gap-2">
-          <span class="text-3xl font-extrabold font-headline">99.8%</span>
-          <span class="text-sm font-semibold text-emerald-600">运行平稳</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Main Data Table -->
-    <div class="bg-surface-container-lowest rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)] overflow-hidden">
-      <div class="p-6 border-b border-surface-container-low flex justify-between items-center bg-surface-container-low/30">
-        <h3 class="font-headline font-bold text-lg">模块列表</h3>
-        <div class="flex items-center gap-3">
-          <div v-if="appState.loading" class="flex items-center gap-2 text-primary text-xs font-bold animate-pulse mr-2">
-            <RefreshCw class="w-3.5 h-3.5 animate-spin" />
-            同步中...
-          </div>
-          <button @click="fetchModules" class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="刷新">
-            <RefreshCw class="w-4 h-4" />
-          </button>
-          <div class="w-px bg-outline-variant/30 my-1 mx-1 h-6"></div>
-          <button @click="isAddModalOpen = true" class="px-4 py-2 text-sm font-semibold bg-primary text-on-primary hover:bg-primary/90 rounded-lg transition-colors flex items-center gap-2">
-            <PlusCircle class="w-4 h-4" /> 新建模块
-          </button>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
+    <div class="bg-white rounded-xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] border border-slate-200">
+      <div class="overflow-x-auto overflow-y-hidden">
         <table class="w-full text-left border-collapse">
           <thead>
-            <tr class="bg-surface-container-low/50">
-              <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">模块 ID</th>
-              <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">模块名称</th>
-              <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">主实体 (Primary)</th>
-              <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest text-center">关联实体数</th>
-              <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">状态</th>
-              <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest text-right">操作</th>
+            <tr class="bg-slate-50 text-xs font-extrabold text-slate-600 uppercase tracking-widest border-b border-slate-200">
+              <th class="px-6 py-4 border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <Hash class="w-4 h-4 text-slate-400" />
+                  模块 ID
+                </div>
+              </th>
+              <th class="px-6 py-4 border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <PackagePlus class="w-4 h-4 text-slate-400" />
+                  模块名称
+                </div>
+              </th>
+              <th class="px-6 py-4 border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <Database class="w-4 h-4 text-slate-400" />
+                  主表 (Primary)
+                </div>
+              </th>
+              <th class="px-6 py-4 border-r border-slate-200">
+                <div class="flex items-center justify-center gap-2">
+                  <Network class="w-4 h-4 text-slate-400" />
+                  关联表数
+                </div>
+              </th>
+              <th class="px-6 py-4 border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <Activity class="w-4 h-4 text-slate-400" />
+                  状态
+                </div>
+              </th>
+              <th class="px-6 py-4 text-center w-[160px] min-w-[160px]">
+                <div class="flex items-center justify-center gap-1.5">
+                  <span>操作</span>
+                  <div class="w-px h-3 bg-slate-300 mx-1"></div>
+                  <button @click="isAddModalOpen = true" 
+                          class="px-2 py-0.5 font-bold text-primary hover:bg-primary/10 rounded transition-all active:scale-95 cursor-pointer bg-white border border-primary/20 hover:border-primary/40 shadow-sm" 
+                          title="新建模块">
+                    新建
+                  </button>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody class="text-sm">
-            <tr v-for="mod in modulesState.list" :key="mod.id" class="border-b border-outline-variant/15 hover:bg-surface-container-low/30 transition-colors group">
-              <td class="px-6 py-5">
-                <span class="font-mono text-xs font-semibold bg-surface-container-high px-2 py-1 rounded" :class="{'text-slate-400': !mod.active}">{{ mod.id }}</span>
+            <tr v-for="mod in modulesState.list" :key="mod.id" class="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50 transition-colors group">
+              <td class="px-6 py-4 border-r border-slate-200">{{ mod.id }}</td>
+              <td class="px-6 py-4 border-r border-slate-200">{{ mod.name }}</td>
+              <td class="px-6 py-4 border-r border-slate-200">{{ mod.entity }}</td>
+              <td class="px-6 py-4 text-center border-r border-slate-200">{{ mod.count }}</td>
+              <td class="px-6 py-4 border-r border-slate-200">
+                <button @click.stop="mod.active = !mod.active" class="px-2.5 py-1 text-xs font-medium rounded cursor-pointer transition-colors" :class="mod.active ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                  {{ mod.active ? '已启用' : '已停用' }}
+                </button>
               </td>
-              <td class="px-6 py-5">
-                <div class="font-semibold" :class="mod.active ? 'text-on-surface' : 'text-slate-400'">{{ mod.name }}</div>
-                <div class="text-xs text-on-surface-variant mt-0.5">{{ mod.desc }}</div>
-              </td>
-              <td class="px-6 py-5 font-mono text-sm" :class="mod.active ? 'text-primary' : 'text-slate-400'">{{ mod.entity }}</td>
-              <td class="px-6 py-5 text-center">
-                <span class="text-sm font-medium px-3 py-1 rounded-full" :class="mod.active ? 'bg-secondary-container/30 text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'">{{ mod.count }}</span>
-              </td>
-              <td class="px-6 py-5">
-                <label class="relative inline-flex items-center cursor-pointer" @click.stop>
-                  <input type="checkbox" v-model="mod.active" class="sr-only peer"/>
-                  <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </td>
-              <td class="px-6 py-5 text-right">
-                <div class="flex justify-end gap-2">
-                  <button @click.stop="goToConfig(mod)" class="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-on-surface-variant" title="配置">
-                    <Settings class="w-5 h-5" />
+              <td class="px-6 py-4 text-center">
+                <div class="flex justify-center gap-3 text-sm font-medium">
+                  <button @click.stop="goToConfig(mod, 'view')" class="text-primary hover:text-primary/80 transition-colors" title="查看配置">
+                    查看
                   </button>
-                  <button @click.stop="openPermissionModal(mod)" class="p-2 hover:bg-tertiary/10 hover:text-tertiary rounded-lg transition-colors text-on-surface-variant" title="权限节点定义">
-                    <Shield class="w-5 h-5" />
+                  <button @click.stop="goToConfig(mod, 'edit')" class="text-primary hover:text-primary/80 transition-colors" title="编辑">
+                    编辑
                   </button>
-                  <button @click.stop class="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-on-surface-variant" title="编辑">
-                    <Edit class="w-5 h-5" />
-                  </button>
-                  <button @click.stop="deleteModule(mod.id)" class="p-2 hover:bg-error/10 hover:text-error rounded-lg transition-colors text-on-surface-variant" title="删除模块">
-                    <Trash2 class="w-5 h-5" />
+                  <button @click.stop="deleteModule(mod.id)" class="text-error hover:text-error/80 transition-colors" title="删除模块">
+                    删除
                   </button>
                 </div>
               </td>
@@ -112,46 +78,22 @@
           </tbody>
         </table>
       </div>
-      <div class="p-6 bg-surface-container-low/10 flex justify-between items-center text-sm font-medium text-on-surface-variant">
-        <div>显示 1 - 4 之 48 个模块</div>
-        <div class="flex gap-1">
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"><ChevronLeft class="w-4 h-4" /></button>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-on-primary">1</button>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors">2</button>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors">3</button>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"><ChevronRight class="w-4 h-4" /></button>
+      <!-- Pagination -->
+      <div class="px-5 py-4 bg-white flex items-center justify-between border-t border-slate-200 rounded-b-xl">
+        <div class="text-sm text-slate-500">
+          共 {{ modulesState.list.length }} 条记录
         </div>
-      </div>
-    </div>
-
-    <!-- Asymmetric Decorative / Info Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-      <div class="lg:col-span-8 bg-primary-container p-8 rounded-xl text-on-primary-container flex flex-col md:flex-row items-center gap-8 shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
-        <div class="flex-1">
-          <h2 class="text-2xl font-extrabold mb-3">提升模块效能</h2>
-          <p class="text-on-primary-container/80 mb-6 leading-relaxed">最新的企业架构标准已更新。通过实施“动态映射”策略，您的关联实体响应速度可平均提升 45%。</p>
-          <button class="bg-white text-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-surface-bright transition-colors">查看架构指南</button>
-        </div>
-        <div class="w-full md:w-48 h-32 rounded-lg bg-white/10 backdrop-blur-md flex items-center justify-center">
-          <Sparkles class="w-12 h-12 opacity-40" />
-        </div>
-      </div>
-      <div class="lg:col-span-4 bg-surface-container-highest p-8 rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)]">
-        <h3 class="font-headline font-bold text-lg mb-4">系统公告</h3>
-        <div class="space-y-4">
-          <div class="flex gap-4">
-            <div class="min-w-[4px] h-12 bg-tertiary rounded-full"></div>
-            <div>
-              <div class="text-xs font-bold text-tertiary uppercase">维护</div>
-              <div class="text-sm font-semibold">凌晨 2:00 进行核心镜像升级</div>
-            </div>
-          </div>
-          <div class="flex gap-4">
-            <div class="min-w-[4px] h-12 bg-primary rounded-full"></div>
-            <div>
-              <div class="text-xs font-bold text-primary uppercase">更新</div>
-              <div class="text-sm font-semibold">支持了新的 Graph 实体模型</div>
-            </div>
+        <div class="flex items-center gap-6">
+          <div class="flex items-center gap-1.5">
+            <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-400 hover:text-primary hover:border-primary transition-colors disabled:opacity-50" disabled>
+              <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button class="w-8 h-8 flex items-center justify-center rounded border border-primary bg-primary/5 text-primary font-medium text-sm transition-colors">1</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-600 hover:text-primary hover:border-primary transition-colors text-sm">2</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-600 hover:text-primary hover:border-primary transition-colors text-sm">3</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-400 hover:text-primary hover:border-primary transition-colors disabled:opacity-50">
+              <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -188,7 +130,7 @@
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-sm font-semibold text-on-surface-variant">绑定的主实体表 <span class="text-error">*</span></label>
+                <label class="text-sm font-semibold text-on-surface-variant">绑定的主表 <span class="text-error">*</span></label>
                 <div class="relative">
                   <TableChart class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4" />
                   <select v-model="newModule.entity" class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant/50 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow appearance-none">
@@ -225,23 +167,22 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { 
-  Trash2, 
-  Settings, 
-  Shield, 
-  PlusCircle, 
-  RefreshCw, 
+import {
+  Plus,
   Edit, 
+  Trash2, 
+  Eye, 
   TableProperties as TableChart,
-  LayoutGrid,
-  Network,
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
   PackagePlus,
   X,
-  Check
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Hash,
+  Database,
+  Activity,
+  Settings2,
+  Network
 } from 'lucide-vue-next';
 import { appState } from '../../store/app';
 import { modulesState, fetchModules, addModule, deleteModule } from '../../store/modules';
@@ -251,8 +192,8 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-const goToConfig = (mod) => {
-  router.push(`/modules/${mod.id}/config`);
+const goToConfig = (mod, mode = 'view') => {
+  router.push(`/modules/${mod.id}/config?mode=${mode}`);
 };
 
 const openPermissionModal = (mod) => {

@@ -1,26 +1,5 @@
 <template>
   <div class="p-8 space-y-12 w-full animate-in fade-in duration-500">
-    <!-- Header Action Section (标题与按钮对齐) -->
-    <div class="flex justify-between items-center mb-6 mt-[-1rem]">
-      <div class="flex items-center gap-3">
-        <h2 class="font-headline text-lg font-bold text-on-surface flex items-center">
-          <ClipboardCheck class="mr-2 text-primary w-5 h-5" />
-          审批处理台
-          <span class="ml-3 text-xs font-mono bg-surface-container-high px-2 py-0.5 rounded text-on-surface-variant tracking-tighter">{{ currentBizNo }}</span>
-        </h2>
-        <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5 animate-pulse">
-          <component :is="simulatorRoles.find(r => r.val === currentUserRole)?.icon" class="w-3.5 h-3.5" />
-          <span>模拟席: {{ simulatorRoles.find(r => r.val === currentUserRole)?.label }}</span>
-        </span>
-      </div>
-      <div class="flex space-x-3">
-        <button @click="goBack" class="px-4 py-2 border border-outline-variant text-on-surface text-sm font-medium rounded-xl hover:bg-surface-variant transition-colors flex items-center cursor-pointer">
-          <X class="w-4 h-4 mr-2" />
-          返回列表
-        </button>
-      </div>
-    </div>
-
     <!-- Main Content Area -->
     <div class="max-w-7xl mx-auto w-full relative space-y-8">
         
@@ -206,7 +185,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 
-const currentBizNo = computed(() => route.params.id);
+const currentBizNo = computed(() => route.query.bizNo);
 
 const nodeTypes = {
   custom: markRaw(FlowNodes),
@@ -626,10 +605,6 @@ const hasPermission = (task) => {
 
 const getLogIcon = (l) => l.isSystem ? AlertTriangle : ({ pass: Check, reject: RotateCcw, submit: Send }[l.action] || Info);
 const getLogActionText = (a) => ({ pass: '审核通过', reject: '审核驳回', submit: '发起申请' }[a] || a);
-
-const goBack = () => {
-  router.push('/workflow/list');
-};
 
 onMounted(async () => {
   if (currentBizNo.value) {

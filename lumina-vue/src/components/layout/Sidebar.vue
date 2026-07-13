@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { Home, LayoutGrid, Workflow, Settings, CircleUser, LogOut, Database } from 'lucide-vue-next';
+import { Home, LayoutGrid, Workflow, Settings, CircleUser, LogOut, Database, PenTool, ClipboardCheck } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { appState } from '../../store/app';
@@ -62,7 +62,9 @@ const route = useRoute();
 const menuIcons = {
   LayoutGrid,
   Workflow,
-  Database
+  Database,
+  PenTool,
+  ClipboardCheck
 };
 
 const sidebarMenuItems = computed(() => {
@@ -74,7 +76,10 @@ const isMenuItemActive = (item) => {
     return ['list', 'config', 'permissions'].includes(appState.currentView);
   }
   if (item.name === 'workflow-list') {
-    return ['workflow-list', 'workflow-designer', 'workflow-detail'].includes(appState.currentView);
+    return ['workflow-list', 'workflow-detail'].includes(appState.currentView);
+  }
+  if (item.name === 'workflow-designer') {
+    return appState.currentView === 'workflow-designer';
   }
   if (item.name === 'diagram') {
     return appState.currentView === 'diagram';

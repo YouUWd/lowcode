@@ -36,11 +36,12 @@ export const fetchModules = async () => {
   }
 };
 
-export const fetchConfig = async (modId) => {
-  if (modulesState.configs[modId]) return;
+export const fetchConfig = async (modId, force = false) => {
+  if (modulesState.configs[modId] && !force) return;
   try {
     setLoading(true);
-    modulesState.configs[modId] = await modulesApi.getById(modId) || { entities: [], mappings: [] };
+    const config = await modulesApi.getById(modId) || { entities: [], mappings: [] };
+    modulesState.configs[modId] = config;
   } catch (e) {
     console.error(`[Store:Modules] Fetch config failed for ${modId}:`, e);
   } finally {
@@ -97,42 +98,58 @@ export const deleteModule = async (moduleId) => {
 
 export const addEntityToCurrentConfig = async (entity) => {
   const modId = modulesState.activeModule?.id;
-  if (!modId) return;
+  if (!modId || !currentConfig.value) return;
+  
+  const primaryEntityName = currentConfig.value.primaryEntity.name;
+  
   try {
     setLoading(true);
+    let relation = { left: 'id', right: 'id', relationType: '1:1' };
+    try {
+      const data = await modulesApi.inferRelation(primaryEntityName, entity.name);
+      if (data) relation = data;
+    } catch (err) {
+      console.warn('Failed to infer relation:', err);
+    }
+
     const payload = {
       ...entity,
       id: entity.id || `entity_${Date.now()}`,
       status: 'active',
-      relationType: entity.cardinality || '1:1',
-      joinCondition: { left: entity.left, right: entity.right }
+      relationType: relation.relationType || '1:1',
+      joinCondition: { left: relation.left || 'id', right: relation.right || 'id' }
     };
 
-    const data = await modulesApi.addEntity(modId, payload);
-    if (data && currentConfig.value) {
-      const finalEntity = { ...payload, ...data };
-      currentConfig.value.entities.push(finalEntity);
-    }
-  } catch (e) {
-    console.error('[Store:Modules] Add entity failed:', e);
+    currentConfig.value.entities.push(payload);
   } finally {
     setLoading(false);
   }
 };
 
-export const removeEntityFromCurrentConfig = async (entityId) => {
+export const removeEntityFromCurrentConfig = (entityId) => {
   const modId = modulesState.activeModule?.id;
-  if (!modId || !confirm('确定要移除此关联表吗？')) return;
+  if (!modId || !currentConfig.value?.entities) return;
+  if (!confirm('确定要移除此关联表吗？')) return;
+  
+  const entities = currentConfig.value.entities;
+  const index = entities.findIndex(e => e.id === entityId);
+  if (index !== -1) {
+    entities.splice(index, 1);
+  }
+};
+
+export const saveCurrentConfig = async () => {
+  const modId = modulesState.activeModule?.id;
+  if (!modId || !currentConfig.value) return false;
+  
   try {
     setLoading(true);
-    await modulesApi.deleteEntity(modId, entityId);
-    const entities = currentConfig.value?.entities;
-    if (entities) {
-      const index = entities.findIndex(e => e.id === entityId);
-      if (index !== -1) entities.splice(index, 1);
-    }
+    const entityNames = currentConfig.value.entities.map(e => e.name);
+    await modulesApi.syncEntities(modId, entityNames);
+    return true;
   } catch (e) {
-    console.error('[Store:Modules] Remove entity failed:', e);
+    console.error('[Store:Modules] Save config failed:', e);
+    return false;
   } finally {
     setLoading(false);
   }

@@ -2,45 +2,54 @@
   <div class="flex flex-col h-full w-full overflow-hidden bg-white">
     <!-- Instance List View -->
     <div class="p-8 flex-1 overflow-y-auto w-full animate-in fade-in duration-500 text-on-surface">
-      <!-- Header Action Section (标题与按钮对齐) -->
-      <div class="flex justify-between items-center mb-6 mt-[-1rem]">
-        <h2 class="font-headline text-lg font-bold flex items-center text-on-surface">
-          <Workflow class="mr-2 text-primary w-5 h-5" />
-          工作流测试面板 (Workflow V2)
-        </h2>
-        <div class="flex items-center space-x-3">
-          <button @click="mockSubmitNew" class="px-5 py-2 bg-primary text-on-primary text-sm font-medium rounded-xl shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center cursor-pointer">
-            <Plus class="w-4 h-4 mr-2" /> 发起新申请
-          </button>
-        </div>
-      </div>
-
-      <div class="bg-surface-container-lowest rounded-xl shadow-[0px_12px_32px_rgba(25,28,29,0.06)] overflow-hidden border border-outline-variant/10">
+      <div class="bg-white rounded-xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] overflow-hidden border border-slate-200">
         <table class="w-full text-left border-collapse">
           <thead>
-            <tr class="bg-surface-container-low/50 text-xs font-bold text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/15">
-              <th class="p-5">业务单号</th>
-              <th class="p-5">目标实体</th>
-              <th class="p-5">宏观状态</th>
-              <th class="p-5 text-right">操作</th>
+            <tr class="bg-slate-50 text-xs font-extrabold text-slate-600 uppercase tracking-widest border-b border-slate-200">
+              <th class="px-6 py-4 w-[25%] border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <Hash class="w-4 h-4 text-slate-400" />
+                  业务单号
+                </div>
+              </th>
+              <th class="px-6 py-4 border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <Database class="w-4 h-4 text-slate-400" />
+                  目标表
+                </div>
+              </th>
+              <th class="px-6 py-4 w-[20%] border-r border-slate-200">
+                <div class="flex items-center gap-2">
+                  <Activity class="w-4 h-4 text-slate-400" />
+                  宏观状态
+                </div>
+              </th>
+              <th class="px-6 py-4 text-center w-[160px] min-w-[160px]">
+                <div class="flex items-center justify-center gap-1.5">
+                  <span>操作</span>
+                  <div class="w-px h-3 bg-slate-300 mx-1"></div>
+                  <button @click="mockSubmitNew" 
+                          class="px-2 py-0.5 text-primary hover:bg-primary/10 rounded transition-all active:scale-95 cursor-pointer bg-white border border-primary/20 hover:border-primary/40 shadow-sm" 
+                          title="发起新申请">
+                    发起
+                  </button>
+                </div>
+              </th>
             </tr>
           </thead>
-          <tbody class="text-sm divide-y divide-surface-container-low">
-            <tr v-for="biz in list" :key="biz.businessNo" class="hover:bg-surface-container-low/30 transition-colors">
-              <td class="p-5 font-mono text-sm font-bold text-on-surface">{{ biz.businessNo }}</td>
-              <td class="p-5 text-on-surface-variant">{{ biz.targetEntity }}</td>
-              <td class="p-5">
-                <span v-if="biz.macroStatus === 1" class="text-primary bg-primary-container/20 px-2.5 py-1 rounded-full font-bold text-xs">1 审批中</span>
-                <span v-else-if="biz.macroStatus === 99" class="text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs">99 已生效</span>
-                <span v-else class="text-error bg-error-container/20 px-2.5 py-1 rounded-full font-bold text-xs">-99 已作废</span>
+          <tbody class="text-sm">
+            <tr v-for="biz in list" :key="biz.businessNo" class="hover:bg-slate-50/50 transition-colors border-b border-slate-200 last:border-b-0">
+              <td class="px-6 py-4 border-r border-slate-200">{{ biz.businessNo }}</td>
+              <td class="px-6 py-4 border-r border-slate-200">{{ biz.targetEntity }}</td>
+              <td class="px-6 py-4 border-r border-slate-200">
+                <span v-if="biz.macroStatus === 1" class="px-2.5 py-1 text-xs font-medium rounded bg-blue-50 text-blue-600">审批中</span>
+                <span v-else-if="biz.macroStatus === 99" class="px-2.5 py-1 text-xs font-medium rounded bg-emerald-50 text-emerald-600">已生效</span>
+                <span v-else class="px-2.5 py-1 text-xs font-medium rounded bg-rose-50 text-rose-600">已作废</span>
               </td>
-              <td class="p-5 text-right">
-                <div class="flex justify-end gap-2">
-                  <button @click="goToDetail(biz.businessNo)" class="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-on-surface-variant flex items-center justify-center cursor-pointer animate-none" title="详情/处理">
-                    <ClipboardCheck class="w-5 h-5" />
-                  </button>
-                  <button @click="goToDesigner(biz.businessNo)" class="p-2 hover:bg-amber-500/10 hover:text-amber-600 rounded-lg transition-colors text-on-surface-variant flex items-center justify-center cursor-pointer animate-none" title="修改流程结构">
-                    <PenTool class="w-5 h-5" />
+              <td class="px-6 py-4 text-center">
+                <div class="flex justify-center gap-3 text-sm font-medium">
+                  <button @click="goToDetail(biz.businessNo)" class="text-primary hover:text-primary/80 transition-colors cursor-pointer">
+                    办理
                   </button>
                 </div>
               </td>
@@ -50,6 +59,26 @@
             </tr>
           </tbody>
         </table>
+        
+        <!-- Pagination -->
+        <div class="px-5 py-4 bg-white flex items-center justify-between border-t border-slate-200 rounded-b-xl">
+          <div class="text-sm text-slate-500">
+            共 {{ list.length }} 条记录
+          </div>
+          <div class="flex items-center gap-6">
+            <div class="flex items-center gap-1.5">
+              <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-400 hover:text-primary hover:border-primary transition-colors disabled:opacity-50" disabled>
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <button class="w-8 h-8 flex items-center justify-center rounded border border-primary bg-primary/5 text-primary font-medium text-sm transition-colors">1</button>
+              <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-600 hover:text-primary hover:border-primary transition-colors text-sm">2</button>
+              <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-600 hover:text-primary hover:border-primary transition-colors text-sm">3</button>
+              <button class="w-8 h-8 flex items-center justify-center rounded border border-slate-300 text-slate-400 hover:text-primary hover:border-primary transition-colors disabled:opacity-50">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -61,7 +90,7 @@ import { useRouter } from 'vue-router';
 import { fetchWorkflowInstances } from '../../store/workflow';
 import { workflowApi } from '../../api/workflow';
 import { appState } from '../../store/app';
-import { Workflow, Plus, ClipboardCheck, PenTool } from 'lucide-vue-next';
+import { Workflow, Plus, ClipboardCheck, Hash, Database, Activity, Settings2, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const router = useRouter();
 const list = ref([]);
@@ -102,12 +131,8 @@ const mockSubmitNew = async () => {
   }
 };
 
-const goToDetail = (no) => {
-  router.push(`/workflow/${no}/detail`);
-};
-
-const goToDesigner = (no) => {
-  router.push(`/workflow/designer?bizNo=${no}`);
+const goToDetail = (bizNo) => {
+  router.push(`/workflow/detail?bizNo=${bizNo}`);
 };
 
 onMounted(() => {

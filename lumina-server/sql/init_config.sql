@@ -232,3 +232,81 @@ SELECT id, 'editor', 4 FROM field_meta WHERE table_meta_id = 3;
 INSERT INTO field_permission (field_meta_id, role_code, perm_value)
 SELECT id, 'viewer', 4 FROM field_meta
 WHERE column_name != 'remark';
+
+
+-- ============================================================
+-- 审批流核心引擎表 (Workflow Engine)
+-- ============================================================
+
+-- 1. 审批流模板定义表
+CREATE TABLE IF NOT EXISTS sys_approval_chain_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module_id VARCHAR(50) NOT NULL,
+    up_id INTEGER DEFAULT 0,
+    next_id INTEGER DEFAULT 0,
+    node_name VARCHAR(100) NOT NULL,
+    node_type VARCHAR(50) DEFAULT 'user_task',
+    approval_rule VARCHAR(50) DEFAULT NULL,
+    role_target VARCHAR(50) DEFAULT NULL,
+    role_approval_percent INTEGER DEFAULT NULL,
+    parallel_branches TEXT DEFAULT NULL,
+    re_approval_strategy VARCHAR(50) DEFAULT 'strict_reset',
+    condition VARCHAR(500) DEFAULT NULL,
+    is_jump BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. 统一流程实例表 (承载所有业务的草稿与宏观状态)
+CREATE TABLE IF NOT EXISTS sys_approval_instance (
+    business_no VARCHAR(50) PRIMARY KEY,
+    module_id VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    target_entity VARCHAR(100) DEFAULT NULL,
+    target_record_id VARCHAR(100) DEFAULT NULL,
+    action_type VARCHAR(50) DEFAULT 'CUSTOM',
+    reason VARCHAR(500) DEFAULT NULL,
+    payload TEXT DEFAULT NULL,
+    macro_status INTEGER DEFAULT 1,
+    submitter_id VARCHAR(50) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. 审批流运行实例任务表 (微观流转追踪)
+CREATE TABLE IF NOT EXISTS sys_approval_task (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_no VARCHAR(50) NOT NULL,
+    node_id INTEGER NOT NULL,
+    branch_id VARCHAR(50) DEFAULT NULL,
+    status VARCHAR(50) DEFAULT 'PENDING',
+    approvers_list VARCHAR(1000) DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_no) REFERENCES sys_approval_instance(business_no) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_sys_approval_task_business_node ON sys_approval_task(business_no, node_id);
+
+-- 4. 审批流执行日志表 (持久化流转轨迹)
+CREATE TABLE IF NOT EXISTS sys_approval_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_no VARCHAR(50) NOT NULL,
+    action_type VARCHAR(50) NOT NULL,
+    operator VARCHAR(100) NOT NULL,
+    node_name VARCHAR(100) DEFAULT NULL,
+    comment VARCHAR(500) DEFAULT NULL,
+    is_system BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sys_approval_log_business ON sys_approval_log(business_no);
+
+-- ============================================================
+-- 审批流 DEMO 种子数据
+-- ============================================================
+INSERT INTO sys_approval_chain_config 
+(id, module_id, up_id, next_id, node_name, node_type, role_target, parallel_branches, re_approval_strategy)
+VALUES 
+(1, 'MOD-SCORE-DETAIL', 0, 2, '教研组长初审', 'user_task', 'head_teacher', NULL, 'strict_reset'),
+(2, 'MOD-SCORE-DETAIL', 1, 3, '跨部门并联交接', 'parallel_group', NULL, '[{"branch_id":"b1","name":"教务处核准","role_target":"academic_admin"},{"branch_id":"b2","name":"财务处退费复核","role_target":"finance"}]', 'smart_rollback'),
+(3, 'MOD-SCORE-DETAIL', 2, 0, '校长终审', 'user_task', 'principal', NULL, 'strict_reset');

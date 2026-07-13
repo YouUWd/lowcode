@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, NotFoundException, BadRequestException, Query } from '@nestjs/common';
 import { ModulesService } from './modules.service';
 
 @Controller('modules')
@@ -12,6 +12,19 @@ export class ModulesController {
   @Get()
   async getAllModules() {
     return this.modulesService.getAllModules();
+  }
+
+  /**
+   * 推断两张表之间的关联关系
+   * GET /api/modules/relations/infer?source=xxx&target=yyy
+   */
+  @Get('relations/infer')
+  async inferRelation(@Query('source') source: string, @Query('target') target: string) {
+    if (!source || !target) {
+      throw new BadRequestException('source and target are required');
+    }
+    const relation = await this.modulesService.resolveRelation(source, target);
+    return relation || { relationType: '1:1', left: 'id', right: 'id' };
   }
 
   /**
@@ -138,12 +151,27 @@ export class ModulesController {
       throw new NotFoundException(`Module not found: ${moduleId}`);
     }
 
-    await this.modulesService.addModuleEntity(moduleId, entityData);
-    return { success: true, id: entityData.id };
+    const tableMetaId = await this.modulesService.addModuleEntity(moduleId, entityData);
+    return { success: true, id: tableMetaId };
   }
 
   /**
-   * 更新模块关联表
+   * 同步模块的所有关联表
+   * PUT /api/modules/:id/entities
+   */
+  @Put(':id/entities')
+  async syncModuleEntities(@Param('id') moduleId: string, @Body() data: { entities: string[] }) {
+    const module = await this.modulesService.getModuleConfig(moduleId);
+    if (!module) {
+      throw new NotFoundException(`Module not found: ${moduleId}`);
+    }
+
+    await this.modulesService.syncModuleEntities(moduleId, data.entities);
+    return { success: true };
+  }
+
+  /**
+   * 更新模块关联表 (保留以便兼容)
    * PUT /api/modules/:id/entities/:entityId
    */
   @Put(':id/entities/:entityId')

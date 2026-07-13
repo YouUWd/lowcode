@@ -8,11 +8,6 @@
       </h2>
 
       <div class="flex space-x-3">
-        <button @click="goToPermissions" class="px-4 py-2 border border-tertiary text-tertiary text-sm font-medium rounded-xl hover:bg-tertiary/5 transition-colors flex items-center">
-          <Shield class="w-4 h-4 mr-2" />
-          权限定义
-        </button>
-        <div class="w-px h-6 bg-outline-variant/40 mx-1 my-auto"></div>
         <button @click="showSqlPreview = true" class="px-4 py-2 border border-outline-variant text-on-surface text-sm font-medium rounded-xl hover:bg-surface-variant transition-colors flex items-center">
           <Code class="w-4 h-4 mr-2" />
           预览 SQL
@@ -20,7 +15,7 @@
         <button class="px-4 py-2 bg-surface-container-highest text-on-surface text-sm font-medium rounded-xl hover:bg-surface-variant transition-colors">
           导入模板
         </button>
-        <button class="px-5 py-2 bg-primary text-on-primary text-sm font-medium rounded-xl shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center">
+        <button v-if="isEditMode" @click="handleSave" class="px-5 py-2 bg-primary text-on-primary text-sm font-medium rounded-xl shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center">
           <CheckCheck class="w-4 h-4 mr-2" />
           验证并保存
         </button>
@@ -28,7 +23,6 @@
     </div>
     
     <AggregationSetup />
-    <FieldMappingTable />
 
     <!-- SQL Preview Modal -->
     <Transition name="fade">
@@ -65,8 +59,11 @@
 import { ref, computed } from 'vue';
 import { Settings, Shield, Code, CheckCheck, Terminal, X, Copy } from 'lucide-vue-next';
 import AggregationSetup from './components/AggregationSetup.vue';
-import FieldMappingTable from './components/FieldMappingTable.vue';
-import { modulesState, currentConfig } from '../../store/modules';
+import { modulesState, currentConfig, saveCurrentConfig } from '../../store/modules';
+import { useRoute, useRouter } from 'vue-router';
+
+const route = useRoute();
+const isEditMode = computed(() => route.query.mode === 'edit');
 
 const showSqlPreview = ref(false);
 
@@ -100,15 +97,17 @@ const copySql = async () => {
   }
 };
 
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
-
-const goToPermissions = () => {
-  if (modulesState.activeModule) {
-    router.push(`/modules/${modulesState.activeModule.id}/permissions`);
+const handleSave = async () => {
+  const success = await saveCurrentConfig();
+  if (success) {
+    alert('保存成功');
+    router.push('/modules');
+  } else {
+    alert('保存失败');
   }
 };
+
+const router = useRouter();
 
 const goBack = () => {
   router.push('/modules');
