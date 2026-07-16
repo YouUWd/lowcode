@@ -1,187 +1,228 @@
 <template>
-  <nav class="bg-[#f3f4f5] dark:bg-[#191c1d] font-inter text-sm h-screen fixed left-0 top-0 z-40 flex flex-col py-6 border-r border-transparent transition-all duration-300 ease-in-out" :class="appState.sidebarCollapsed ? 'w-16 px-2' : 'w-64 px-4'">
-    <!-- Sidebar Header with Brand and Toggle button -->
-    <div class="mb-6 flex items-center justify-between" :class="appState.sidebarCollapsed ? 'px-1' : 'px-4'">
-      <div v-show="!appState.sidebarCollapsed" class="flex flex-col space-y-1 overflow-hidden transition-all duration-300">
-        <span class="font-manrope font-extrabold tracking-tighter text-[#005daa] text-xl whitespace-nowrap">Lumina</span>
-        <span class="text-on-surface-variant text-[10px] whitespace-nowrap">系统级管理后台</span>
-      </div>
-      <button 
-        @click="appState.sidebarCollapsed = !appState.sidebarCollapsed"
-        class="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg text-slate-500 hover:text-slate-700 cursor-pointer flex items-center justify-center"
-        :class="appState.sidebarCollapsed ? 'mx-auto w-full' : ''"
-        :title="appState.sidebarCollapsed ? '展开菜单' : '折叠菜单'"
+  <nav
+    class="bg-[#f3f4f5] dark:bg-[#191c1d] font-inter text-sm h-screen fixed left-0 top-0 z-50 flex flex-col border-r border-slate-200/60 dark:border-slate-700/50 transition-all duration-300 ease-in-out"
+    :class="appState.sidebarCollapsed ? 'w-16' : 'w-64'"
+  >
+    <!-- Inner container: adapting to outer nav width -->
+    <div class="flex flex-col h-full w-full py-5">
+
+      <!-- ── Brand & Toggle Button ── -->
+      <div
+        class="mb-5 flex transition-all duration-300"
+        :class="appState.sidebarCollapsed ? 'flex-col items-center gap-3 px-0' : 'flex-row items-center justify-between px-5'"
       >
-        <ChevronRight v-if="appState.sidebarCollapsed" class="w-4 h-4" />
-        <ChevronLeft v-else class="w-4 h-4" />
-      </button>
-    </div>
-
-    <!-- Collapsed Mode Flat Icon Menu (Separated into Business and Config) -->
-    <div v-if="appState.sidebarCollapsed" class="flex-1 space-y-4 mt-4 overflow-y-auto">
-      <!-- 业务类图标 -->
-      <div class="space-y-2">
-        <router-link 
-          v-for="item in businessItems" 
-          :key="item.name" 
-          :to="item.path" 
-          :class="[isMenuItemActive(item) 
-            ? 'text-[#005daa] bg-[#005daa]/5 font-bold shadow-sm' 
-            : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100']"
-          class="flex items-center justify-center w-11 h-11 rounded-xl mx-auto transition-all duration-200 cursor-pointer select-none relative group"
-        >
-          <component 
-            :is="menuIcons[item.meta.icon]" 
-            class="w-5 h-5 transition-transform"
-            :class="{'scale-110 text-[#005daa]': isMenuItemActive(item)}"
-          />
-          <!-- CSS Pop Tooltip -->
-          <span class="absolute left-14 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md pointer-events-none z-50">
-            {{ item.meta.title }}
-          </span>
-        </router-link>
-      </div>
-
-      <!-- 细分割线 -->
-      <div class="mx-2 border-t border-slate-200/60"></div>
-
-      <!-- 配置类图标 -->
-      <div class="space-y-2">
-        <router-link 
-          v-for="item in configItems" 
-          :key="item.name" 
-          :to="item.path" 
-          :class="[isMenuItemActive(item) 
-            ? 'text-[#005daa] bg-[#005daa]/5 font-bold shadow-sm' 
-            : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100']"
-          class="flex items-center justify-center w-11 h-11 rounded-xl mx-auto transition-all duration-200 cursor-pointer select-none relative group"
-        >
-          <component 
-            :is="menuIcons[item.meta.icon]" 
-            class="w-5 h-5 transition-transform"
-            :class="{'scale-110 text-[#005daa]': isMenuItemActive(item)}"
-          />
-          <!-- CSS Pop Tooltip -->
-          <span class="absolute left-14 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md pointer-events-none z-50">
-            {{ item.meta.title }}
-          </span>
-        </router-link>
-      </div>
-    </div>
-
-    <!-- Expanded Mode Nested Accordion Menu -->
-    <div v-else class="flex-1 space-y-2 overflow-y-auto pr-1">
-      <!-- 业务类二级菜单 -->
-      <div>
-        <button 
-          @click="businessOpen = !businessOpen"
-          class="flex items-center justify-between w-full px-4 py-2.5 rounded-xl text-[#191c1d] hover:bg-[#f8f9fa] transition-colors duration-200 cursor-pointer select-none"
-          :class="businessOpen ? 'font-bold opacity-100' : 'opacity-60'"
-        >
-          <div class="flex items-center gap-2.5">
-            <Briefcase class="w-[18px] h-[18px] text-slate-500" />
-            <span class="text-[13px]">业务</span>
-          </div>
-          <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300" :class="{ 'rotate-180': businessOpen }" />
-        </button>
-        <Transition name="submenu">
-          <div v-show="businessOpen" class="ml-3.5 pl-4 border-l border-slate-200/80 space-y-0.5 mt-0.5">
-            <router-link 
-              v-for="item in businessItems" 
-              :key="item.name" 
-              :to="item.path" 
-              :class="[isMenuItemActive(item) 
-                ? 'text-[#005daa] bg-[#005daa]/5 font-bold' 
-                : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100']"
-              class="flex items-center px-3 py-2.5 rounded-lg transition-colors duration-200 cursor-pointer select-none text-[13px]"
+        <!-- Collapsed Mode Header -->
+        <template v-if="appState.sidebarCollapsed">
+          <!-- Toggle Button for Collapsed Mode -->
+          <div class="relative group flex justify-center w-full">
+            <button
+              @click="appState.sidebarCollapsed = !appState.sidebarCollapsed"
+              class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-all duration-150 cursor-pointer flex-shrink-0"
             >
-              <component 
-                :is="menuIcons[item.meta.icon]" 
-                class="mr-2.5 w-4 h-4 transition-transform"
-                :class="{'scale-110 text-[#005daa]': isMenuItemActive(item)}"
-              />
-              {{ item.meta.title }}
-            </router-link>
+              <PanelLeft class="w-[18px] h-[18px]" />
+            </button>
+            <!-- Claude-like Tooltip -->
+            <span class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150">
+              展开菜单
+            </span>
           </div>
-        </Transition>
-      </div>
+          
+          <!-- Logo 'L' -->
+          <div class="w-8 h-8 rounded-lg bg-[#005daa]/10 flex items-center justify-center flex-shrink-0">
+            <span class="font-manrope font-extrabold text-[#005daa] text-sm">L</span>
+          </div>
+        </template>
 
-      <!-- 配置类二级菜单 -->
-      <div>
-        <button 
-          @click="configOpen = !configOpen"
-          class="flex items-center justify-between w-full px-4 py-2.5 rounded-xl text-[#191c1d] hover:bg-[#f8f9fa] transition-colors duration-200 cursor-pointer select-none"
-          :class="configOpen ? 'font-bold opacity-100' : 'opacity-60'"
-        >
-          <div class="flex items-center gap-2.5">
-            <Settings2 class="w-[18px] h-[18px] text-slate-500" />
-            <span class="text-[13px]">配置</span>
+        <!-- Expanded Mode Header -->
+        <template v-else>
+          <div class="flex flex-col space-y-0.5 overflow-hidden">
+            <span class="font-manrope font-extrabold tracking-tighter text-[#005daa] text-xl whitespace-nowrap">Lumina</span>
+            <span class="text-on-surface-variant text-[10px] whitespace-nowrap">系统级管理后台</span>
           </div>
-          <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300" :class="{ 'rotate-180': configOpen }" />
-        </button>
-        <Transition name="submenu">
-          <div v-show="configOpen" class="ml-3.5 pl-4 border-l border-slate-200/80 space-y-0.5 mt-0.5">
-            <router-link 
-              v-for="item in configItems" 
-              :key="item.name" 
-              :to="item.path" 
-              :class="[isMenuItemActive(item) 
-                ? 'text-[#005daa] bg-[#005daa]/5 font-bold' 
-                : 'text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100']"
-              class="flex items-center px-3 py-2.5 rounded-lg transition-colors duration-200 cursor-pointer select-none text-[13px]"
+          <!-- Toggle Button for Expanded Mode -->
+          <div class="relative group">
+            <button
+              @click="appState.sidebarCollapsed = !appState.sidebarCollapsed"
+              class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-all duration-150 cursor-pointer flex-shrink-0"
             >
-              <component 
-                :is="menuIcons[item.meta.icon]" 
-                class="mr-2.5 w-4 h-4 transition-transform"
-                :class="{'scale-110 text-[#005daa]': isMenuItemActive(item)}"
-              />
-              {{ item.meta.title }}
-            </router-link>
+              <PanelLeftClose class="w-[18px] h-[18px]" />
+            </button>
+            <!-- Claude-like Tooltip -->
+            <span class="pointer-events-none absolute right-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:right-13 transition-all duration-150">
+              折叠菜单
+            </span>
           </div>
-        </Transition>
+        </template>
       </div>
-    </div>
 
-    <!-- Bottom Actions Area -->
-    <div class="mt-auto space-y-2" :class="appState.sidebarCollapsed ? 'pt-4 border-t border-slate-200/50' : ''">
-      <template v-if="appState.sidebarCollapsed">
-        <a class="flex items-center justify-center w-11 h-11 rounded-xl mx-auto text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors cursor-pointer select-none relative group">
-          <Settings class="w-5 h-5 text-slate-500" />
-          <span class="absolute left-14 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md pointer-events-none z-50">设置</span>
-        </a>
-        <a class="flex items-center justify-center w-11 h-11 rounded-xl mx-auto text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors cursor-pointer select-none relative group">
-          <CircleUser class="w-5 h-5 text-slate-500" />
-          <span class="absolute left-14 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md pointer-events-none z-50">个人中心</span>
-        </a>
-        <a class="flex items-center justify-center w-11 h-11 rounded-xl mx-auto text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors cursor-pointer select-none relative group">
-          <LogOut class="w-5 h-5 text-slate-500" />
-          <span class="absolute left-14 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md pointer-events-none z-50">安全退出</span>
-        </a>
-      </template>
-      <template v-else>
-        <div class="space-y-1">
-          <a class="flex items-center px-4 py-2 rounded-xl text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors cursor-pointer select-none">
-            <Settings class="mr-3 w-4 h-4 text-slate-500" />
-            设置
-          </a>
-          <a class="flex items-center px-4 py-2 rounded-xl text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors cursor-pointer select-none">
-            <CircleUser class="mr-3 w-4 h-4 text-slate-500" />
-            个人中心
-          </a>
-          <a class="flex items-center px-4 py-2 rounded-xl text-[#191c1d] opacity-60 hover:bg-[#f8f9fa] hover:opacity-100 transition-colors cursor-pointer select-none">
-            <LogOut class="mr-3 w-4 h-4 text-slate-500" />
-            安全退出
-          </a>
+      <!-- ── Menu area ── -->
+      <div 
+        class="flex-1"
+        :class="appState.sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'"
+      >
+
+        <!-- ══ COLLAPSED: icon rail ══ -->
+        <div v-if="appState.sidebarCollapsed" class="flex flex-col items-center gap-1 px-2 pt-1">
+          <!-- divider label: business -->
+          <div class="w-full my-1 border-t border-slate-200/70"></div>
+
+          <router-link
+            v-for="item in businessItems"
+            :key="item.name"
+            :to="item.path"
+            :class="[isMenuItemActive(item)
+              ? 'text-[#005daa] bg-[#005daa]/8'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 dark:hover:bg-slate-700/60']"
+            class="relative group w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150 cursor-pointer"
+          >
+            <component
+              :is="menuIcons[item.meta.icon]"
+              class="w-[18px] h-[18px] flex-shrink-0"
+            />
+            <!-- Claude-like Tooltip -->
+            <span class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150">
+              {{ item.meta.title }}
+            </span>
+          </router-link>
+
+          <!-- divider: config -->
+          <div class="w-full my-1 border-t border-slate-200/70"></div>
+
+          <router-link
+            v-for="item in configItems"
+            :key="item.name"
+            :to="item.path"
+            :class="[isMenuItemActive(item)
+              ? 'text-[#005daa] bg-[#005daa]/8'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 dark:hover:bg-slate-700/60']"
+            class="relative group w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150 cursor-pointer"
+          >
+            <component
+              :is="menuIcons[item.meta.icon]"
+              class="w-[18px] h-[18px] flex-shrink-0"
+            />
+            <!-- Claude-like Tooltip -->
+            <span class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150">
+              {{ item.meta.title }}
+            </span>
+          </router-link>
         </div>
-      </template>
-    </div>
+
+        <!-- ══ EXPANDED: accordion menu ══ -->
+        <div v-else class="space-y-1 px-3">
+          <!-- 业务 group -->
+          <div>
+            <button
+              @click="businessOpen = !businessOpen"
+              class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-[#191c1d] hover:bg-slate-200/50 transition-colors duration-150 cursor-pointer select-none"
+              :class="businessOpen ? 'font-semibold opacity-100' : 'opacity-50'"
+            >
+              <div class="flex items-center gap-2">
+                <Briefcase class="w-4 h-4 text-slate-400" />
+                <span class="text-[12px] tracking-wide uppercase font-bold text-slate-400">业务</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': businessOpen }" />
+            </button>
+            <Transition name="submenu">
+              <div v-show="businessOpen" class="mt-0.5 space-y-0.5">
+                <router-link
+                  v-for="item in businessItems"
+                  :key="item.name"
+                  :to="item.path"
+                  :class="[isMenuItemActive(item)
+                    ? 'text-[#005daa] bg-[#005daa]/8 font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50']"
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer select-none text-[13px]"
+                >
+                  <component
+                    :is="menuIcons[item.meta.icon]"
+                    class="w-4 h-4 flex-shrink-0"
+                    :class="isMenuItemActive(item) ? 'text-[#005daa]' : 'text-slate-400'"
+                  />
+                  {{ item.meta.title }}
+                </router-link>
+              </div>
+            </Transition>
+          </div>
+
+          <!-- 配置 group -->
+          <div class="pt-1">
+            <button
+              @click="configOpen = !configOpen"
+              class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-[#191c1d] hover:bg-slate-200/50 transition-colors duration-150 cursor-pointer select-none"
+              :class="configOpen ? 'font-semibold opacity-100' : 'opacity-50'"
+            >
+              <div class="flex items-center gap-2">
+                <Settings2 class="w-4 h-4 text-slate-400" />
+                <span class="text-[12px] tracking-wide uppercase font-bold text-slate-400">配置</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': configOpen }" />
+            </button>
+            <Transition name="submenu">
+              <div v-show="configOpen" class="mt-0.5 space-y-0.5">
+                <router-link
+                  v-for="item in configItems"
+                  :key="item.name"
+                  :to="item.path"
+                  :class="[isMenuItemActive(item)
+                    ? 'text-[#005daa] bg-[#005daa]/8 font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50']"
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer select-none text-[13px]"
+                >
+                  <component
+                    :is="menuIcons[item.meta.icon]"
+                    class="w-4 h-4 flex-shrink-0"
+                    :class="isMenuItemActive(item) ? 'text-[#005daa]' : 'text-slate-400'"
+                  />
+                  {{ item.meta.title }}
+                </router-link>
+              </div>
+            </Transition>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Bottom actions ── -->
+      <div
+        class="mt-auto border-t border-slate-200/60 pt-3 transition-all duration-300"
+        :class="appState.sidebarCollapsed ? 'px-2 flex flex-col items-center gap-1' : 'px-3 space-y-0.5'"
+      >
+        <!-- Collapsed bottom icons -->
+        <template v-if="appState.sidebarCollapsed">
+          <button
+            v-for="btn in bottomActions"
+            :key="btn.label"
+            class="relative group w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-all duration-150 cursor-pointer"
+          >
+            <component :is="btn.icon" class="w-[18px] h-[18px]" />
+            <!-- Claude-like Tooltip -->
+            <span class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150">
+              {{ btn.label }}
+            </span>
+          </button>
+        </template>
+
+        <!-- Expanded bottom items -->
+        <template v-else>
+          <button
+            v-for="btn in bottomActions"
+            :key="btn.label"
+            class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 transition-all duration-150 cursor-pointer text-[13px]"
+          >
+            <component :is="btn.icon" class="w-4 h-4 text-slate-400" />
+            {{ btn.label }}
+          </button>
+        </template>
+      </div>
+
+    </div><!-- /inner wrapper -->
   </nav>
 </template>
 
 <script setup>
-import { 
-  LayoutGrid, Workflow, Settings, Settings2, CircleUser, LogOut, Database, 
-  PenTool, ShieldAlert, GitFork, ChevronDown, Briefcase, ChevronLeft, ChevronRight 
+import {
+  LayoutGrid, Workflow, Settings, Settings2, CircleUser, LogOut, Database,
+  PenTool, ShieldAlert, GitFork, ChevronDown, Briefcase, PanelLeft, PanelLeftClose
 } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -201,6 +242,12 @@ const menuIcons = {
   ShieldAlert,
   GitFork
 };
+
+const bottomActions = [
+  { label: '设置', icon: Settings },
+  { label: '个人中心', icon: CircleUser },
+  { label: '安全退出', icon: LogOut },
+];
 
 const sidebarMenuItems = computed(() => {
   return router.options.routes.filter(r => r.meta && r.meta.sidebar);
@@ -258,7 +305,7 @@ watch(() => appState.sidebarCollapsed, (isCollapsed) => {
 <style scoped>
 .submenu-enter-active,
 .submenu-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 .submenu-enter-from,
