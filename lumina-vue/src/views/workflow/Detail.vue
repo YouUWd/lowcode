@@ -229,6 +229,10 @@ watch(() => appState.refreshTrigger, () => {
   if (currentBizNo.value) fetchDetail(currentBizNo.value);
 });
 
+watch([() => appState.currentUserRole, () => appState.currentUser, () => appState.simulationMode], () => {
+  if (currentBizNo.value) fetchDetail(currentBizNo.value);
+});
+
 const taskComments = ref({});
 const elements = shallowRef([]);
 

@@ -1,7 +1,8 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Knex } from 'knex';
-import { EntityRelation } from '../modules/modules.service';
+import { EntityRelation, ModulesService } from '../modules/modules.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { QueryPayload, SavePayload } from './engine.dto';
 
 export interface QueryOptions {
   page?: number;
@@ -14,7 +15,9 @@ export class EngineService {
     @Inject('BUSINESS_DB') private readonly knex: Knex,
     @Inject('CONFIG_DB') private readonly configDb: Knex,
     private readonly permissionsService: PermissionsService,
+    private readonly modulesService: ModulesService,
   ) {}
+
 
   async executeDynamicQuery(config: any, options: QueryOptions = {}) {
     const { primaryEntity, entities, mappings } = config;
@@ -584,4 +587,515 @@ export class EngineService {
     }
     return expression;
   }
+
+  /**
+   * 动态多条件通用数据查询（包含列表、详情、位掩码列级权限拦截及子表加载）
+   */
+  async executeQueryPayload(moduleId: string, payload: QueryPayload, roleCode: string) {
+    const meta: any = await this.modulesService.getModuleMeta(moduleId);
+    if (!meta) {
+      throw new NotFoundException(`模块不存在: ${moduleId}`);
+    }
+    if (!meta.mainTable) {
+      throw new BadRequestException(`模块主表未配置`);
+    }
+
+    const permMap = await this.permissionsService.getFieldPermissionsForRole(roleCode);
+
+    const readableMainFields = meta.mainTable.fields.filter(f =>
+      this.permissionsService.hasReadPermission(roleCode, meta.mainTable.tableName, f.columnName, permMap)
+    );
+    if (readableMainFields.length === 0) {
+      throw new BadRequestException(`表 [${meta.mainTable.tableName}] 无任何可读字段`);
+    }
+
+    if (payload.id !== undefined && payload.id !== null) {
+      // ================== 详情模式 ==================
+      const query = this.knex(meta.mainTable.tableName).where('id', payload.id).first();
+      const mainRow = await query;
+      if (!mainRow) {
+        return null;
+      }
+
+      const detailResult: Record<string, any> = {};
+      
+      // 组装主表字段并实现列遮罩脱敏
+      const mainWithOpt = payload.with?.find(w => w.tableName === meta.mainTable.tableName);
+      const mainObj: Record<string, any> = {};
+      for (const field of meta.mainTable.fields) {
+        if (mainWithOpt && mainWithOpt.fields && !mainWithOpt.fields.includes(field.columnName)) {
+          continue;
+        }
+        const hasRead = this.permissionsService.hasReadPermission(roleCode, meta.mainTable.tableName, field.columnName, permMap);
+        if (hasRead) {
+          mainObj[field.columnName] = mainRow[field.columnName];
+        } else {
+          mainObj[field.columnName] = '***';
+        }
+      }
+      detailResult[meta.mainTable.tableName] = mainObj;
+
+      // 组装 1:1/N:1 JOIN 表
+      const activeJoinTables = meta.joinTables.filter(jt =>
+        payload.with && payload.with.some(w => w.tableName === jt.tableName)
+      );
+
+      for (const joinTable of activeJoinTables) {
+        const withOpt = payload.with?.find(w => w.tableName === joinTable.tableName);
+        const joinMatch = joinTable.joinOn.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s*=\s*([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/);
+        if (joinMatch) {
+          const [, leftTable, leftCol, rightTable, rightCol] = joinMatch;
+          const leftVal = leftTable === meta.mainTable.tableName ? mainRow[leftCol] : mainRow[rightCol];
+          if (leftVal !== undefined && leftVal !== null) {
+            const joinRow = await this.knex(joinTable.tableName)
+              .where(leftTable === meta.mainTable.tableName ? rightCol : leftCol, leftVal)
+              .first();
+            
+            if (joinRow) {
+              const nestedObj: Record<string, any> = {};
+              for (const field of joinTable.fields) {
+                if (withOpt && withOpt.fields && !withOpt.fields.includes(field.columnName)) {
+                  continue;
+                }
+                if (this.permissionsService.hasReadPermission(roleCode, joinTable.tableName, field.columnName, permMap)) {
+                  nestedObj[field.columnName] = joinRow[field.columnName];
+                } else {
+                  nestedObj[field.columnName] = '***';
+                }
+              }
+              detailResult[joinTable.tableName] = nestedObj;
+            } else {
+              detailResult[joinTable.tableName] = null;
+            }
+          }
+        }
+      }
+
+      // 级联拉取
+      if (payload.with && payload.with.length > 0) {
+        for (const withOpt of payload.with) {
+          const subTable = meta.subTables.find(s => s.tableName === withOpt.tableName);
+          if (subTable) {
+            const children = await this.knex(subTable.tableName).where(subTable.foreignKey, payload.id);
+            const filteredChildren = children.map(child => {
+              const cleaned: Record<string, any> = {};
+              for (const field of subTable.fields) {
+                if (withOpt.fields && !withOpt.fields.includes(field.columnName)) {
+                  continue;
+                }
+                if (this.permissionsService.hasReadPermission(roleCode, subTable.tableName, field.columnName, permMap)) {
+                  cleaned[field.columnName] = child[field.columnName];
+                } else {
+                  cleaned[field.columnName] = '***';
+                }
+              }
+              return cleaned;
+            });
+            detailResult[subTable.tableName] = filteredChildren;
+          }
+
+          const rel = meta.relations.find(r => r.name === withOpt.tableName || r.rightTable === withOpt.tableName);
+          if (rel) {
+            const rightFields = await this.configDb('field_meta')
+              .join('table_meta', 'field_meta.table_meta_id', 'table_meta.id')
+              .where('table_meta.table_name', rel.rightTable)
+              .select('field_meta.column_name');
+
+            const rightRows = await this.knex(rel.rightTable)
+              .join(rel.junctionTable, `${rel.rightTable}.${rel.rightJoinColumn}`, '=', `${rel.junctionTable}.${rel.rightFk}`)
+              .where(`${rel.junctionTable}.${rel.leftFk}`, payload.id)
+              .select(`${rel.rightTable}.*`);
+
+            const filteredRelations = rightRows.map(row => {
+              const cleaned: Record<string, any> = {};
+              rightFields.forEach(f => {
+                if (withOpt.fields && !withOpt.fields.includes(f.column_name)) {
+                  return;
+                }
+                if (this.permissionsService.hasReadPermission(roleCode, rel.rightTable, f.column_name, permMap)) {
+                  cleaned[f.column_name] = row[f.column_name];
+                } else {
+                  cleaned[f.column_name] = '***';
+                }
+              });
+              return cleaned;
+            });
+            detailResult[rel.rightTable] = filteredRelations;
+          }
+        }
+      }
+
+      return detailResult;
+    } else {
+      // ================== 列表模式 ==================
+      const query = this.knex(meta.mainTable.tableName);
+
+      const activeJoins = meta.joinTables.filter(jt =>
+        payload.with && payload.with.some(w => w.tableName === jt.tableName)
+      );
+
+      for (const joinTable of activeJoins) {
+        const joinMatch = joinTable.joinOn.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s*=\s*([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/);
+        if (joinMatch) {
+          const [, leftTable, leftCol, rightTable, rightCol] = joinMatch;
+          query.leftJoin(
+            joinTable.tableName,
+            `${leftTable}.${leftCol}`,
+            '=',
+            `${rightTable}.${rightCol}`
+          );
+        }
+      }
+
+      const selectFields: any[] = [];
+      
+      const mainWithOpt = payload.with?.find(w => w.tableName === meta.mainTable.tableName);
+      meta.mainTable.fields.forEach(f => {
+        if (mainWithOpt && mainWithOpt.fields && !mainWithOpt.fields.includes(f.columnName)) {
+          return;
+        }
+        if (this.permissionsService.hasReadPermission(roleCode, meta.mainTable.tableName, f.columnName, permMap)) {
+          selectFields.push(`${meta.mainTable.tableName}.${f.columnName} AS ${meta.mainTable.tableName}_${f.columnName}`);
+        }
+      });
+
+      for (const joinTable of activeJoins) {
+        const withOpt = payload.with?.find(w => w.tableName === joinTable.tableName);
+        joinTable.fields.forEach(f => {
+          if (withOpt && withOpt.fields && !withOpt.fields.includes(f.columnName)) {
+            return;
+          }
+          if (this.permissionsService.hasReadPermission(roleCode, joinTable.tableName, f.columnName, permMap)) {
+            selectFields.push(`${joinTable.tableName}.${f.columnName} AS ${joinTable.tableName}_${f.columnName}`);
+          }
+        });
+      }
+
+      query.select(selectFields);
+
+      // 应用过滤器
+      if (payload.filters && payload.filters.length > 0) {
+        payload.filters.forEach(filter => {
+          const table = filter.tableName || meta.mainTable.tableName;
+          if (this.permissionsService.hasReadPermission(roleCode, table, filter.field, permMap)) {
+            if (filter.op.toLowerCase() === 'like') {
+              query.where(`${table}.${filter.field}`, 'like', `%${filter.value}%`);
+            } else {
+              query.where(`${table}.${filter.field}`, filter.op, filter.value);
+            }
+          }
+        });
+      }
+
+      // 应用排序
+      if (payload.sorts && payload.sorts.length > 0) {
+        payload.sorts.forEach(sort => {
+          let sortField = sort.field;
+          let sortTable = meta.mainTable.tableName;
+          
+          const match = sort.field.match(/^([a-zA-Z0-9_]+)_([a-zA-Z0-9_]+)$/);
+          if (match) {
+            sortTable = match[1];
+            sortField = match[2];
+          }
+
+          if (this.permissionsService.hasReadPermission(roleCode, sortTable, sortField, permMap)) {
+            query.orderBy(`${sortTable}.${sortField}`, sort.dir);
+          }
+        });
+      } else {
+        query.orderBy(`${meta.mainTable.tableName}.id`, 'DESC');
+      }
+
+      // 总数计算
+      const totalQuery = query.clone().clearSelect().clearOrder().count('* as total');
+      const countRes = await totalQuery;
+      const total = countRes[0]?.total ? parseInt(countRes[0].total.toString()) : 0;
+
+      const page = payload.page || 1;
+      const size = payload.size || 10;
+      query.limit(size).offset((page - 1) * size);
+
+      const rows = await query;
+
+      // 列表内级联拉取子表
+      if (payload.with && payload.with.length > 0 && rows.length > 0) {
+        const parentIds = rows.map(r => r[`${meta.mainTable.tableName}_id`]).filter(Boolean);
+        
+        for (const withOpt of payload.with) {
+          const subTable = meta.subTables.find(s => s.tableName === withOpt.tableName);
+          if (subTable && parentIds.length > 0) {
+            const allChildren = await this.knex(subTable.tableName).whereIn(subTable.foreignKey, parentIds);
+
+            rows.forEach(row => {
+              const parentId = row[`${meta.mainTable.tableName}_id`];
+              const matched = allChildren.filter(c => c[subTable.foreignKey] === parentId);
+              
+              row[subTable.tableName] = matched.map(child => {
+                const cleaned: Record<string, any> = {};
+                for (const field of subTable.fields) {
+                  if (withOpt.fields && !withOpt.fields.includes(field.columnName)) {
+                    continue;
+                  }
+                  if (this.permissionsService.hasReadPermission(roleCode, subTable.tableName, field.columnName, permMap)) {
+                    cleaned[field.columnName] = child[field.columnName];
+                  } else {
+                    cleaned[field.columnName] = '***';
+                  }
+                }
+                return cleaned;
+              });
+            });
+          }
+
+          const rel = meta.relations.find(r => r.name === withOpt.tableName || r.rightTable === withOpt.tableName);
+          if (rel && parentIds.length > 0) {
+            const junctionRows = await this.knex(rel.junctionTable)
+              .join(rel.rightTable, `${rel.junctionTable}.${rel.rightFk}`, '=', `${rel.rightTable}.${rel.rightJoinColumn}`)
+              .whereIn(`${rel.junctionTable}.${rel.leftFk}`, parentIds)
+              .select(`${rel.junctionTable}.${rel.leftFk} as parent_id`, `${rel.rightTable}.*`);
+
+            const rightFields = await this.configDb('field_meta')
+              .join('table_meta', 'field_meta.table_meta_id', 'table_meta.id')
+              .where('table_meta.table_name', rel.rightTable)
+              .select('field_meta.column_name');
+
+            rows.forEach(row => {
+              const parentId = row[`${meta.mainTable.tableName}_id`];
+              const matched = junctionRows.filter(j => j.parent_id === parentId);
+
+              row[rel.rightTable] = matched.map(rightRow => {
+                const cleaned: Record<string, any> = {};
+                rightFields.forEach(f => {
+                  if (withOpt.fields && !withOpt.fields.includes(f.column_name)) {
+                    return;
+                  }
+                  if (this.permissionsService.hasReadPermission(roleCode, rel.rightTable, f.column_name, permMap)) {
+                    cleaned[f.column_name] = rightRow[f.column_name];
+                  } else {
+                    cleaned[f.column_name] = '***';
+                  }
+                });
+                return cleaned;
+              });
+            });
+          }
+        }
+      }
+      // 列表内后置处理：将主表及 1:1/N:1 JOIN 表扁平字段打包嵌套为对象结构
+      if (rows.length > 0) {
+        rows.forEach(row => {
+          // 1. 打包主表
+          const mainObj: Record<string, any> = {};
+          const mainWithOpt = payload.with?.find(w => w.tableName === meta.mainTable.tableName);
+          meta.mainTable.fields.forEach(f => {
+            if (mainWithOpt && mainWithOpt.fields && !mainWithOpt.fields.includes(f.columnName)) {
+              return;
+            }
+            const keyName = `${meta.mainTable.tableName}_${f.columnName}`;
+            if (row[keyName] !== undefined) {
+              mainObj[f.columnName] = row[keyName];
+              delete row[keyName];
+            } else {
+              mainObj[f.columnName] = '***';
+            }
+          });
+          row[meta.mainTable.tableName] = mainObj;
+
+          // 2. 打包 JOIN 关联表
+          for (const joinTable of activeJoins) {
+            const withOpt = payload.with?.find(w => w.tableName === joinTable.tableName);
+            const nestedObj: Record<string, any> = {};
+            let hasData = false;
+            joinTable.fields.forEach(f => {
+              if (withOpt && withOpt.fields && !withOpt.fields.includes(f.columnName)) {
+                return;
+              }
+              const keyName = `${joinTable.tableName}_${f.columnName}`;
+              if (row[keyName] !== undefined) {
+                nestedObj[f.columnName] = row[keyName];
+                delete row[keyName];
+                hasData = true;
+              } else {
+                nestedObj[f.columnName] = '***';
+                hasData = true;
+              }
+            });
+            row[joinTable.tableName] = hasData ? nestedObj : null;
+          }
+        });
+      }
+
+
+      return {
+        rows,
+        total,
+        page,
+        size
+      };
+    }
+  }
+
+  /**
+   * 事务性一键级联保存记录（包含列级权限校验、一对多物理覆盖及多对多同步）
+   */
+  async saveModuleRecord(moduleId: string, data: any, roleCode: string) {
+    const meta: any = await this.modulesService.getModuleMeta(moduleId);
+    if (!meta) {
+      throw new NotFoundException(`模块不存在: ${moduleId}`);
+    }
+    if (!meta.mainTable) {
+      throw new BadRequestException(`模块主表未配置`);
+    }
+
+    const permMap = await this.permissionsService.getFieldPermissionsForRole(roleCode);
+    
+    // 支持主表数据嵌套在以表名命名的属性下 (如 data.orders.order_no)
+    const mainData = data[meta.mainTable.tableName] || data;
+    const isUpdate = mainData.id !== undefined && mainData.id !== null;
+
+    const trx = await this.knex.transaction();
+    try {
+      const mainFieldsToSave: Record<string, any> = {};
+      
+      for (const field of meta.mainTable.fields) {
+        if (field.columnName === 'id') continue;
+        if (mainData[field.columnName] !== undefined) {
+          const hasWrite = this.permissionsService.hasWritePermission(roleCode, meta.mainTable.tableName, field.columnName, permMap, isUpdate);
+          if (!hasWrite) {
+            throw new BadRequestException(
+              `表 [${meta.mainTable.tableName}] 字段 [${field.columnName}] 不允许${isUpdate ? '修改' : '写入'}`
+            );
+          }
+          mainFieldsToSave[field.columnName] = mainData[field.columnName];
+        }
+      }
+
+      let mainRecordId = mainData.id;
+
+      if (isUpdate) {
+        await trx(meta.mainTable.tableName)
+          .where('id', mainRecordId)
+          .update({
+            ...mainFieldsToSave,
+            updated_at: trx.fn.now()
+          });
+      } else {
+        const [insertedId] = await trx(meta.mainTable.tableName).insert({
+          ...mainFieldsToSave,
+          created_at: trx.fn.now(),
+          updated_at: trx.fn.now()
+        });
+        mainRecordId = insertedId;
+      }
+
+
+      // 级联处理一对多子表 (SUB)
+      for (const subTable of meta.subTables) {
+        if (data[subTable.tableName] !== undefined) {
+          const incomingItems = data[subTable.tableName] || [];
+          
+          for (const item of incomingItems) {
+            const itemIsUpdate = item.id !== undefined && item.id !== null;
+            for (const field of subTable.fields) {
+              if (field.columnName === 'id' || field.columnName === subTable.foreignKey) continue;
+              if (item[field.columnName] !== undefined) {
+                const hasWrite = this.permissionsService.hasWritePermission(roleCode, subTable.tableName, field.columnName, permMap, itemIsUpdate);
+                if (!hasWrite) {
+                  throw new BadRequestException(
+                    `表 [${subTable.tableName}] 字段 [${field.columnName}] 不允许${itemIsUpdate ? '修改' : '写入'}`
+                  );
+                }
+              }
+            }
+          }
+
+          const existingItems = await trx(subTable.tableName).where(subTable.foreignKey, mainRecordId).select('id');
+          const existingIds = existingItems.map(i => i.id);
+
+          const incomingIds = incomingItems.map(i => i.id).filter(Boolean);
+          const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
+
+          if (idsToDelete.length > 0) {
+            await trx(subTable.tableName).whereIn('id', idsToDelete).delete();
+          }
+
+          for (const item of incomingItems) {
+            const itemFields: Record<string, any> = {};
+            subTable.fields.forEach(f => {
+              if (f.columnName === 'id') return;
+              if (f.columnName === subTable.foreignKey) {
+                itemFields[f.columnName] = mainRecordId;
+              } else if (item[f.columnName] !== undefined) {
+                itemFields[f.columnName] = item[f.columnName];
+              }
+            });
+
+            if (item.id) {
+              await trx(subTable.tableName).where('id', item.id).update(itemFields);
+            } else {
+              await trx(subTable.tableName).insert(itemFields);
+            }
+          }
+        }
+      }
+
+      // 级联处理多对多关系 (RELATION)
+      for (const rel of meta.relations) {
+        if (data[rel.rightTable] !== undefined) {
+          const incomingRelations = data[rel.rightTable] || [];
+          const targetIds = incomingRelations.map((r: any) => r.id).filter(Boolean);
+
+          await trx(rel.junctionTable).where(rel.leftFk, mainRecordId).delete();
+          
+          if (targetIds.length > 0) {
+            const junctionInserts = targetIds.map(tId => ({
+              [rel.leftFk]: mainRecordId,
+              [rel.rightFk]: tId
+            }));
+            await trx(rel.junctionTable).insert(junctionInserts);
+          }
+        }
+      }
+
+      await trx.commit();
+      return mainRecordId;
+    } catch (e) {
+      await trx.rollback();
+      throw e;
+    }
+  }
+
+  /**
+   * 事务级联物理删除主记录及其从表/关联记录
+   */
+  async deleteModuleRecord(moduleId: string, id: number | string) {
+    const meta: any = await this.modulesService.getModuleMeta(moduleId);
+    if (!meta) {
+      throw new NotFoundException(`模块不存在: ${moduleId}`);
+    }
+    if (!meta.mainTable) {
+      throw new BadRequestException(`模块主表未配置`);
+    }
+
+    const trx = await this.knex.transaction();
+    try {
+      for (const subTable of meta.subTables) {
+        await trx(subTable.tableName).where(subTable.foreignKey, id).delete();
+      }
+
+      for (const rel of meta.relations) {
+        await trx(rel.junctionTable).where(rel.leftFk, id).delete();
+      }
+
+      await trx(meta.mainTable.tableName).where('id', id).delete();
+
+      await trx.commit();
+      return true;
+    } catch (e) {
+      await trx.rollback();
+      throw e;
+    }
+  }
 }
+

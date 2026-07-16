@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
 import { PermissionsController } from './permissions.controller';
+import { FieldPermissionsController } from './field-permissions.controller';
 
 /**
  * 权限管理模块
@@ -8,7 +9,8 @@ import { PermissionsController } from './permissions.controller';
  */
 @Module({
   providers: [PermissionsService],
-  controllers: [PermissionsController],
+  controllers: [PermissionsController, FieldPermissionsController],
   exports: [PermissionsService],
 })
 export class PermissionsModule {}
+

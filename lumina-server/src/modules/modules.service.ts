@@ -82,6 +82,131 @@ export class ModulesService {
   }
 
   /**
+   * 获取模块元数据设计结构 (优化关联表及字段信息展示)
+   */
+  async getModuleMeta(id: string): Promise<any> {
+    const dbModule = await this.knex('module_meta').where('id', id).first();
+    if (!dbModule) return null;
+
+    const moduleTables = await this.knex('module_table_meta')
+      .join('table_meta', 'module_table_meta.table_meta_id', 'table_meta.id')
+      .where('module_table_meta.module_id', id)
+      .orderBy('module_table_meta.sort_order', 'asc')
+      .select('table_meta.*');
+
+
+
+    if (moduleTables.length === 0) {
+      return {
+        id: dbModule.id,
+        name: dbModule.name,
+        description: dbModule.description,
+        mainTable: null,
+        subTables: [],
+        joinTables: [],
+        relations: []
+      };
+    }
+
+    const mainTableMeta = moduleTables[0];
+    const otherTablesMeta = moduleTables.slice(1);
+
+    const getFieldsForTable = async (tableId: number) => {
+      const fields = await this.knex('field_meta')
+        .where('table_meta_id', tableId)
+        .orderBy('id', 'asc');
+      return fields.map(f => ({
+        id: f.id,
+        columnName: f.column_name,
+        label: f.label || f.column_name,
+        dataType: f.data_type,
+        queryOp: f.column_name === 'id' ? 'EQ' : (f.data_type === 'STRING' ? 'LIKE' : 'EQ')
+      }));
+    };
+
+    const mainTableFields = await getFieldsForTable(mainTableMeta.id);
+    const mainTable = {
+      id: mainTableMeta.id,
+      tableName: mainTableMeta.table_name,
+      queryType: 'MAIN',
+      joinType: null,
+      joinOn: null,
+      foreignKey: null,
+      fields: mainTableFields
+    };
+
+    const subTables: any[] = [];
+    const joinTables: any[] = [];
+    const relations: any[] = [];
+
+
+    // 区分 SUB 和 JOIN 表
+    for (const otherTable of otherTablesMeta) {
+      const relInfo = await this.resolveRelation(mainTableMeta.table_name, otherTable.table_name);
+      if (relInfo) {
+        if (relInfo.relationType === '1:N') {
+          const fields = await getFieldsForTable(otherTable.id);
+          subTables.push({
+            id: otherTable.id,
+            tableName: otherTable.table_name,
+            queryType: 'SUB',
+            joinType: null,
+            joinOn: null,
+            foreignKey: relInfo.right,
+            fields: fields
+          });
+        } else if (relInfo.relationType === 'N:1' || relInfo.relationType === '1:1') {
+          const fields = await getFieldsForTable(otherTable.id);
+          joinTables.push({
+            id: otherTable.id,
+            tableName: otherTable.table_name,
+            queryType: 'JOIN',
+            joinType: 'LEFT',
+            joinOn: `${mainTableMeta.table_name}.${relInfo.left} = ${otherTable.table_name}.${relInfo.right}`,
+            foreignKey: null,
+            fields: fields
+          });
+        }
+      }
+    }
+
+    // 探测 N:M 关系并提取
+    for (const junctionMeta of otherTablesMeta) {
+      const leftRel = await this.resolveRelation(mainTableMeta.table_name, junctionMeta.table_name);
+      if (leftRel && leftRel.relationType === '1:N') {
+        for (const rightMeta of otherTablesMeta) {
+          if (rightMeta.id === junctionMeta.id) continue;
+          const rightRel = await this.resolveRelation(rightMeta.table_name, junctionMeta.table_name);
+          if (rightRel && rightRel.relationType === '1:N') {
+            relations.push({
+              id: relations.length + 1,
+              name: rightMeta.table_name,
+              leftTable: mainTableMeta.table_name,
+              rightTable: rightMeta.table_name,
+              junctionTable: junctionMeta.table_name,
+              leftFk: leftRel.right,
+              rightFk: rightRel.right,
+              leftJoinColumn: leftRel.left,
+              rightJoinColumn: rightRel.left
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      id: dbModule.id,
+      name: dbModule.name,
+      description: dbModule.description,
+      mainTable,
+      subTables,
+      joinTables,
+      relations
+    };
+  }
+
+
+  /**
    * (方案A核心) 从全局 ER 定义推断两张表之间的关联路径
    * 必须同时提供字段关联元数据 (relation_meta + relation_field_meta) 才能准确判断关系类型
    */

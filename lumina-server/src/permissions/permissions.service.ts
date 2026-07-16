@@ -353,4 +353,158 @@ export class PermissionsService {
       return modifiedMapping;
     });
   }
+
+  /**
+   * 获取指定角色的字段权限映射表
+   */
+  async getFieldPermissionsForRole(roleCode: string): Promise<Map<string, number>> {
+    if (roleCode === 'admin') {
+      return new Map(); // Admin has all rights by default
+    }
+    try {
+      const perms = await this.knex('field_permission')
+        .join('field_meta', 'field_permission.field_meta_id', 'field_meta.id')
+        .join('table_meta', 'field_meta.table_meta_id', 'table_meta.id')
+        .where('field_permission.role_code', roleCode)
+        .select('table_meta.table_name', 'field_meta.column_name', 'field_permission.perm_value');
+
+      const permMap = new Map<string, number>();
+      perms.forEach((p) => {
+        permMap.set(`${p.table_name}.${p.column_name}`, p.perm_value);
+      });
+      return permMap;
+    } catch (e) {
+      console.error('[权限服务] 获取角色字段权限失败:', e);
+      return new Map();
+    }
+  }
+
+  /**
+   * 判定是否有读取权限 (Unix 风格: perm & 4 !== 0)
+   */
+  hasReadPermission(roleCode: string, tableName: string, columnName: string, permMap: Map<string, number>): boolean {
+    if (roleCode === 'admin') return true;
+    const perm = permMap.get(`${tableName}.${columnName}`);
+    return perm !== undefined && (perm & 4) !== 0;
+  }
+
+  /**
+   * 判定是否有写入权限 (Unix 风格: 新增 perm & 2 !== 0, 修改 perm & 1 !== 0)
+   */
+  hasWritePermission(roleCode: string, tableName: string, columnName: string, permMap: Map<string, number>, isUpdate = false): boolean {
+    if (roleCode === 'admin') return true;
+    const perm = permMap.get(`${tableName}.${columnName}`);
+    if (perm === undefined) return false;
+    return isUpdate ? (perm & 1) !== 0 : (perm & 2) !== 0;
+  }
+
+  /**
+   * 获取全局所有物理表及字段的整型位掩码权限
+   */
+  async getGlobalRolePermissions(roleCode: string) {
+    const allTables = await this.knex('table_meta').select('*');
+
+    const result: any[] = [];
+    for (const t of allTables) {
+      const fields = await this.knex('field_meta')
+        .where('table_meta_id', t.id)
+        .orderBy('id', 'asc');
+      
+      const fieldsWithPerm: any[] = [];
+      for (const f of fields) {
+        const permRecord = await this.knex('field_permission')
+          .where('field_meta_id', f.id)
+          .where('role_code', roleCode)
+          .first();
+        
+        fieldsWithPerm.push({
+          fieldMetaId: f.id,
+          columnName: f.column_name,
+          label: f.label || f.column_name,
+          perm: permRecord ? permRecord.perm_value : 0
+        });
+      }
+
+      result.push({
+        tableMetaId: t.id,
+        tableName: t.table_name,
+        fields: fieldsWithPerm
+      });
+    }
+    return result;
+  }
+
+  /**
+   * 获取指定角色在模块下的全部表及字段的整型位掩码权限
+   */
+  async getRoleModulePermissions(moduleId: string, roleCode: string) {
+    const moduleTables = await this.knex('module_table_meta')
+      .join('table_meta', 'module_table_meta.table_meta_id', 'table_meta.id')
+      .where('module_table_meta.module_id', moduleId)
+      .orderBy('module_table_meta.sort_order', 'asc')
+      .select('table_meta.*');
+
+    const result: any[] = [];
+    for (const t of moduleTables) {
+      const fields = await this.knex('field_meta').where('table_meta_id', t.id).orderBy('id', 'asc');
+      
+      const fieldsWithPerm: any[] = [];
+      for (const f of fields) {
+        const permRecord = await this.knex('field_permission')
+          .where('field_meta_id', f.id)
+          .where('role_code', roleCode)
+          .first();
+        
+        fieldsWithPerm.push({
+          fieldMetaId: f.id,
+          columnName: f.column_name,
+          label: f.label || f.column_name,
+          perm: permRecord ? permRecord.perm_value : 0
+        });
+      }
+
+      result.push({
+        tableMetaId: t.id,
+        tableName: t.table_name,
+        fields: fieldsWithPerm
+      });
+    }
+    return result;
+  }
+
+  /**
+   * 批量配置指定角色的物理字段权限掩码
+   */
+  async batchUpdatePermissions(roleCode: string, tables: any[]) {
+    const trx = await this.knex.transaction();
+    try {
+      for (const t of tables) {
+        for (const f of t.fields) {
+          const existing = await trx('field_permission')
+            .where('field_meta_id', f.fieldMetaId)
+            .where('role_code', roleCode)
+            .first();
+          
+          if (existing) {
+            await trx('field_permission')
+              .where('id', existing.id)
+              .update({ perm_value: f.perm });
+          } else {
+            await trx('field_permission').insert({
+              field_meta_id: f.fieldMetaId,
+              role_code: roleCode,
+              perm_value: f.perm
+            });
+          }
+        }
+      }
+      await trx.commit();
+      return true;
+    } catch (e) {
+      await trx.rollback();
+      throw e;
+    }
+  }
 }
+
+

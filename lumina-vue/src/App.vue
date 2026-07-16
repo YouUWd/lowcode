@@ -1,6 +1,9 @@
 <template>
   <Sidebar />
-  <main class="ml-64 flex-1 flex flex-col h-screen overflow-y-auto bg-surface relative">
+  <main 
+    class="flex-1 flex flex-col h-screen overflow-y-auto bg-surface relative transition-all duration-300 ease-in-out"
+    :class="appState.sidebarCollapsed ? 'ml-16' : 'ml-64'"
+  >
     <Header />
     <router-view v-slot="{ Component }">
       <Transition name="fade-page" mode="out-in">
@@ -16,6 +19,7 @@ import Sidebar from './components/layout/Sidebar.vue';
 import Header from './components/layout/Header.vue';
 import { fetchModules } from './store/modules';
 import { loadDatabaseSchema } from './store/metadata';
+import { appState } from './store/app';
 
 onMounted(() => {
   console.log('[App] Initializing modular stores...');

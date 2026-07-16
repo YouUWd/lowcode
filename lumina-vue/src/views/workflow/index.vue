@@ -110,6 +110,10 @@ watch(() => appState.currentView, (newVal) => {
   }
 });
 
+watch([() => appState.currentUserRole, () => appState.currentUser, () => appState.simulationMode], () => {
+  fetchList();
+});
+
 const mockSubmitNew = async () => {
   const currentUserRole = appState.simulationMode === 'role' ? appState.currentUserRole : 'admin';
   const currentUser = appState.simulationMode === 'user' ? appState.currentUser : 'admin_sys';

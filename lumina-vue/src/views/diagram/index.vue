@@ -2,113 +2,114 @@
   <div class="flex flex-col h-full w-full overflow-hidden bg-white">
     <div class="p-8 flex flex-col flex-1 overflow-hidden w-full animate-in fade-in duration-500 text-on-surface">
       
-      <!-- ══ Header Action Section ════════════════════════════════════════════════════════ -->
-      <div class="flex justify-between items-center mb-6 mt-[-1rem] shrink-0">
-        <div class="flex items-center">
-          <h2 class="font-headline text-lg font-bold flex items-center text-on-surface mr-8">
-            <Database class="mr-2 text-primary w-5 h-5" />
-            ER 图模型
-          </h2>
-          
-          <div class="flex gap-3 items-center flex-1 min-w-0" v-if="allTables.length">
-            <!-- 表列表选择框 -->
-            <div class="relative w-52 flex items-center rounded-lg bg-surface-container-lowest border border-outline-variant/50 py-1.5 pl-3 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-primary focus-within:border-primary sm:text-sm transition-shadow z-20 cursor-pointer" v-click-outside="() => tableDropdownOpen = false" @click="tableDropdownOpen = !tableDropdownOpen">
-              <div class="flex items-center min-w-0 mr-2 flex-shrink-0">
-                <span class="text-xs text-on-surface-variant font-medium whitespace-nowrap">{{ allTables.length }} 表</span>
-                <div class="w-px h-3 bg-outline-variant/30 mx-2"></div>
-              </div>
-              <div class="relative flex-1 flex items-center min-w-0">
-                <span class="block truncate text-[13px] text-on-surface font-medium flex-1 text-left">
-                  {{ selectedTableName || '定位表...' }}
-                </span>
-                <ChevronDown class="h-4 w-4 text-on-surface-variant transition-transform ml-1 flex-shrink-0" :class="{'rotate-180': tableDropdownOpen}" aria-hidden="true" />
+      <!-- ══ Unified Canvas Card (Header + Canvas) ════════════════════════════════════════════════════════ -->
+      <div class="bg-surface-container-low rounded-2xl shadow-sm overflow-hidden border border-outline-variant/15 flex-1 relative flex flex-col mt-[-1rem]">
+        
+        <!-- Compact Toolbar Row -->
+        <div class="flex flex-wrap justify-between items-center gap-3 px-4 py-2.5 border-b border-outline-variant/30 bg-surface z-10 shrink-0">
+          <div class="flex-1"></div>
 
-                <transition enter-active-class="transition duration-100 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-75 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
-                  <div v-if="tableDropdownOpen" class="absolute top-full left-0 mt-3 max-h-60 min-w-[14rem] overflow-auto rounded-xl bg-surface-container-lowest p-1.5 shadow-[0px_8px_24px_rgba(25,28,29,0.12)] border border-outline-variant/20 focus:outline-none sm:text-sm custom-scrollbar z-50" @click.stop>
-                    <div
-                      v-for="(table, idx) in allTables"
-                      :key="table.tableName"
-                      @click="selectedTableName = table.tableName; onSidebarTableClick(table.tableName); tableDropdownOpen = false"
-                      class="relative cursor-pointer select-none py-2 px-3 rounded-lg flex items-center justify-between gap-2 transition-colors hover:bg-primary/5 hover:text-primary text-on-surface"
-                      :class="{'bg-primary/5 text-primary font-bold': selectedTableName === table.tableName}"
-                    >
-                      <div class="flex items-center min-w-0">
-                        <span class="w-2 h-2 rounded-sm shrink-0 mr-2" :style="{ background: TABLE_COLORS[idx % TABLE_COLORS.length] }"></span>
-                        <span class="block truncate text-[13px]">{{ table.tableName }}</span>
+          <div class="flex items-center gap-3 flex-wrap justify-end">
+            <div class="flex gap-3 items-center min-w-0" v-if="allTables.length">
+              <!-- 表列表选择框 -->
+              <div class="relative w-48 flex items-center rounded bg-surface-container-lowest border border-outline-variant/30 py-1 pl-2.5 pr-2 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-shadow cursor-pointer" v-click-outside="() => tableDropdownOpen = false" @click="tableDropdownOpen = !tableDropdownOpen">
+                <div class="flex items-center min-w-0 mr-2 flex-shrink-0">
+                  <span class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">{{ allTables.length }} 表</span>
+                  <div class="w-px h-3 bg-outline-variant/30 mx-1.5"></div>
+                </div>
+                <div class="relative flex-1 flex items-center min-w-0">
+                  <span class="block truncate text-xs text-on-surface font-medium flex-1 text-left">
+                    {{ selectedTableName || '定位表...' }}
+                  </span>
+                  <ChevronDown class="h-3.5 w-3.5 text-on-surface-variant transition-transform ml-1 flex-shrink-0" :class="{'rotate-180': tableDropdownOpen}" aria-hidden="true" />
+
+                  <transition enter-active-class="transition duration-100 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-75 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+                    <div v-if="tableDropdownOpen" class="absolute top-full left-0 mt-2 max-h-60 min-w-[14rem] overflow-auto rounded-xl bg-surface-container-lowest p-1.5 shadow-[0px_8px_24px_rgba(25,28,29,0.12)] border border-outline-variant/20 focus:outline-none sm:text-sm custom-scrollbar z-50" @click.stop>
+                      <div
+                        v-for="(table, idx) in allTables"
+                        :key="table.tableName"
+                        @click="selectedTableName = table.tableName; onSidebarTableClick(table.tableName); tableDropdownOpen = false"
+                        class="relative cursor-pointer select-none py-1.5 px-2.5 rounded-lg flex items-center justify-between gap-2 transition-colors hover:bg-primary/5 hover:text-primary text-on-surface"
+                        :class="{'bg-primary/5 text-primary font-bold': selectedTableName === table.tableName}"
+                      >
+                        <div class="flex items-center min-w-0">
+                          <span class="w-2 h-2 rounded-sm shrink-0 mr-2" :style="{ background: TABLE_COLORS[idx % TABLE_COLORS.length] }"></span>
+                          <span class="block truncate text-xs">{{ table.tableName }}</span>
+                        </div>
+                        <span class="text-[10px] shrink-0 opacity-70">{{ table.fields.length }} 字段</span>
                       </div>
-                      <span class="text-[11px] shrink-0 opacity-70">{{ table.fields.length }} 字段</span>
                     </div>
-                  </div>
-                </transition>
+                  </transition>
+                </div>
+              </div>
+
+              <!-- 关系列表选择框 -->
+              <div class="relative w-56 flex items-center rounded bg-surface-container-lowest border border-outline-variant/30 py-1 pl-2.5 pr-2 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-shadow cursor-pointer" v-click-outside="() => relDropdownOpen = false" @click="relDropdownOpen = !relDropdownOpen">
+                <div class="flex items-center min-w-0 mr-2 flex-shrink-0">
+                  <span class="text-[11px] text-on-surface-variant font-medium whitespace-nowrap">{{ schema.relations?.length ?? 0 }} 关系</span>
+                  <div class="w-px h-3 bg-outline-variant/30 mx-1.5"></div>
+                </div>
+                <div class="relative flex-1 flex items-center min-w-0">
+                  <span class="block truncate text-xs text-on-surface font-medium flex-1 text-left">
+                    {{ activeRelationId ? schema.relations.find(r => r.id === activeRelationId)?.name : '定位关系...' }}
+                  </span>
+                  <ChevronDown class="h-3.5 w-3.5 text-on-surface-variant transition-transform ml-1 flex-shrink-0" :class="{'rotate-180': relDropdownOpen}" aria-hidden="true" />
+
+                  <transition enter-active-class="transition duration-100 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-75 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+                    <div v-if="relDropdownOpen" class="absolute top-full left-0 mt-2 max-h-60 min-w-[18rem] overflow-auto rounded-xl bg-surface-container-lowest p-1.5 shadow-[0px_8px_24px_rgba(25,28,29,0.12)] border border-outline-variant/20 focus:outline-none sm:text-sm custom-scrollbar z-50" @click.stop>
+                      <div
+                        v-for="rel in schema.relations"
+                        :key="rel.id"
+                        @click="activeRelationId = rel.id; onFocusRelation(rel.id); relDropdownOpen = false"
+                        class="relative cursor-pointer select-none py-1.5 px-2.5 rounded-lg flex items-center justify-between gap-3 transition-colors hover:bg-primary/5 hover:text-primary text-on-surface"
+                        :class="{'bg-primary/5 text-primary font-bold': activeRelationId === rel.id}"
+                      >
+                        <span class="block truncate text-xs flex-1">{{ rel.name }}</span>
+                        <span class="text-[10px] font-mono shrink-0 opacity-70">{{ rel.nodes?.[0]?.tableName }} → {{ rel.nodes?.[1]?.tableName }}</span>
+                      </div>
+                    </div>
+                  </transition>
+                </div>
               </div>
             </div>
 
-            <!-- 关系列表选择框 -->
-            <div class="relative w-64 flex items-center rounded-lg bg-surface-container-lowest border border-outline-variant/50 py-1.5 pl-3 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-primary focus-within:border-primary sm:text-sm transition-shadow z-20 cursor-pointer" v-click-outside="() => relDropdownOpen = false" @click="relDropdownOpen = !relDropdownOpen">
-              <div class="flex items-center min-w-0 mr-2 flex-shrink-0">
-                <span class="text-xs text-on-surface-variant font-medium whitespace-nowrap">{{ schema.relations?.length ?? 0 }} 关系</span>
-                <div class="w-px h-3 bg-outline-variant/30 mx-2"></div>
-              </div>
-              <div class="relative flex-1 flex items-center min-w-0">
-                <span class="block truncate text-[13px] text-on-surface font-medium flex-1 text-left">
-                  {{ activeRelationId ? schema.relations.find(r => r.id === activeRelationId)?.name : '定位关系...' }}
-                </span>
-                <ChevronDown class="h-4 w-4 text-on-surface-variant transition-transform ml-1 flex-shrink-0" :class="{'rotate-180': relDropdownOpen}" aria-hidden="true" />
+            <div class="w-px bg-outline-variant/30 h-4 hidden sm:block mx-1"></div>
 
-                <transition enter-active-class="transition duration-100 ease-out" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-75 ease-in" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
-                  <div v-if="relDropdownOpen" class="absolute top-full left-0 mt-3 max-h-60 min-w-[18rem] overflow-auto rounded-xl bg-surface-container-lowest p-1.5 shadow-[0px_8px_24px_rgba(25,28,29,0.12)] border border-outline-variant/20 focus:outline-none sm:text-sm custom-scrollbar z-50" @click.stop>
-                    <div
-                      v-for="rel in schema.relations"
-                      :key="rel.id"
-                      @click="activeRelationId = rel.id; onFocusRelation(rel.id); relDropdownOpen = false"
-                      class="relative cursor-pointer select-none py-2 px-3 rounded-lg flex items-center justify-between gap-3 transition-colors hover:bg-primary/5 hover:text-primary text-on-surface"
-                      :class="{'bg-primary/5 text-primary font-bold': activeRelationId === rel.id}"
-                    >
-                      <span class="block truncate text-[13px] flex-1">{{ rel.name }}</span>
-                      <span class="text-[11px] font-mono shrink-0 opacity-70">{{ rel.nodes?.[0]?.tableName }} → {{ rel.nodes?.[1]?.tableName }}</span>
-                    </div>
-                  </div>
-                </transition>
-              </div>
-            </div>
+            <div class="flex items-center gap-1.5">
+            <!-- 模式切换 -->
+            <button
+              @click="isEditMode = !isEditMode"
+              class="px-2.5 py-1 text-xs font-semibold rounded border transition-all flex items-center gap-1 cursor-pointer"
+              :class="isEditMode ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' : 'border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container'"
+              :title="isEditMode ? '切换到只读模式' : '切换到编辑模式'"
+            >
+              <component :is="isEditMode ? Pencil : Eye" class="w-3.5 h-3.5" />
+              {{ isEditMode ? '编辑模式' : '只读模式' }}
+            </button>
+
+            <div class="w-px bg-outline-variant/30 h-4 mx-1"></div>
+
+            <button @click="runAutoLayout" class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              <LayoutTemplate class="w-3.5 h-3.5" />
+              自动排版
+            </button>
+
+            <button @click="onRefresh" :disabled="loading" class="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center cursor-pointer border border-transparent disabled:opacity-50 disabled:cursor-not-allowed" title="刷新数据">
+              <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': loading }" />
+            </button>
+
+            <div class="w-px bg-outline-variant/30 h-4 mx-1"></div>
+
+            <button @click="onExportPng" class="px-3 py-1 bg-primary text-on-primary text-xs font-semibold rounded shadow-sm hover:bg-primary/95 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              <ImageIcon class="w-3.5 h-3.5" />
+              导出 PNG
+            </button>
+          </div>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <!-- 模式切换 -->
-          <button
-            @click="isEditMode = !isEditMode"
-            class="px-4 py-2 text-sm font-medium rounded-xl transition-all flex items-center cursor-pointer"
-            :class="isEditMode ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'"
-            :title="isEditMode ? '切换到只读模式' : '切换到编辑模式'"
-          >
-            <component :is="isEditMode ? Pencil : Eye" class="w-4 h-4 mr-2" />
-            {{ isEditMode ? '编辑模式' : '只读模式' }}
-          </button>
-
-          <div class="w-px bg-outline-variant/30 h-5 mx-2"></div>
-
-          <button @click="runAutoLayout" class="px-4 py-2 text-sm font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded-xl transition-all flex items-center cursor-pointer">
-            <LayoutTemplate class="w-4 h-4 mr-2" />
-            自动排版
-          </button>
-
-          <button @click="onRefresh" :disabled="loading" class="px-4 py-2 text-sm font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded-xl transition-all flex items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-            <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': loading }" />
-            刷新
-          </button>
-
-          <div class="w-px bg-outline-variant/30 h-5 mx-2"></div>
-
-          <button @click="onExportPng" class="px-4 py-2 text-sm font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded-xl transition-all flex items-center cursor-pointer">
-            <ImageIcon class="w-4 h-4 mr-2" />
-            导出 PNG
-          </button>
-        </div>
-      </div>
-
-      <!-- ══ 主体（画布 + Inspector）═════════════════════════════ -->
-      <div class="bg-surface-container-low rounded-2xl shadow-sm overflow-hidden border border-outline-variant/15 flex-1 relative flex">
+        <!-- 主体（画布 + Inspector） -->
+        <div class="flex-1 relative flex overflow-hidden">
         
         <!-- 中央：Vue Flow 画布 -->
       <div class="er-canvas-wrap" ref="canvasWrapRef">
@@ -175,6 +176,7 @@
     />
   </div>
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -218,7 +220,7 @@ const edgeTypes = { relationEdge: markRaw(RelationEdge) }
 
 // ── Vue Flow ID（用于在父组件通过 useVueFlow(id) 调用 fitView 等 API）──────
 const FLOW_ID = 'er-main-canvas'
-const { fitView, setCenter } = useVueFlow({ id: FLOW_ID })
+const { fitView, setCenter } = useVueFlow(FLOW_ID)
 
 // ── 画布 nodes/edges 状态 ──────────────────────────────────────────────────
 const nodes = ref<any[]>([])

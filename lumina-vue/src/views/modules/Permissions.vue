@@ -1,156 +1,222 @@
 <template>
-  <div class="p-8 space-y-12 w-full animate-in fade-in duration-500">
-    <!-- Header Action Section (标题与按钮对齐) -->
-    <div class="flex justify-between items-center mb-6 mt-[-1rem]">
-      <h2 class="font-headline text-lg font-bold text-on-surface flex items-center">
-        <Shield class="mr-2 text-primary w-5 h-5" />
-        物理层级权限拦截规则 (CLS Rules)
-      </h2>
+  <div class="p-8 space-y-6 w-full animate-in fade-in duration-300">
+    <!-- Selected Table Matrix Card (unified: toolbar + matrix in one card) -->
+    <div v-if="!loading && currentTable" class="bg-surface rounded-2xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] border border-outline-variant/30 overflow-hidden animate-in fade-in duration-200">
+      <!-- Compact Toolbar Row -->
+      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-outline-variant/30 bg-surface z-10 shrink-0">
+        <div class="flex-1"></div>
 
-      <div class="flex space-x-3">
-        <button @click="goToConfig" class="px-4 py-2 border border-primary text-primary text-sm font-medium rounded-xl hover:bg-primary/5 transition-colors flex items-center">
-          <Settings class="w-4 h-4 mr-2" />
-          模块配置
-        </button>
-        <div class="w-px h-6 bg-outline-variant/40 mx-1 my-auto"></div>
-        <button @click="toggleAll(true)" class="px-4 py-2 border border-outline-variant text-on-surface text-sm font-medium rounded-xl hover:bg-surface-variant transition-colors flex items-center">
-          <CheckCheck class="w-4 h-4 mr-2" />
-          全选所有
-        </button>
-        <button @click="toggleAll(false)" class="px-4 py-2 border border-outline-variant text-on-surface text-sm font-medium rounded-xl hover:bg-surface-variant transition-colors flex items-center">
-          <Eraser class="w-4 h-4 mr-2" />
-          重置权限
-        </button>
-        <button @click="saveAndGoBack" class="px-5 py-2 bg-primary text-on-primary text-sm font-medium rounded-xl shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center">
-          <Check class="w-4 h-4 mr-2" />
-          保存配置
-        </button>
+        <div class="flex items-center gap-3">
+          <div v-if="tables.length > 0" class="flex items-center gap-1.5">
+            <span class="text-xs text-on-surface-variant font-medium">物理表：</span>
+            <select 
+              v-model="selectedTableId"
+              class="text-xs rounded border border-outline-variant/30 bg-surface-container-lowest focus:ring-1 focus:border-primary focus:ring-primary transition-shadow py-1 pl-2.5 pr-8 outline-none cursor-pointer"
+            >
+              <option v-for="t in tables" :key="t.tableMetaId" :value="t.tableMetaId">
+                {{ t.tableName }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="w-px h-4 bg-outline-variant/30 mx-1"></div>
+          <button 
+            @click="toggleAll(true)"
+            :disabled="appState.currentUserRole === 'admin' || !selectedTableId"
+            class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <CheckCheck class="w-3.5 h-3.5" />
+            全选
+          </button>
+          <button 
+            @click="toggleAll(false)"
+            :disabled="appState.currentUserRole === 'admin' || !selectedTableId"
+            class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Eraser class="w-3.5 h-3.5" />
+            清空
+          </button>
+          <div class="w-px h-4 bg-outline-variant/30 mx-1"></div>
+          <button 
+            @click="handleSave"
+            :disabled="appState.currentUserRole === 'admin'"
+            class="px-3 py-1 bg-primary text-on-primary text-xs font-semibold rounded shadow-sm hover:bg-primary/95 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check class="w-3.5 h-3.5" />
+            保存
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- Section 1: Data Source Info -->
-    <section>
-      <PermissionMatrix 
-        :fields="derivedFields" 
-        :active-permissions="permissionsState.activeNodes"
-        @toggle="togglePermission"
-      />
-    </section>
 
-    <!-- Info Section -->
-    <div class="p-6 bg-primary-container/30 rounded-2xl border border-primary/10 flex items-start space-x-4">
-      <div class="p-3 bg-white rounded-xl shadow-sm text-primary">
-        <Info class="w-5 h-5" />
-      </div>
-      <div>
-        <h4 class="text-sm font-bold text-on-primary-container">关于物理权限拦截模拟</h4>
-        <p class="text-xs text-on-primary-container/80 mt-1 leading-relaxed">
-          此处定义的节点将作为 <b>ColumnLevelSecurityInterceptor</b> 的决策依据。系统在执行查询时，会遍历 AST 并对比当前节点的激活状态，自动剔除无权限的字段。
-          当前共有 <span class="font-bold underline">{{ activePermissionCount }}</span> 个模拟节点生效。
-        </p>
+      <!-- Columns Matrix Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left border-collapse">
+          <thead>
+            <tr class="bg-surface-container-lowest text-xs font-extrabold text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/30">
+              <th class="px-4 py-4 border-r border-outline-variant/30 text-center w-16">序号</th>
+              <th class="px-6 py-4 border-r border-outline-variant/30">物理字段</th>
+              <th class="px-6 py-4 border-r border-outline-variant/30">字段别名</th>
+              <th class="px-6 py-4 text-center w-40 border-r border-outline-variant/30 whitespace-nowrap">READ (读取/4)</th>
+              <th class="px-6 py-4 text-center w-40 border-r border-outline-variant/30 whitespace-nowrap">CREATE (新建/2)</th>
+              <th class="px-6 py-4 text-center w-40 border-r border-outline-variant/30 whitespace-nowrap">UPDATE (修改/1)</th>
+              <th class="px-6 py-4 text-center w-32 whitespace-nowrap">当前掩码值</th>
+            </tr>
+          </thead>
+          <tbody class="text-sm text-on-surface">
+            <tr 
+              v-for="(f, index) in currentTable.fields" 
+              :key="f.fieldMetaId" 
+              class="border-b border-outline-variant/30 last:border-b-0 hover:bg-surface-container-lowest transition-colors group"
+            >
+              <!-- 序号 -->
+              <td class="px-4 py-4 border-r border-outline-variant/30 text-center font-mono text-xs text-on-surface-variant">
+                {{ index + 1 }}
+              </td>
+
+              <!-- 物理字段 -->
+              <td class="px-6 py-4 border-r border-outline-variant/30 font-mono text-xs font-semibold text-on-surface">
+                {{ f.columnName }}
+              </td>
+
+              <!-- 字段别名 -->
+              <td class="px-6 py-4 border-r border-outline-variant/30 text-on-surface-variant">
+                {{ f.label }}
+              </td>
+
+              <!-- READ checkbox -->
+              <td class="px-6 py-4 text-center border-r border-outline-variant/30">
+                <input 
+                  type="checkbox"
+                  :checked="appState.currentUserRole === 'admin' || (f.perm & 4) !== 0"
+                  :disabled="appState.currentUserRole === 'admin'"
+                  @change="togglePerm(f, 4, $event.target.checked)"
+                  class="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary cursor-pointer disabled:opacity-50"
+                />
+              </td>
+
+              <!-- CREATE checkbox -->
+              <td class="px-6 py-4 text-center border-r border-outline-variant/30">
+                <input 
+                  type="checkbox"
+                  :checked="appState.currentUserRole === 'admin' || (f.perm & 2) !== 0"
+                  :disabled="appState.currentUserRole === 'admin'"
+                  @change="togglePerm(f, 2, $event.target.checked)"
+                  class="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary cursor-pointer disabled:opacity-50"
+                />
+              </td>
+
+              <!-- UPDATE checkbox -->
+              <td class="px-6 py-4 text-center border-r border-outline-variant/30">
+                <input 
+                  type="checkbox"
+                  :checked="appState.currentUserRole === 'admin' || (f.perm & 1) !== 0"
+                  :disabled="appState.currentUserRole === 'admin'"
+                  @change="togglePerm(f, 1, $event.target.checked)"
+                  class="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary cursor-pointer disabled:opacity-50"
+                />
+              </td>
+
+              <!-- Mask Value Display -->
+              <td class="px-6 py-4 text-center">
+                <span class="font-mono text-xs font-bold bg-surface-container px-2.5 py-0.5 rounded border border-outline-variant/30" :class="f.perm > 0 ? 'text-primary' : 'text-on-surface-variant/50'">
+                  {{ appState.currentUserRole === 'admin' ? 7 : f.perm }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { Shield, Settings, CheckCheck, Eraser, Check, Info } from 'lucide-vue-next';
+import { ref, computed, onMounted, watch } from 'vue';
+import { CheckCheck, Eraser, Check, RotateCw, Database, ChevronDown } from 'lucide-vue-next';
+import { permissionsApi } from '../../api/permissions';
 import { appState } from '../../store/app';
-import { modulesState } from '../../store/modules';
-import { permissionsState, fetchDetailedPermissions, updatePermissions } from '../../store/permissions';
-import PermissionMatrix from './components/PermissionMatrix.vue';
 
-import { useRouter } from 'vue-router';
+const loading = ref(false);
+const tables = ref([]);
+const selectedTableId = ref(null);
 
-const router = useRouter();
+const roles = [
+  { code: 'admin', name: '管理员 (Admin)' },
+  { code: 'editor', name: '编辑员 (Editor)' },
+  { code: 'viewer', name: '查看员 (Viewer)' }
+];
 
-const goToConfig = () => {
-  if (modulesState.activeModule) {
-    router.push(`/modules/${modulesState.activeModule.id}/config`);
-  }
-};
-
-const saveAndGoBack = async () => {
-  if (!modulesState.activeModule) return;
-  const success = await updatePermissions(modulesState.activeModule.id, permissionsState.activeNodes);
-  if (success) {
-    router.push('/modules');
-  } else {
-    alert('保存权限配置失败，请检查后端连接');
-  }
-};
-
-const derivedFields = computed(() => {
-  const fieldsMap = new Map();
-  const modId = modulesState.activeModule?.id;
-  if (!modId) return [];
-
-  // 1. 首先从本地配置映射中提取所有已定义的物理字段
-  const config = modulesState.configs[modId];
-  if (config && config.mappings) {
-    config.mappings.forEach(m => {
-      m.physicalFields?.forEach(pf => {
-        const key = `${pf.entity}.${pf.field}`;
-        if (!fieldsMap.has(key)) {
-          fieldsMap.set(key, { 
-            entity: pf.entity, 
-            field: pf.field, 
-            id: key,
-            logicalField: m.logicalField
-          });
-        }
-      });
-    });
-  }
-
-  // 2. 然后用后端返回的详细权限节点信息进行补充/修正
-  if (permissionsState.detailedList && permissionsState.detailedList.length > 0) {
-    permissionsState.detailedList.forEach(p => {
-      const key = `${p.entity}.${p.field_name}`;
-      if (fieldsMap.has(key)) {
-        const existing = fieldsMap.get(key);
-        existing.logicalField = p.logical_field || existing.logicalField;
-      } else {
-        fieldsMap.set(key, { 
-          entity: p.entity, 
-          field: p.field_name, 
-          id: key,
-          logicalField: p.logical_field 
-        });
-      }
-    });
-  }
-
-  return Array.from(fieldsMap.values());
+const activeRoleName = computed(() => {
+  return roles.find(r => r.code === appState.currentUserRole)?.name || appState.currentUserRole;
 });
 
-const togglePermission = (node) => {
-  if (permissionsState.activeNodes.has(node)) {
-    permissionsState.activeNodes.delete(node);
+const currentTable = computed(() => {
+  return tables.value.find(t => t.tableMetaId === selectedTableId.value) || tables.value[0] || null;
+});
+
+const loadPermissions = async () => {
+  loading.value = true;
+  try {
+    const res = await permissionsApi.getGlobalPermissions(appState.currentUserRole);
+    if (res && Array.isArray(res)) {
+      tables.value = res;
+      if (res.length > 0 && (!selectedTableId.value || !res.some(t => t.tableMetaId === selectedTableId.value))) {
+        selectedTableId.value = res[0].tableMetaId;
+      }
+    } else if (res && res.data) {
+      tables.value = res.data;
+      if (res.data.length > 0 && (!selectedTableId.value || !res.data.some(t => t.tableMetaId === selectedTableId.value))) {
+        selectedTableId.value = res.data[0].tableMetaId;
+      }
+    }
+  } catch (e) {
+    console.error('加载全局权限配置失败:', e);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const togglePerm = (field, bitValue, checked) => {
+  if (checked) {
+    field.perm |= bitValue;
   } else {
-    permissionsState.activeNodes.add(node);
+    field.perm &= ~bitValue;
   }
 };
 
 const toggleAll = (active) => {
-  derivedFields.value.forEach(f => {
-    ['READ', 'CREATE', 'UPDATE'].forEach(type => {
-      const node = `${f.entity}.${f.field}.${type}`;
-      if (active) permissionsState.activeNodes.add(node);
-      else permissionsState.activeNodes.delete(node);
+  if (currentTable.value) {
+    currentTable.value.fields.forEach(f => {
+      f.perm = active ? 7 : 0;
     });
-  });
+  }
 };
 
-const activePermissionCount = computed(() => {
-  if (!modulesState.activeModule) return 0;
-  let count = 0;
-  derivedFields.value.forEach(f => {
-    ['READ', 'CREATE', 'UPDATE'].forEach(type => {
-      if (permissionsState.activeNodes.has(`${f.entity}.${f.field}.${type}`)) count++;
-    });
-  });
-  return count;
+const handleSave = async () => {
+  if (appState.currentUserRole === 'admin') return;
+  try {
+    const res = await permissionsApi.updateGlobalPermissions(appState.currentUserRole, tables.value);
+    if (res === true || (res && (res.code === 200 || res.data === true))) {
+      alert('权限配置保存成功！');
+      loadPermissions();
+    } else {
+      alert('保存失败，请检查网络');
+    }
+  } catch (e) {
+    console.error('保存失败:', e);
+    alert('保存失败，服务端连接异常');
+  }
+};
+
+watch(() => appState.currentUserRole, () => {
+  loadPermissions();
+});
+
+onMounted(() => {
+  loadPermissions();
 });
 </script>
+
+<style scoped>
+</style>

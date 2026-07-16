@@ -6,13 +6,15 @@ import WorkflowList from '../views/workflow/index.vue';
 import LightweightWorkflowBuilder from '../views/workflow/Designer.vue';
 import WorkflowDetail from '../views/workflow/Detail.vue';
 import ErDiagram from '../views/diagram/index.vue';
+import DataCenter from '../views/data/index.vue';
 import { updateView } from '../store/index';
 
 const routes = [
   {
     path: '/',
-    redirect: '/modules'
+    redirect: '/data-center'
   },
+
   {
     path: '/modules',
     name: 'modules',
@@ -21,6 +23,7 @@ const routes = [
       title: '模块管理',
       icon: 'LayoutGrid',
       sidebar: true,
+      group: 'config',
       breadcrumb: {
         title: '模块管理',
         description: '配置、监控及优化您的企业级架构模块'
@@ -51,21 +54,21 @@ const routes = [
     }
   },
   {
-    path: '/modules/:id/permissions',
-    name: 'module-permissions',
+    path: '/permissions',
+    name: 'permissions',
     component: ModulePermissions,
     meta: {
-      title: '模块权限',
-      sidebar: false,
+      title: '字段权限',
+      icon: 'ShieldAlert',
+      sidebar: true,
+      group: 'config',
       breadcrumb: {
-        parent: { name: 'modules', title: '模块管理' },
-        dynamicActive: true,
-        description: '配置物理字段的细粒度安全访问控制节点 (CLS)'
+        title: '字段权限配置',
+        description: '配置系统所有物理字段的细粒度安全访问控制矩阵 (CLS)'
       }
     },
     beforeEnter: async (to, from, next) => {
-      const moduleId = to.params.id;
-      await updateView('permissions', { id: moduleId });
+      await updateView('permissions');
       next();
     }
   },
@@ -81,6 +84,7 @@ const routes = [
       title: '待办审批',
       icon: 'Workflow',
       sidebar: true,
+      group: 'business',
       breadcrumb: {
         title: '待办审批',
         description: '演示彻底解耦的 Fork-Join 架构与靶向回退'
@@ -99,6 +103,7 @@ const routes = [
       title: '流程设计器',
       icon: 'PenTool',
       sidebar: true,
+      group: 'config',
       breadcrumb: {
         parent: { name: 'workflow-list', title: '待办审批' },
         dynamicActive: true,
@@ -130,13 +135,33 @@ const routes = [
     }
   },
   {
+    path: '/data-center',
+    name: 'data-center',
+    component: DataCenter,
+    meta: {
+      title: '数据中心',
+      icon: 'Database',
+      sidebar: true,
+      group: 'business',
+      breadcrumb: {
+        title: '数据中心',
+        description: '访问和消费系统动态低代码建模数据，实时触发列级鉴权与脱敏'
+      }
+    },
+    beforeEnter: (to, from, next) => {
+      updateView('data-center');
+      next();
+    }
+  },
+  {
     path: '/diagram',
     name: 'diagram',
     component: ErDiagram,
     meta: {
       title: 'ER 图模型',
-      icon: 'Database',
+      icon: 'GitFork',
       sidebar: true,
+      group: 'config',
       breadcrumb: {
         title: 'ER 图模型',
         description: '直观地管理和配置系统实体关系模型'
@@ -147,6 +172,7 @@ const routes = [
       next();
     }
   }
+
 ];
 
 const router = createRouter({

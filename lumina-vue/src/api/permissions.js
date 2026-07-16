@@ -20,5 +20,19 @@ export const permissionsApi = {
    */
   clearModulePermissions(moduleId) {
     return client.post(`/permissions/module/${moduleId}/clear`);
+  },
+
+  /**
+   * 获取全局物理字段权限配置
+   */
+  getGlobalPermissions(roleCode) {
+    return client.get(`/admin/permission/global/${roleCode}`);
+  },
+
+  /**
+   * 批量更新全局物理字段权限配置
+   */
+  updateGlobalPermissions(roleCode, tables) {
+    return client.post(`/admin/permission/field/batch`, { roleCode, tables });
   }
 };

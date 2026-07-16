@@ -52,12 +52,12 @@
               Clearance Simulator
             </span>
             <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
-              <button @click="appState.simulationMode = 'role'" 
+              <button @click="appState.simulationMode = 'role'; appState.refreshTrigger++" 
                       class="px-2 py-1 text-[10px] font-extrabold rounded-md transition-all cursor-pointer"
                       :class="appState.simulationMode === 'role' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-800'">
                 角色
               </button>
-              <button @click="appState.simulationMode = 'user'" 
+              <button @click="appState.simulationMode = 'user'; appState.refreshTrigger++" 
                       class="px-2 py-1 text-[10px] font-extrabold rounded-md transition-all cursor-pointer ml-0.5"
                       :class="appState.simulationMode === 'user' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-800'">
                 人员
@@ -70,7 +70,7 @@
             <button 
               v-for="role in simulatorRoles" 
               :key="role.val" 
-              @click="appState.currentUserRole = role.val; appState.refreshTrigger++; showSwitcher = false"
+              @click="onSelectRole(role.val)"
               class="flex items-center justify-between w-full p-2 rounded-xl text-left border text-xs font-bold transition-all hover:bg-slate-50 cursor-pointer"
               :class="appState.currentUserRole === role.val 
                 ? 'bg-primary/5 text-primary border-primary/30 ring-1 ring-primary/10' 
@@ -92,7 +92,7 @@
             <button 
               v-for="user in simulatorUsers" 
               :key="user.val" 
-              @click="appState.currentUser = user.val; appState.refreshTrigger++; showSwitcher = false"
+              @click="onSelectUser(user.val)"
               class="flex items-center justify-between w-full p-2 rounded-xl text-left border text-xs font-bold transition-all hover:bg-slate-50 cursor-pointer"
               :class="appState.currentUser === user.val 
                 ? 'bg-primary/5 text-primary border-primary/30 ring-1 ring-primary/10' 
@@ -122,7 +122,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { appState } from '../../store/app';
+import { appState, selectRole, selectUser } from '../../store/app';
 import { modulesState } from '../../store/modules';
 import { useRouter, useRoute } from 'vue-router';
 import { 
@@ -155,6 +155,16 @@ const isWorkflow = computed(() => {
 // 父层级面包屑跳转
 const navigateTo = (routeName) => {
   router.push({ name: routeName });
+};
+
+const onSelectRole = (val) => {
+  selectRole(val);
+  showSwitcher.value = false;
+};
+
+const onSelectUser = (val) => {
+  selectUser(val);
+  showSwitcher.value = false;
 };
 
 const showSwitcher = ref(false);

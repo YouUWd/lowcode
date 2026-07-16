@@ -1,222 +1,195 @@
 <template>
-  <section class="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
-    <div class="flex items-center justify-between mb-2">
-      <div>
-        <h3 class="text-sm font-bold text-on-surface flex items-center">
-          <Columns class="w-4 h-4 mr-2 text-primary" />
-          字段投影 (Field Mappings)
-        </h3>
-        <p class="text-xs text-on-surface-variant mt-1 opacity-70">本列表为系统根据表结构自动推断生成的全量字段（只读模式）</p>
-      </div>
-      <div class="flex items-center space-x-3">
-        <button 
-          @click="showSqlPreview = true"
-          class="px-4 py-2 bg-surface-container text-on-surface-variant text-xs font-bold rounded-xl hover:bg-surface-variant hover:text-on-surface transition-all flex items-center shadow-sm"
-        >
-          <Code class="w-3.5 h-3.5 mr-1.5" />
-          SQL 预览
-        </button>
-      </div>
+  <section class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
+    <!-- Metadata loading state -->
+    <div v-if="loading" class="bg-surface-container-low rounded-2xl border border-outline-variant/30 p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
+      <RotateCw class="w-6 h-6 text-primary animate-spin" />
+      <span class="text-xs">解析模块层次结构中...</span>
     </div>
 
-    <!-- 字段映射表格 -->
-    <div class="bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
-          <thead class="text-xs text-on-surface-variant bg-surface-container uppercase font-bold border-b border-outline-variant/30">
-            <tr>
-              <th scope="col" class="px-6 py-4 w-12 text-center"></th>
-              <th scope="col" class="px-6 py-4">展示名称 / 逻辑字段</th>
-              <th scope="col" class="px-6 py-4">物理映射来源</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-if="rows && rows.length > 0">
-              <tr 
-                v-for="(row, index) in rows" 
-                :key="index"
-                class="border-b border-outline-variant/10 hover:bg-surface-container-high transition-colors group"
-              >
-                <td class="px-6 py-4 text-center">
-                  <GripVertical class="w-4 h-4 mx-auto text-on-surface-variant opacity-30 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity" />
-                </td>
-                <td class="px-6 py-4">
-                  <div class="flex items-center">
-                    <component :is="resolveRenderIcon(row.renderIcon)" class="w-4 h-4 mr-3 text-primary/70" />
-                    <div>
-                      <div class="font-bold text-on-surface flex items-center">
-                        {{ row.displayName }}
-                      </div>
-                      <div class="text-xs text-on-surface-variant opacity-70 mt-1 font-mono">{{ row.logicalField }}</div>
-                    </div>
-                  </div>
-                </td>
-                
-                <td class="px-6 py-4">
-                  <div class="flex flex-wrap gap-2">
-                    <span 
-                      v-for="(pf, idx) in row.physicalFields" 
-                      :key="idx"
-                      class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-primary-fixed/30 text-on-primary-fixed"
-                    >
-                      <Database class="w-3 h-3 mr-1.5 opacity-70" />
-                      {{ pf.entity }}.{{ pf.field }}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </template>
-            <tr v-else>
-              <td colspan="3" class="px-6 py-12 text-center text-on-surface-variant">
-                <div class="flex flex-col items-center justify-center opacity-60">
-                  <Columns class="w-8 h-8 mb-3" />
-                  <p class="font-bold">暂无字段映射</p>
-                  <p class="text-xs mt-1">请先添加实体表，字段将会自动生成</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- SQL Preview Modal -->
-    <Transition name="fade">
-      <div v-if="showSqlPreview" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
-        <div class="bg-surface-container-high rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-outline-variant/20">
-          <div class="px-6 py-4 border-b border-outline-variant/15 flex items-center justify-between bg-surface-container-low">
-            <h3 class="text-lg font-bold text-on-surface flex items-center">
-              <Terminal class="w-5 h-5 mr-2 text-primary" />
-              底层 SQL 预览
-            </h3>
-            <button @click="showSqlPreview = false" class="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors">
-              <X class="w-5 h-5" />
-            </button>
+    <!-- Hierarchical Structure Renderer -->
+    <div v-else class="space-y-6 font-inter">
+      <!-- 1. MAIN Table Section -->
+      <div v-if="metaData.mainTable" class="bg-surface-container-low rounded-2xl border-l-4 border-l-primary border border-outline-variant/30 overflow-hidden shadow-sm">
+        <div class="px-6 py-4 bg-surface-container/60 flex items-center justify-between border-b border-outline-variant/20">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Database class="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">主表 (MAIN ENTITY DTO)</div>
+              <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
+                "{{ metaData.mainTable.tableName }}" : { ... }
+              </h4>
+            </div>
           </div>
-          
-          <div class="flex-1 overflow-auto p-6 bg-[#1e1e1e]">
-            <pre class="text-[#d4d4d4] font-mono text-sm leading-relaxed"><code>{{ generatedSql }}</code></pre>
-          </div>
-
-          <div class="px-6 py-4 border-t border-outline-variant/15 flex justify-end space-x-3 bg-surface-container-low">
-            <button @click="copySql" class="px-4 py-2 text-sm font-bold text-primary hover:bg-primary/10 rounded-xl transition-colors flex items-center">
-              <Copy class="w-4 h-4 mr-2" />
-              复制 SQL
-            </button>
-            <button @click="showSqlPreview = false" class="px-5 py-2 bg-primary text-on-primary text-sm font-bold rounded-xl shadow-sm hover:bg-primary/90 active:scale-95 transition-all">关闭</button>
+          <span class="text-[10px] bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono font-bold">主实体</span>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div v-for="f in metaData.mainTable.fields" :key="f.id" class="p-3 bg-surface rounded-xl border border-outline-variant/40 flex items-center gap-2.5">
+              <Type class="w-4 h-4 text-primary/70 shrink-0" />
+              <div class="truncate">
+                <div class="text-xs font-bold text-on-surface truncate">{{ f.label }}</div>
+                <div class="text-[10px] text-outline font-mono mt-0.5 truncate">{{ f.columnName }} ({{ f.dataType }})</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </Transition>
+
+      <!-- 2. JOIN Tables Section (1:1 / N:1 Nested Objects) -->
+      <div v-if="metaData.joinTables?.length > 0" class="space-y-4">
+        <h5 class="text-xs font-extrabold text-secondary uppercase tracking-widest flex items-center gap-1.5">
+          <LinkIcon class="w-3.5 h-3.5" />
+          <span>关联参考实体 (JOIN TABLES - 1:1/N:1 NESTED OBJECTS)</span>
+        </h5>
+        
+        <div v-for="joinTable in metaData.joinTables" :key="joinTable.tableName" class="bg-surface-container-low rounded-2xl border-l-4 border-l-secondary border border-outline-variant/30 overflow-hidden shadow-sm">
+          <div class="px-6 py-4 bg-surface-container/60 flex items-center justify-between border-b border-outline-variant/20">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                <LinkIcon class="w-4 h-4 text-secondary" />
+              </div>
+              <div>
+                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">关联对象 (NESTED OBJECT)</div>
+                <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
+                  "{{ joinTable.tableName }}" : { ... }
+                </h4>
+              </div>
+            </div>
+            <div class="flex flex-col items-end gap-1">
+              <span class="text-[9px] bg-secondary/15 text-secondary px-2 py-0.5 rounded font-mono font-bold">JOIN ON: {{ joinTable.joinOn }}</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div v-for="f in joinTable.fields" :key="f.id" class="p-3 bg-surface rounded-xl border border-outline-variant/40 flex items-center gap-2.5">
+                <Type class="w-4 h-4 text-secondary/70 shrink-0" />
+                <div class="truncate">
+                  <div class="text-xs font-bold text-on-surface truncate">{{ f.label }}</div>
+                  <div class="text-[10px] text-outline font-mono mt-0.5 truncate">{{ f.columnName }} ({{ f.dataType }})</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. SUB Tables Section (1:N Nested Arrays) -->
+      <div v-if="metaData.subTables?.length > 0" class="space-y-4">
+        <h5 class="text-xs font-extrabold text-tertiary uppercase tracking-widest flex items-center gap-1.5">
+          <GitMerge class="w-3.5 h-3.5" />
+          <span>级联子表明细 (SUB TABLES - 1:N NESTED ARRAYS)</span>
+        </h5>
+        
+        <div v-for="subTable in metaData.subTables" :key="subTable.tableName" class="bg-surface-container-low rounded-2xl border-l-4 border-l-tertiary border border-outline-variant/30 overflow-hidden shadow-sm">
+          <div class="px-6 py-4 bg-surface-container/60 flex items-center justify-between border-b border-outline-variant/20">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-tertiary/10 flex items-center justify-center">
+                <GitMerge class="w-4 h-4 text-tertiary" />
+              </div>
+              <div>
+                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">子表明细数组 (NESTED ARRAY)</div>
+                <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
+                  "{{ subTable.tableName }}" : [ { ... } ]
+                </h4>
+              </div>
+            </div>
+            <span class="text-[9px] bg-tertiary/15 text-tertiary px-2 py-0.5 rounded font-mono font-bold">FK: {{ subTable.foreignKey }}</span>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div v-for="f in subTable.fields" :key="f.id" class="p-3 bg-surface rounded-xl border border-outline-variant/40 flex items-center gap-2.5">
+                <Type class="w-4 h-4 text-tertiary/70 shrink-0" />
+                <div class="truncate">
+                  <div class="text-xs font-bold text-on-surface truncate">{{ f.label }}</div>
+                  <div class="text-[10px] text-outline font-mono mt-0.5 truncate">{{ f.columnName }} ({{ f.dataType }})</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. N:M RELATIONS Section (Nested Arrays of Association table) -->
+      <div v-if="metaData.relations?.length > 0" class="space-y-4">
+        <h5 class="text-xs font-extrabold text-primary uppercase tracking-widest flex items-center gap-1.5">
+          <GitPullRequest class="w-3.5 h-3.5" />
+          <span>多对多关系实体 (RELATIONS - N:M NESTED ARRAYS)</span>
+        </h5>
+        
+        <div v-for="rel in metaData.relations" :key="rel.rightTable" class="bg-surface-container-low rounded-2xl border-l-4 border-l-primary/70 border border-outline-variant/30 overflow-hidden shadow-sm">
+          <div class="px-6 py-4 bg-surface-container/60 flex items-center justify-between border-b border-outline-variant/20">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <GitPullRequest class="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">关系实体数组 (RELATION ARRAY)</div>
+                <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
+                  "{{ rel.rightTable }}" : [ { ... } ]
+                </h4>
+              </div>
+            </div>
+            <div class="flex flex-col items-end gap-0.5">
+              <span class="text-[9px] bg-primary/15 text-primary px-2 py-0.5 rounded font-mono font-bold">中间表: {{ rel.junctionTable }}</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div v-for="f in rel.fields" :key="f.id" class="p-3 bg-surface rounded-xl border border-outline-variant/40 flex items-center gap-2.5">
+                <Type class="w-4 h-4 text-primary/70 shrink-0" />
+                <div class="truncate">
+                  <div class="text-xs font-bold text-on-surface truncate">{{ f.label }}</div>
+                  <div class="text-[10px] text-outline font-mono mt-0.5 truncate">{{ f.columnName }} ({{ f.dataType }})</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { 
-  Columns, Code, GripVertical, 
-  X, Link as LinkIcon, 
-  Database, Terminal, Copy, Type, Tag, Hash, Circle,
-  Fingerprint, GraduationCap, Users, BookOpen, Calendar, 
-  Mail, Phone, MapPin, ShieldCheck, User, School, Star
+  Database, Type,
+  GitMerge, GitPullRequest, Link as LinkIcon, RotateCw
 } from 'lucide-vue-next';
+import { useRoute } from 'vue-router';
+import { dataEngineApi } from '../../../api/dataEngine';
 
-const resolveRenderIcon = (iconName) => {
-  if (!iconName) return Type;
-  if (typeof iconName !== 'string') return iconName; 
+const route = useRoute();
+const moduleId = computed(() => route.params.id);
 
-  const iconMap = {
-    'icon-id': Fingerprint,
-    'icon-user': User,
-    'icon-users': Users,
-    'icon-class': School,
-    'icon-grade': GraduationCap,
-    'icon-star': Star,
-    'icon-book': BookOpen,
-    'icon-calendar': Calendar,
-    'icon-mail': Mail,
-    'icon-phone': Phone,
-    'icon-location': MapPin,
-    'icon-shield': ShieldCheck,
-    'icon-tag': Tag,
-    'icon-hash': Hash,
-    'icon-link': LinkIcon,
-    'icon-text': Type,
-    'icon-circle': Circle
-  };
+const loading = ref(false);
+const metaData = ref({ mainTable: null, subTables: [], joinTables: [], relations: [] });
 
-  return iconMap[iconName] || Type;
+const loadMeta = async () => {
+  if (!moduleId.value) return;
+  loading.value = true;
+  try {
+    const res = await dataEngineApi.getModuleMeta(moduleId.value);
+    if (res) {
+      metaData.value = res;
+    }
+  } catch (e) {
+    console.error('加载结构元数据树失败:', e);
+  } finally {
+    loading.value = false;
+  }
 };
 
-import { currentConfig } from '../../../store/modules';
-
-const rows = computed(() => currentConfig.value.mappings || []);
-const showSqlPreview = ref(false);
-
-const generatedSql = computed(() => {
-  if (!rows.value || rows.value.length === 0) return '-- 无投影配置';
-  
-  let sql = 'SELECT\n';
-  const sqlSelectMap = new Map();
-
-  rows.value.forEach(row => {
-    let expression = '';
-    const physField = row.physicalFields?.[0];
-    expression = physField ? `${physField.entity}.${physField.field} AS ${row.logicalField}` : `UNKNOWN_FIELD AS ${row.logicalField}`;
-    
-    if (!sqlSelectMap.has(expression)) sqlSelectMap.set(expression, new Set());
-    sqlSelectMap.get(expression).add(row.displayName);
-  });
-
-  const uniqueParts = [];
-  sqlSelectMap.forEach((commentsSet, expr) => {
-    uniqueParts.push(`  ${expr} /* ${Array.from(commentsSet).join(', ')} */`);
-  });
-  
-  sql += uniqueParts.join(',\n');
-  
-  const usedEntities = new Set();
-  rows.value.forEach(row => {
-    row.physicalFields?.forEach(pf => {
-      usedEntities.add(pf.entity);
-    });
-  });
-
-  const primaryEntityName = currentConfig.value.primaryEntity?.name || 'unknown_table';
-  sql += `\nFROM ${primaryEntityName}`;
-  
-  if (currentConfig.value.entities) {
-    currentConfig.value.entities.forEach(entity => {
-      if (usedEntities.has(entity.name)) {
-        const joinCond = entity.joinCondition;
-        if (joinCond) {
-          sql += `\nLEFT JOIN ${entity.name} ON ${entity.name}.${joinCond.left} = ${primaryEntityName}.${joinCond.right}`;
-        }
-      }
-    });
-  }
-  sql += '\n';
-  
-  return sql;
+onMounted(() => {
+  loadMeta();
 });
 
-const copySql = async () => {
-  try {
-    await navigator.clipboard.writeText(generatedSql.value);
-  } catch (err) {
-    console.error('复制失败:', err);
-  }
-};
+watch(moduleId, () => {
+  loadMeta();
+});
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
 </style>
