@@ -16,13 +16,13 @@
               <Database class="w-4 h-4 text-primary" />
             </div>
             <div>
-              <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">主表 (MAIN ENTITY DTO)</div>
+              <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">主表 (MAIN TABLE)</div>
               <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
                 "{{ metaData.mainTable.tableName }}" : { ... }
               </h4>
             </div>
           </div>
-          <span class="text-[10px] bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono font-bold">主实体</span>
+          <span class="text-[10px] bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono font-bold">主表</span>
         </div>
         <div class="p-6">
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -51,14 +51,17 @@
                 <LinkIcon class="w-4 h-4 text-secondary" />
               </div>
               <div>
-                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">关联对象 (NESTED OBJECT)</div>
+                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">关联表 (JOIN TABLE)</div>
                 <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
                   "{{ joinTable.tableName }}" : { ... }
                 </h4>
               </div>
             </div>
-            <div class="flex flex-col items-end gap-1">
+            <div class="flex items-center gap-3">
               <span class="text-[9px] bg-secondary/15 text-secondary px-2 py-0.5 rounded font-mono font-bold">JOIN ON: {{ joinTable.joinOn }}</span>
+              <button v-if="isEditMode" @click="$emit('remove', joinTable.tableName)" class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors cursor-pointer" title="移除该表">
+                <Trash2 class="w-4 h-4" />
+              </button>
             </div>
           </div>
           <div class="p-6">
@@ -89,13 +92,18 @@
                 <GitMerge class="w-4 h-4 text-tertiary" />
               </div>
               <div>
-                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">子表明细数组 (NESTED ARRAY)</div>
+                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">子表明细 (SUB TABLE)</div>
                 <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
                   "{{ subTable.tableName }}" : [ { ... } ]
                 </h4>
               </div>
             </div>
-            <span class="text-[9px] bg-tertiary/15 text-tertiary px-2 py-0.5 rounded font-mono font-bold">FK: {{ subTable.foreignKey }}</span>
+            <div class="flex items-center gap-3">
+              <span class="text-[9px] bg-tertiary/15 text-tertiary px-2 py-0.5 rounded font-mono font-bold">FK: {{ subTable.foreignKey }}</span>
+              <button v-if="isEditMode" @click="$emit('remove', subTable.tableName)" class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors cursor-pointer" title="移除该表">
+                <Trash2 class="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div class="p-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -125,14 +133,17 @@
                 <GitPullRequest class="w-4 h-4 text-primary" />
               </div>
               <div>
-                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">关系实体数组 (RELATION ARRAY)</div>
+                <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">多对多关联表 (N:M RELATION)</div>
                 <h4 class="text-sm font-extrabold text-on-surface mt-0.5">
                   "{{ rel.rightTable }}" : [ { ... } ]
                 </h4>
               </div>
             </div>
-            <div class="flex flex-col items-end gap-0.5">
+            <div class="flex items-center gap-3">
               <span class="text-[9px] bg-primary/15 text-primary px-2 py-0.5 rounded font-mono font-bold">中间表: {{ rel.junctionTable }}</span>
+              <button v-if="isEditMode" @click="$emit('remove', rel.rightTable)" class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors cursor-pointer" title="移除该表">
+                <Trash2 class="w-4 h-4" />
+              </button>
             </div>
           </div>
           <div class="p-6">
@@ -153,42 +164,28 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
 import { 
-  Database, Type,
+  Database, Type, Trash2,
   GitMerge, GitPullRequest, Link as LinkIcon, RotateCw
 } from 'lucide-vue-next';
-import { useRoute } from 'vue-router';
-import { dataEngineApi } from '../../../api/dataEngine';
 
-const route = useRoute();
-const moduleId = computed(() => route.params.id);
-
-const loading = ref(false);
-const metaData = ref({ mainTable: null, subTables: [], joinTables: [], relations: [] });
-
-const loadMeta = async () => {
-  if (!moduleId.value) return;
-  loading.value = true;
-  try {
-    const res = await dataEngineApi.getModuleMeta(moduleId.value);
-    if (res) {
-      metaData.value = res;
-    }
-  } catch (e) {
-    console.error('加载结构元数据树失败:', e);
-  } finally {
-    loading.value = false;
+defineProps({
+  metaData: {
+    type: Object,
+    default: () => ({ mainTable: null, subTables: [], joinTables: [], relations: [] })
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  },
+  isEditMode: {
+    type: Boolean,
+    default: false
   }
-};
-
-onMounted(() => {
-  loadMeta();
 });
 
-watch(moduleId, () => {
-  loadMeta();
-});
+defineEmits(['remove']);
+
 </script>
 
 <style scoped>

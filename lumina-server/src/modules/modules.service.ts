@@ -178,17 +178,18 @@ export class ModulesService {
           if (rightMeta.id === junctionMeta.id) continue;
           const rightRel = await this.resolveRelation(rightMeta.table_name, junctionMeta.table_name);
           if (rightRel && rightRel.relationType === '1:N') {
-            relations.push({
-              id: relations.length + 1,
-              name: rightMeta.table_name,
-              leftTable: mainTableMeta.table_name,
-              rightTable: rightMeta.table_name,
-              junctionTable: junctionMeta.table_name,
-              leftFk: leftRel.right,
-              rightFk: rightRel.right,
-              leftJoinColumn: leftRel.left,
-              rightJoinColumn: rightRel.left
-            });
+              relations.push({
+                id: rightMeta.id,
+                name: rightMeta.table_name,
+                leftTable: mainTableMeta.table_name,
+                rightTable: rightMeta.table_name,
+                junctionTable: junctionMeta.table_name,
+                leftFk: leftRel.right,
+                rightFk: rightRel.right,
+                leftJoinColumn: leftRel.left,
+                rightJoinColumn: rightRel.left,
+                junctionId: junctionMeta.id
+              });
           }
         }
       }

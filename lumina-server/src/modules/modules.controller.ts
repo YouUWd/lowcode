@@ -24,7 +24,10 @@ export class ModulesController {
       throw new BadRequestException('source and target are required');
     }
     const relation = await this.modulesService.resolveRelation(source, target);
-    return relation || { relationType: '1:1', left: 'id', right: 'id' };
+    if (!relation) {
+      throw new NotFoundException(`No relation found between ${source} and ${target}`);
+    }
+    return relation;
   }
 
   /**

@@ -1,12 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import ModuleList from '../views/modules/index.vue';
+import ModuleList from '../views/modules/Index.vue';
 import ModuleConfig from '../views/modules/Config.vue';
 import ModulePermissions from '../views/modules/Permissions.vue';
-import WorkflowList from '../views/workflow/index.vue';
+import WorkflowList from '../views/workflow/Index.vue';
 import LightweightWorkflowBuilder from '../views/workflow/Designer.vue';
 import WorkflowDetail from '../views/workflow/Detail.vue';
-import ErDiagram from '../views/diagram/index.vue';
-import DataCenter from '../views/data/index.vue';
+import ErDiagram from '../views/diagram/Index.vue';
+import DataCenter from '../views/data/Index.vue';
 import { updateView } from '../store/index';
 
 const routes = [

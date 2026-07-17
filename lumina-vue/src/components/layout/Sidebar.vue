@@ -265,8 +265,8 @@ const isMenuItemActive = (item) => {
   if (item.name === 'modules') {
     return ['list', 'config', 'permissions'].includes(appState.currentView);
   }
-  if (item.name === 'data-center') {
-    return appState.currentView === 'data-center';
+  if (item.name === 'data') {
+    return appState.currentView === 'data';
   }
   if (item.name === 'workflow-list') {
     return ['workflow-list', 'workflow-detail'].includes(appState.currentView);

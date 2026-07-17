@@ -1,60 +1,7 @@
 <template>
   <div class="p-8 space-y-6 w-full">
 
-    <!-- Collapsible Add Module Panel -->
-    <Transition name="panel-slide">
-      <div v-if="isAddPanelOpen" class="bg-surface rounded-2xl shadow-[0px_4px_24px_rgba(25,28,29,0.03)] border border-outline-variant/30 overflow-hidden">
-        <div class="px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center bg-surface-container-lowest">
-          <h3 class="text-sm font-bold text-on-surface flex items-center gap-2">
-            <PackagePlus class="text-primary w-4 h-4" />
-            新建系统模块
-          </h3>
-          <button @click="isAddPanelOpen = false" class="p-1.5 hover:bg-surface-container rounded-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">
-            <X class="w-4 h-4" />
-          </button>
-        </div>
-        <div class="p-6 space-y-5">
-          <div class="grid grid-cols-2 gap-5">
-            <div class="space-y-1.5">
-              <label class="text-sm font-semibold text-on-surface-variant">模块名称 <span class="text-error">*</span></label>
-              <input v-model="newModule.name" type="text" class="w-full px-3 py-1.5 bg-surface border border-outline-variant/30 rounded-md text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" placeholder="例如：员工档案管理" />
-            </div>
-            <div class="space-y-1.5">
-              <label class="text-sm font-semibold text-on-surface-variant">模块标识 (ID) <span class="text-error">*</span></label>
-              <input v-model="newModule.id" type="text" class="w-full px-3 py-1.5 bg-surface border border-outline-variant/30 rounded-md text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" placeholder="例如：MOD-HR-EMP" />
-            </div>
-          </div>
 
-          <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-on-surface-variant">绑定的主表 <span class="text-error">*</span></label>
-            <div class="relative">
-              <TableChart class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4" />
-              <select v-model="newModule.entity" class="w-full pl-10 pr-3 py-1.5 bg-surface border border-outline-variant/30 rounded-md text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow appearance-none">
-                <option disabled value="">请选择物理表</option>
-                <option v-for="table in availableTables" :key="table.name" :value="table.name">
-                  {{ table.name }} ({{ table.desc }})
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-on-surface-variant">模块描述</label>
-            <textarea v-model="newModule.desc" rows="2" class="w-full px-3 py-1.5 bg-surface border border-outline-variant/30 rounded-md text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow resize-none" placeholder="简要描述该模块的业务边界和职责..."></textarea>
-          </div>
-
-          <div class="flex justify-end gap-3 pt-2 border-t border-outline-variant/30">
-            <button @click="isAddPanelOpen = false" class="px-4 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container rounded-md transition-colors cursor-pointer">
-              取消
-            </button>
-            <button @click="submitModule" class="px-5 py-1.5 text-xs font-semibold bg-primary text-on-primary hover:bg-primary/95 shadow-sm rounded-md transition-colors flex items-center gap-2 cursor-pointer">
-              <Check class="w-4 h-4" />
-              确认创建
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
 
     <!-- Main Data Table -->
     <div class="bg-surface rounded-2xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] border border-outline-variant/30">
@@ -96,9 +43,10 @@
                 <div class="flex items-center justify-center gap-1.5">
                   <span>操作</span>
                   <div class="w-px h-3 bg-outline-variant/30 mx-1"></div>
-                  <button @click="isAddPanelOpen = true" 
-                          class="px-2 py-0.5 font-bold text-primary hover:bg-primary/10 rounded transition-all active:scale-95 cursor-pointer bg-surface border border-primary/20 hover:border-primary/40 shadow-sm" 
+                  <button @click="router.push('/modules/create/config?mode=create')" 
+                          class="px-2.5 py-1 bg-primary text-on-primary text-xs font-semibold rounded shadow-sm hover:bg-primary/95 active:scale-95 transition-all flex items-center gap-1 cursor-pointer" 
                           title="新建模块">
+                    <PackagePlus class="w-3.5 h-3.5" />
                     新建
                   </button>
                 </div>
@@ -118,13 +66,13 @@
               </td>
               <td class="px-6 py-4 text-center">
                 <div class="flex justify-center gap-3 text-sm font-medium">
-                  <button @click.stop="goToConfig(mod, 'view')" class="text-primary hover:text-primary/80 transition-colors" title="查看配置">
+                  <button @click.stop="goToConfig(mod, 'view')" class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all cursor-pointer" title="查看配置">
                     查看
                   </button>
-                  <button @click.stop="goToConfig(mod, 'edit')" class="text-primary hover:text-primary/80 transition-colors" title="编辑">
+                  <button @click.stop="goToConfig(mod, 'edit')" class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all cursor-pointer" title="编辑">
                     编辑
                   </button>
-                  <button @click.stop="deleteModule(mod.id)" class="text-error hover:text-error/80 transition-colors" title="删除模块">
+                  <button @click.stop="deleteModule(mod.id)" class="px-2.5 py-1 border border-error/30 text-error hover:bg-error/10 text-xs font-semibold rounded transition-all cursor-pointer" title="删除模块">
                     删除
                   </button>
                 </div>
@@ -157,9 +105,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
-  TableProperties as TableChart,
   PackagePlus,
   X,
   Check,
@@ -176,6 +123,10 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
+onMounted(() => {
+  fetchModules();
+});
+
 const goToConfig = (mod, mode = 'view') => {
   router.push(`/modules/${mod.id}/config?mode=${mode}`);
 };
@@ -186,51 +137,4 @@ const availableTables = computed(() => {
     desc: tableMap.value[key].desc
   }));
 });
-
-const isAddPanelOpen = ref(false);
-
-const newModule = ref({
-  id: '',
-  name: '',
-  entity: '',
-  desc: ''
-});
-
-const submitModule = async () => {
-  if (!newModule.value.name || !newModule.value.id || !newModule.value.entity) return;
-  
-  const success = await addModule({
-    id: newModule.value.id,
-    name: newModule.value.name,
-    desc: newModule.value.desc,
-    entity: newModule.value.entity
-  });
-  
-  if (success) {
-    isAddPanelOpen.value = false;
-    newModule.value = { id: '', name: '', entity: '', desc: '' };
-  }
-};
 </script>
-
-<style>
-.panel-slide-enter-active,
-.panel-slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-.panel-slide-enter-from,
-.panel-slide-leave-to {
-  opacity: 0;
-  max-height: 0;
-  margin-top: 0;
-  margin-bottom: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.panel-slide-enter-to,
-.panel-slide-leave-from {
-  opacity: 1;
-  max-height: 500px;
-}
-</style>
