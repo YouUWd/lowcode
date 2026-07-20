@@ -67,9 +67,9 @@ INSERT INTO tags (name) VALUES ('VIP'), ('加急'), ('退货'), ('特价'), ('�
 
 -- 导入订单主表
 INSERT INTO orders (order_no, customer_id, amount, status, remark) VALUES
-('ORD-20240101-001', 1, 1500.00, 'PAID',    '首单客户'),
-('ORD-20240101-002', 2, 3200.50, 'SHIPPED', '加急'),
-('ORD-20240102-003', 3, 800.00,  'PENDING', NULL);
+('20240101001', 1, 1500.00, 'PAID',    '首单客户'),
+('20240101002', 2, 3200.50, 'SHIPPED', '加急'),
+('20240102003', 3, 800.00,  'PENDING', NULL);
 
 -- 导入订单从表
 INSERT INTO order_items (order_id, product_name, qty, price) VALUES
