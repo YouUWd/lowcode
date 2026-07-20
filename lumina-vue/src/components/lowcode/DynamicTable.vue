@@ -71,12 +71,12 @@
               </th>
               <!-- Extended Relations Columns Header -->
               <th v-for="sub in metaData.subTables" :key="sub.tableName" class="px-6 py-4 font-semibold border-r border-outline-variant/10">
-                {{ sub.tableName }} (明细)
+                {{ sub.tableNameLabel || sub.tableName }} (明细)
               </th>
               <th v-for="rel in metaData.relations" :key="rel.rightTable" class="px-6 py-4 font-semibold border-r border-outline-variant/10">
                 {{ rel.name }} (关联)
               </th>
-              <th class="px-6 py-4 text-center w-[150px] min-w-[150px]">操作</th>
+              <th class="px-6 py-4 text-center w-[150px] min-w-[150px] whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody class="text-sm divide-y divide-outline-variant/20">
@@ -113,36 +113,44 @@
                 </span>
               </td>
               
-              <!-- Render SUB table items -->
-              <td v-for="sub in metaData.subTables" :key="sub.tableName" class="px-6 py-3.5 border-r border-outline-variant/5">
-                <div class="flex flex-col gap-1 max-h-[100px] overflow-y-auto pr-1">
-                  <div v-for="item in row[sub.tableName]" :key="item.id" class="text-xs bg-surface-container-high px-2 py-1 rounded border border-outline-variant/30 flex items-center justify-between gap-2">
-                    <span class="font-medium text-on-surface truncate">{{ item.product_name || item.name || '明细项' }}</span>
-                    <span v-if="item.qty !== undefined" class="text-[10px] text-on-surface-variant font-mono bg-surface-container-highest px-1 rounded">x{{ item.qty }}</span>
+              <!-- Render SUB table items (Drawer Triggers) -->
+              <td v-for="sub in metaData.subTables" :key="sub.tableName" class="px-6 py-3.5 border-r border-outline-variant/5 whitespace-nowrap">
+                <template v-if="ensureArray(row[sub.tableName]).length > 0">
+                  <div class="inline-block whitespace-nowrap">
+                    <!-- Trigger pill (Click to open Drawer) -->
+                    <button 
+                      @click="showDetailsDrawer(ensureArray(row[sub.tableName]), sub)"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15 transition-all whitespace-nowrap cursor-pointer active:scale-95"
+                    >
+                      <List class="w-3.5 h-3.5" />
+                      {{ ensureArray(row[sub.tableName]).length }} 条明细
+                    </button>
                   </div>
-                  <span v-if="!row[sub.tableName] || row[sub.tableName].length === 0" class="text-xs text-outline">-</span>
-                </div>
+                </template>
+                <span v-else class="text-xs text-outline">-</span>
               </td>
 
               <!-- Render N:M RELATION items -->
               <td v-for="rel in metaData.relations" :key="rel.rightTable" class="px-6 py-3.5 border-r border-outline-variant/5">
                 <div class="flex flex-wrap gap-1.5 max-w-[200px]">
-                  <span v-for="tag in row[rel.rightTable]" :key="tag.id" class="px-2 py-0.5 bg-primary/5 text-primary text-[10px] font-semibold rounded border border-primary/10">
-                    {{ tag.name }}
-                  </span>
-                  <span v-if="!row[rel.rightTable] || row[rel.rightTable].length === 0" class="text-xs text-outline">-</span>
+                  <template v-if="ensureArray(row[rel.rightTable]).length > 0">
+                    <span v-for="tag in ensureArray(row[rel.rightTable])" :key="tag.id" class="px-2 py-0.5 bg-primary/5 text-primary text-[10px] font-semibold rounded border border-primary/10">
+                      {{ tag.name }}
+                    </span>
+                  </template>
+                  <span v-else class="text-xs text-outline">-</span>
                 </div>
               </td>
 
               <!-- Action buttons -->
-              <td class="px-6 py-3.5 text-center">
-                <div class="flex justify-center items-center gap-3">
-                  <button @click="$emit('edit', row[metaData.mainTable.tableName]?.id)" class="text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer flex items-center gap-1 text-xs">
+              <td class="px-6 py-3.5 text-center whitespace-nowrap">
+                <div class="flex justify-center items-center gap-3 whitespace-nowrap">
+                  <button @click="$emit('edit', row[metaData.mainTable.tableName]?.id)" class="text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer flex items-center gap-1 text-xs whitespace-nowrap">
                     <Edit class="w-3.5 h-3.5" />
                     编辑
                   </button>
                   <div class="w-px h-3 bg-outline-variant/50"></div>
-                  <button @click="handleDelete(row[metaData.mainTable.tableName]?.id)" class="text-error hover:text-error/80 font-medium transition-colors cursor-pointer flex items-center gap-1 text-xs">
+                  <button @click="handleDelete(row[metaData.mainTable.tableName]?.id)" class="text-error hover:text-error/80 font-medium transition-colors cursor-pointer flex items-center gap-1 text-xs whitespace-nowrap">
                     <Trash2 class="w-3.5 h-3.5" />
                     删除
                   </button>
@@ -186,13 +194,96 @@
       </div>
     </div>
   </div>
+
+  <!-- Teleport Drawer to body to completely bypass table overflow-x-auto & card overflow-hidden -->
+  <Teleport to="body">
+    <!-- Backdrop Overlay -->
+    <div 
+      v-if="drawerOpen" 
+      @click="drawerOpen = false"
+      class="fixed inset-0 bg-slate-900/30 dark:bg-black/50 backdrop-blur-[3px] z-[9998] transition-opacity duration-300"
+    ></div>
+
+    <!-- Drawer Panel (Self-adaptive width based on columns, slide in from right) -->
+    <div 
+      v-if="drawerOpen && drawerSubMeta" 
+      class="fixed right-0 top-0 bottom-0 z-[9999] bg-white dark:bg-[#191c1d] border-l border-outline-variant/40 dark:border-slate-800 shadow-[rgba(0,0,0,0.16)_0px_8px_36px] flex flex-col p-6 transition-transform duration-300 ease-out h-full overflow-hidden w-full sm:w-auto min-w-[380px] max-w-[85vw] md:max-w-[70vw]"
+    >
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-outline-variant/30 pb-4 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+            <List class="w-4 h-4" />
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-on-surface">
+              {{ drawerSubMeta.tableNameLabel || drawerSubMeta.tableName }} 明细列表
+            </h3>
+            <p class="text-[10px] text-on-surface-variant font-medium mt-0.5">
+              共查询到 {{ drawerItems.length }} 条明细项数据
+            </p>
+          </div>
+        </div>
+        <button 
+          @click="drawerOpen = false" 
+          class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+
+      <!-- Scrollable content area with responsive auto-width table -->
+      <div class="flex-1 overflow-auto border border-outline-variant/30 rounded-xl bg-surface-container-lowest">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-surface-container-low text-on-surface-variant border-b border-outline-variant/35 font-bold">
+              <th v-for="f in getSubTableVisibleFields(drawerSubMeta)" :key="f.columnName" class="px-4 py-3 font-semibold whitespace-nowrap">
+                {{ f.label || f.columnName }}
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-outline-variant/20">
+            <tr v-for="item in drawerItems" :key="item.id" class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+              <td v-for="f in getSubTableVisibleFields(drawerSubMeta)" :key="f.columnName" class="px-4 py-3 text-on-surface whitespace-nowrap align-middle">
+                <!-- Format money columns -->
+                <template v-if="f.dataType === 'DECIMAL' || (f.dataType === 'NUMBER' && (f.columnName.includes('amount') || f.columnName.includes('price')))">
+                  <span class="font-mono font-semibold text-primary">
+                    ￥{{ typeof item[f.columnName] === 'number' ? item[f.columnName].toFixed(2) : (item[f.columnName] || '0.00') }}
+                  </span>
+                </template>
+                <!-- Format status column -->
+                <template v-else-if="f.columnName === 'status'">
+                  <span class="px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-tight uppercase" :class="getStatusBadgeClass(item[f.columnName])">
+                    {{ item[f.columnName] }}
+                  </span>
+                </template>
+                <template v-else>
+                  {{ item[f.columnName] !== null && item[f.columnName] !== undefined ? item[f.columnName] : '-' }}
+                </template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Drawer Footer -->
+      <div class="border-t border-outline-variant/30 pt-4 mt-4 flex justify-end">
+        <button 
+          @click="drawerOpen = false" 
+          class="px-4 py-2 bg-secondary text-on-secondary hover:bg-secondary/90 active:scale-95 transition-all text-xs font-semibold rounded-lg cursor-pointer"
+        >
+          关闭
+        </button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { 
   Database, RotateCw, Plus, Search, RefreshCw, X, ChevronUp, ChevronDown, 
-  Trash2, Edit, ChevronLeft, ChevronRight, Inbox
+  Trash2, Edit, ChevronLeft, ChevronRight, Inbox, List
 } from 'lucide-vue-next';
 import { dataEngineApi } from '../../api/dataEngine';
 
@@ -229,6 +320,59 @@ const sortState = reactive({
 });
 
 const filtersState = ref({});
+
+// Teleport Drawer active states
+const drawerOpen = ref(false);
+const drawerItems = ref([]);
+const drawerSubMeta = ref(null);
+
+const showDetailsDrawer = (items, subMeta) => {
+  drawerItems.value = items;
+  drawerSubMeta.value = subMeta;
+  drawerOpen.value = true;
+};
+
+// Helper to safely get an array from value
+const ensureArray = (val) => {
+  if (!val) return [];
+  if (Array.isArray(val)) {
+    return val.filter(i => i !== null && i !== undefined);
+  }
+  if (typeof val === 'object') {
+    return [val];
+  }
+  return [];
+};
+
+// Filter out system ID/audit fields to display clean data in Hover Cards
+const getSubTableVisibleFields = (sub) => {
+  if (!sub || !sub.fields) return [];
+  return sub.fields.filter(f => 
+    f.columnName !== 'id' && 
+    !f.columnName.endsWith('_id') &&
+    f.columnName !== 'created_at' &&
+    f.columnName !== 'updated_at'
+  );
+};
+
+// Map semantic status text to nice UI tags
+const getStatusBadgeClass = (status) => {
+  if (!status) return 'bg-slate-100 text-slate-600';
+  const val = String(status).toUpperCase();
+  if (['PAID', 'SUCCESS', 'APPROVED', 'ACTIVE', 'COMPLETED'].includes(val)) {
+    return 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30';
+  }
+  if (['PENDING', 'WAITING', 'PROCESSING', 'TODO'].includes(val)) {
+    return 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30';
+  }
+  if (['SHIPPED', 'DELIVERED', 'SENT', 'ONGOING'].includes(val)) {
+    return 'bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/30';
+  }
+  if (['CANCELLED', 'REJECTED', 'FAILED', 'CLOSED'].includes(val)) {
+    return 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-900/30';
+  }
+  return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/50';
+};
 
 // Field mappings dynamically compiled from getModuleMeta
 const columns = computed(() => {

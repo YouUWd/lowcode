@@ -128,6 +128,7 @@ export class ModulesService {
     const mainTable = {
       id: mainTableMeta.id,
       tableName: mainTableMeta.table_name,
+      tableNameLabel: mainTableMeta.display_name || mainTableMeta.table_name,
       queryType: 'MAIN',
       joinType: null,
       joinOn: null,
@@ -149,6 +150,7 @@ export class ModulesService {
           subTables.push({
             id: otherTable.id,
             tableName: otherTable.table_name,
+            tableNameLabel: otherTable.display_name || otherTable.table_name,
             queryType: 'SUB',
             joinType: null,
             joinOn: null,
@@ -160,6 +162,7 @@ export class ModulesService {
           joinTables.push({
             id: otherTable.id,
             tableName: otherTable.table_name,
+            tableNameLabel: otherTable.display_name || otherTable.table_name,
             queryType: 'JOIN',
             joinType: 'LEFT',
             joinOn: `${mainTableMeta.table_name}.${relInfo.left} = ${otherTable.table_name}.${relInfo.right}`,

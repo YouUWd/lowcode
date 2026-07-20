@@ -3,6 +3,21 @@
     <!-- Instance List View -->
     <div class="p-8 flex-1 overflow-y-auto w-full animate-in fade-in duration-500 text-on-surface">
       <div class="bg-white rounded-xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] overflow-hidden border border-slate-200">
+        <!-- Compact Toolbar Row (Aligned with /data) -->
+        <div class="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 bg-white">
+          <div class="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Workflow class="w-4 h-4 text-primary" />
+            待办审批流程
+          </div>
+          <button 
+            @click="mockSubmitNew" 
+            class="px-3 py-1.5 bg-primary text-on-primary text-xs font-semibold rounded-lg shadow-sm hover:bg-primary/95 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus class="w-4 h-4" />
+            发起新申请
+          </button>
+        </div>
+
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 text-xs font-extrabold text-slate-600 uppercase tracking-widest border-b border-slate-200">
@@ -24,16 +39,8 @@
                   宏观状态
                 </div>
               </th>
-              <th class="px-6 py-4 text-center w-[160px] min-w-[160px]">
-                <div class="flex items-center justify-center gap-1.5">
-                  <span>操作</span>
-                  <div class="w-px h-3 bg-slate-300 mx-1"></div>
-                  <button @click="mockSubmitNew" 
-                          class="px-2 py-0.5 text-primary hover:bg-primary/10 rounded transition-all active:scale-95 cursor-pointer bg-white border border-primary/20 hover:border-primary/40 shadow-sm" 
-                          title="发起新申请">
-                    发起
-                  </button>
-                </div>
+              <th class="px-6 py-4 text-center w-[150px] min-w-[150px] whitespace-nowrap">
+                操作
               </th>
             </tr>
           </thead>
@@ -46,9 +53,10 @@
                 <span v-else-if="biz.macroStatus === 99" class="px-2.5 py-1 text-xs font-medium rounded bg-emerald-50 text-emerald-600">已生效</span>
                 <span v-else class="px-2.5 py-1 text-xs font-medium rounded bg-rose-50 text-rose-600">已作废</span>
               </td>
-              <td class="px-6 py-4 text-center">
-                <div class="flex justify-center gap-3 text-sm font-medium">
-                  <button @click="goToDetail(biz.businessNo)" class="text-primary hover:text-primary/80 transition-colors cursor-pointer">
+              <td class="px-6 py-4 text-center whitespace-nowrap">
+                <div class="flex justify-center items-center gap-3 text-xs font-medium whitespace-nowrap">
+                  <button @click="goToDetail(biz.businessNo)" class="text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap" title="办理审批">
+                    <ClipboardCheck class="w-3.5 h-3.5" />
                     办理
                   </button>
                 </div>

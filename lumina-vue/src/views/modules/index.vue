@@ -4,11 +4,23 @@
 
 
     <!-- Main Data Table -->
-    <div class="bg-surface rounded-2xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] border border-outline-variant/30">
+    <div class="bg-surface rounded-2xl shadow-[0px_4px_24px_rgba(25,28,29,0.04)] border border-outline-variant/30 overflow-hidden">
+      <!-- Compact Toolbar Row (Aligned with /data) -->
+      <div class="flex items-center justify-between px-6 py-3.5 border-b border-outline-variant/30 bg-surface">
+        <div class="text-sm font-bold text-on-surface">系统模块架构</div>
+        <button 
+          @click="router.push('/modules/create/config?mode=create')" 
+          class="px-3 py-1 bg-primary text-on-primary text-xs font-semibold rounded shadow-sm hover:bg-primary/95 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          新建
+        </button>
+      </div>
+
       <div class="overflow-x-auto overflow-y-hidden">
         <table class="w-full text-left border-collapse">
           <thead>
-            <tr class="bg-surface-container-lowest text-xs font-extrabold text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/30">
+            <tr class="bg-surface-container-low text-xs font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant/35">
               <th class="px-6 py-4 border-r border-outline-variant/30">
                 <div class="flex items-center gap-2">
                   <Hash class="w-4 h-4 text-on-surface-variant" />
@@ -39,17 +51,8 @@
                   状态
                 </div>
               </th>
-              <th class="px-6 py-4 text-center w-[160px] min-w-[160px]">
-                <div class="flex items-center justify-center gap-1.5">
-                  <span>操作</span>
-                  <div class="w-px h-3 bg-outline-variant/30 mx-1"></div>
-                  <button @click="router.push('/modules/create/config?mode=create')" 
-                          class="px-2.5 py-1 bg-primary text-on-primary text-xs font-semibold rounded shadow-sm hover:bg-primary/95 active:scale-95 transition-all flex items-center gap-1 cursor-pointer" 
-                          title="新建模块">
-                    <PackagePlus class="w-3.5 h-3.5" />
-                    新建
-                  </button>
-                </div>
+              <th class="px-6 py-4 text-center w-[150px] min-w-[150px] whitespace-nowrap">
+                操作
               </th>
             </tr>
           </thead>
@@ -64,15 +67,20 @@
                   {{ mod.active ? '已启用' : '已停用' }}
                 </button>
               </td>
-              <td class="px-6 py-4 text-center">
-                <div class="flex justify-center gap-3 text-sm font-medium">
-                  <button @click.stop="goToConfig(mod, 'view')" class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all cursor-pointer" title="查看配置">
+              <td class="px-6 py-4 text-center whitespace-nowrap">
+                <div class="flex justify-center items-center gap-3 text-xs font-medium whitespace-nowrap">
+                  <button @click.stop="goToConfig(mod, 'view')" class="text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap" title="查看配置">
+                    <Eye class="w-3.5 h-3.5" />
                     查看
                   </button>
-                  <button @click.stop="goToConfig(mod, 'edit')" class="px-2.5 py-1 border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container text-xs font-semibold rounded transition-all cursor-pointer" title="编辑">
+                  <div class="w-px h-3 bg-outline-variant/50"></div>
+                  <button @click.stop="goToConfig(mod, 'edit')" class="text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap" title="编辑">
+                    <Edit class="w-3.5 h-3.5" />
                     编辑
                   </button>
-                  <button @click.stop="deleteModule(mod.id)" class="px-2.5 py-1 border border-error/30 text-error hover:bg-error/10 text-xs font-semibold rounded transition-all cursor-pointer" title="删除模块">
+                  <div class="w-px h-3 bg-outline-variant/50"></div>
+                  <button @click.stop="deleteModule(mod.id)" class="text-error hover:text-error/80 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap" title="删除模块">
+                    <Trash2 class="w-3.5 h-3.5" />
                     删除
                   </button>
                 </div>
@@ -107,13 +115,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import {
-  PackagePlus,
+  Plus,
   X,
   Check,
   Hash,
   Database,
   Activity,
-  Network
+  Network,
+  Eye,
+  Edit,
+  Trash2
 } from 'lucide-vue-next';
 import { appState } from '../../store/app';
 import { modulesState, fetchModules, addModule, deleteModule } from '../../store/modules';

@@ -1,4 +1,4 @@
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
 
 export const userToRoleMap = {
   admin_sys: 'admin',
@@ -22,7 +22,7 @@ export const appState = reactive({
   currentView: 'list',
   loading: false,
   workflowViewMode: 'list',
-  sidebarCollapsed: false, // Left sidebar fold/unfold state
+  sidebarCollapsed: localStorage.getItem('sidebar_collapsed') === 'true', // Retrieve from localStorage
   
   // Simulated identity states:
   simulationMode: 'role', // 'role' | 'user'
@@ -32,6 +32,14 @@ export const appState = reactive({
   // Global event to trigger reload
   refreshTrigger: 0
 });
+
+// Watch and persist sidebar collapsed state to localStorage
+watch(
+  () => appState.sidebarCollapsed,
+  (newVal) => {
+    localStorage.setItem('sidebar_collapsed', newVal ? 'true' : 'false');
+  }
+);
 
 export const setView = (view) => {
   appState.currentView = view;

@@ -1,18 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import ModuleList from '../views/modules/Index.vue';
+import ModuleList from '../views/modules/index.vue';
 import ModuleConfig from '../views/modules/Config.vue';
 import ModulePermissions from '../views/modules/Permissions.vue';
-import WorkflowList from '../views/workflow/Index.vue';
+import WorkflowList from '../views/workflow/index.vue';
 import LightweightWorkflowBuilder from '../views/workflow/Designer.vue';
 import WorkflowDetail from '../views/workflow/Detail.vue';
-import ErDiagram from '../views/diagram/Index.vue';
-import DataCenter from '../views/data/Index.vue';
+import ErDiagram from '../views/diagram/index.vue';
+import DataCenter from '../views/data/index.vue';
 import { updateView } from '../store/index';
 
 const routes = [
   {
     path: '/',
-    redirect: '/data-center'
+    redirect: '/data'
   },
 
   {
@@ -135,7 +135,7 @@ const routes = [
     }
   },
   {
-    path: '/data-center',
+    path: '/data',
     name: 'data-center',
     component: DataCenter,
     meta: {
@@ -159,7 +159,7 @@ const routes = [
     component: ErDiagram,
     meta: {
       title: 'ER 图模型',
-      icon: 'GitFork',
+      icon: 'TableProperties',
       sidebar: true,
       group: 'config',
       breadcrumb: {

@@ -2,7 +2,7 @@
   <Sidebar />
   <main 
     class="flex-1 flex flex-col h-screen overflow-y-auto bg-surface relative transition-all duration-300 ease-in-out"
-    :class="appState.sidebarCollapsed ? 'ml-16' : 'ml-64'"
+    :class="appState.sidebarCollapsed ? 'ml-16' : 'ml-52'"
   >
     <Header />
     <router-view v-slot="{ Component }">
