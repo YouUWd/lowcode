@@ -1,55 +1,67 @@
 <template>
-  <header class="bg-[#ffffff] dark:bg-[#191c1d] font-manrope text-sm font-medium tracking-tight flex justify-between items-center px-8 h-16 w-full shrink-0 z-30 shadow-[0px_4px_16px_rgba(25,28,29,0.02)] relative">
-    <div class="flex items-center text-on-surface-variant">
-      <!-- 数据驱动的自适应面包屑系统 -->
-      <div v-if="route.meta" class="flex items-center">
-        <!-- 1. 当前页面标题 -->
-        <span class="font-bold text-on-surface text-base">
+  <header class="bg-[#ffffff] dark:bg-[#191c1d] font-manrope text-sm font-medium tracking-tight flex justify-between items-center px-8 h-14 w-full shrink-0 z-30 shadow-[0px_4px_16px_rgba(25,28,29,0.02)] relative">
+    <div class="flex items-center">
+      <!-- 极简单行面包屑 -->
+      <div v-if="route.meta" class="flex items-center gap-1.5 select-none">
+        <!-- 一级菜单：粗体深色 -->
+        <span class="text-[14px] text-slate-800 dark:text-slate-200 font-bold">
+          {{ route.meta.group === 'business' ? '业务' : '配置' }}
+        </span>
+        <ChevronRight class="w-3.5 h-3.5 text-slate-400 dark:text-slate-600" />
+        <!-- 二级菜单：常规/中等字体 -->
+        <span class="text-[14px] text-slate-600 dark:text-slate-300 font-medium">
           {{ route.meta.title }}
         </span>
-
-        <!-- 2. 描述说明 -->
-        <span v-if="route.meta.breadcrumb?.description" class="ml-4 px-3 border-l border-outline-variant/40 text-xs font-semibold text-on-surface-variant/80">
+        <!-- 页面介绍说明 (12px 细体清晰呈现) -->
+        <span 
+          v-if="route.meta.breadcrumb?.description" 
+          class="text-xs text-slate-500 dark:text-slate-400 font-medium leading-none pl-2 border-l border-slate-200 dark:border-slate-800 ml-1.5 mt-0.5"
+        >
           {{ route.meta.breadcrumb.description }}
         </span>
       </div>
     </div>
     
-    <div class="flex items-center space-x-4 text-[#005daa] dark:text-[#0075d5]">
-      <button class="hover:bg-primary/10 rounded-full transition-colors duration-200 active:scale-95 p-1.5 flex items-center justify-center">
-        <Bell class="w-5 h-5" />
+    <!-- 右侧动作功能区 (文字与图标主次对齐) -->
+    <div class="flex items-center space-x-3.5">
+      <!-- 辅助功能图标 (收缩尺寸为标准 w-4/16px 且淡化颜色，主次分明) -->
+      <button class="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200 active:scale-95 p-1.5 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 cursor-pointer">
+        <Bell class="w-4 h-4" />
       </button>
-      <button class="hover:bg-primary/10 rounded-full transition-colors duration-200 active:scale-95 p-1.5 flex items-center justify-center">
-        <HelpCircle class="w-5 h-5" />
+      <button class="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200 active:scale-95 p-1.5 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 cursor-pointer">
+        <HelpCircle class="w-4 h-4" />
       </button>
-      <button class="hover:bg-primary/10 rounded-full transition-colors duration-200 active:scale-95 p-1.5 flex items-center justify-center">
-        <LayoutGrid class="w-5 h-5" />
+      <button class="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200 active:scale-95 p-1.5 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 cursor-pointer">
+        <LayoutGrid class="w-4 h-4" />
       </button>
-      <div class="h-6 w-px bg-outline-variant/30 mx-1"></div>
+      <div class="h-5 w-px bg-slate-200/80 dark:bg-slate-800/80 mx-1"></div>
       
-      <!-- Premium Identity Switcher Pill -->
+      <!-- Premium Identity Switcher (Rounded-lg, single-line cloud style switcher) -->
       <div ref="dropdownRef" class="relative">
-        <button @click="showSwitcher = !showSwitcher" class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-outline-variant/40 bg-surface-container-low hover:bg-surface-variant/40 active:scale-[0.98] transition-all cursor-pointer shadow-sm select-none">
-          <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <ShieldCheck class="w-[14px] h-[14px]" />
-          </div>
-          <div class="flex flex-col text-left">
-            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">模拟操作身份</span>
-            <span class="text-xs font-bold text-on-surface mt-0.5 leading-none">
-              {{ appState.simulationMode === 'role' 
-                ? (simulatorRoles.find(r => r.val === appState.currentUserRole)?.label || '管理员') 
-                : (simulatorUsers.find(u => u.val === appState.currentUser)?.label || '管理员') }}
-            </span>
-          </div>
-          <ChevronDown class="w-4 h-4 text-slate-400 transition-transform duration-300" :class="{ 'rotate-180': showSwitcher }" />
+        <button 
+          @click="showSwitcher = !showSwitcher" 
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 hover:bg-slate-100/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm select-none"
+        >
+          <!-- Active Pulse Simulator Indicator Dot -->
+          <span class="relative flex h-2 w-2 flex-shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          
+          <span class="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+            {{ appState.simulationMode === 'role' 
+              ? (simulatorRoles.find(r => r.val === appState.currentUserRole)?.label || '管理员') 
+              : (simulatorUsers.find(u => u.val === appState.currentUser)?.label || '管理员') }}
+          </span>
+          <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ml-0.5" :class="{ 'rotate-180': showSwitcher }" />
         </button>
 
-        <!-- Premium Switcher Dropdown Panel -->
+        <!-- Switcher Dropdown Panel -->
         <div v-show="showSwitcher" class="absolute right-0 mt-2 w-80 bg-white border border-outline-variant/30 rounded-2xl shadow-[0px_16px_36px_rgba(25,28,29,0.12)] p-4 z-50 animate-in fade-in slide-in-from-top-3 duration-200">
           <div class="flex items-center justify-between mb-3.5 border-b border-outline-variant/15 pb-2.5">
             <span class="text-xs font-black text-on-surface flex items-center gap-1.5">
               <IdCard class="w-4 h-4 text-primary" />
-              Clearance Simulator
+              模拟操作身份
             </span>
             <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
               <button @click="appState.simulationMode = 'role'; appState.refreshTrigger++" 
@@ -114,7 +126,8 @@
         </div>
       </div>
 
-      <img alt="管理员头像" class="w-8 h-8 rounded-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3GOcIlVbZkTgDXRE5mGiTgMJw2XEyaAdsA5Ik94PkBP0G-19CgFwHQfRDU63v7hc3EOz-J4GkIaPpdsljpchp9VD1y4tQ_625ei0QLbKnpP1rerpudnJgLGqUTBuJiuS0gWmU0BzTFfoeCag7kUFlRcs5teVDl5EC9xIrzrTRCYALio45-G5UOfK8i4M3YZqtY4H-C__bu1WSkSwlf1fKlBRYIxoybgzGak5APYooqfkvLu8bindxQic0QTXvk9U7lRQkSyGNdg" />
+      <!-- 用户微缩头像 (28px) -->
+      <img alt="管理员头像" class="w-7 h-7 rounded-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all object-cover bg-slate-100" src="https://api.dicebear.com/9.x/bottts/svg?seed=TechAdmin&backgroundColor=f1f5f9" />
     </div>
     <div class="absolute bottom-0 left-0 bg-[#f3f4f5] dark:bg-[#2a2d2e] h-[1px] w-full"></div>
   </header>
@@ -130,7 +143,6 @@ import {
   Bell, 
   HelpCircle, 
   LayoutGrid, 
-  ShieldCheck, 
   ChevronDown, 
   IdCard, 
   CheckCircle2,
@@ -141,9 +153,7 @@ import {
   Shield,
   Users,
   User,
-  ShieldAlert,
-  PanelLeft,
-  PanelLeftClose
+  ShieldAlert
 } from 'lucide-vue-next';
 
 

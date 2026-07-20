@@ -124,7 +124,8 @@ import {
   Network,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  PackagePlus
 } from 'lucide-vue-next';
 import { appState } from '../../store/app';
 import { modulesState, fetchModules, addModule, deleteModule } from '../../store/modules';

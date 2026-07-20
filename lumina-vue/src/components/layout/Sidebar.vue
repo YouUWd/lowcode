@@ -37,7 +37,7 @@
         <template v-else>
           <div class="flex flex-col space-y-0.5 overflow-hidden">
             <span class="font-manrope font-extrabold tracking-tighter text-[#005daa] text-xl whitespace-nowrap">Lumina</span>
-            <span class="text-on-surface-variant text-[10px] whitespace-nowrap">系统级管理后台</span>
+            <span class="text-on-surface-variant text-[11px] font-bold text-slate-400 whitespace-nowrap">系统级管理后台</span>
           </div>
           <!-- Toggle Button for Expanded Mode -->
           <div class="relative group">
@@ -57,21 +57,20 @@
 
       <!-- ── Menu area (Unified layout using contents property to ensure pixel-perfect alignment) ── -->
       <div 
-        class="flex-1 px-3 space-y-1.5 select-none transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col"
+        class="flex-1 px-3 space-y-2 select-none transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col"
         :class="appState.sidebarCollapsed ? 'overflow-visible !px-0 items-center gap-1.5' : 'overflow-y-auto items-stretch'"
       >
         <!-- 业务 group -->
         <div :class="appState.sidebarCollapsed ? 'contents' : 'flex flex-col'">
-          <!-- Accordion Header for Group: Business -->
+          <!-- Accordion Header for Group: Business (大组标题优化为 14px 粗体，与正文对齐) -->
           <button
             v-show="!appState.sidebarCollapsed"
             @click="businessOpen = !businessOpen"
-            class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-[#191c1d] hover:bg-slate-200/50 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] cursor-pointer select-none h-10 mb-0.5"
-            :class="businessOpen ? 'font-semibold opacity-100' : 'opacity-50'"
+            class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-[#191c1d] hover:bg-slate-200/50 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] cursor-pointer select-none h-10 mb-0.5 font-bold"
           >
             <div class="flex items-center gap-2">
-              <Briefcase class="w-4 h-4 text-slate-400" />
-              <span class="text-[12px] tracking-wide uppercase font-bold text-slate-400">业务</span>
+              <Briefcase class="w-[18px] h-[18px] text-slate-600" />
+              <span class="text-[14.5px] tracking-wide uppercase font-bold text-slate-700">业务</span>
             </div>
             <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': businessOpen }" />
           </button>
@@ -87,35 +86,36 @@
               :to="item.path"
               :class="[
                 isMenuItemActive(item)
-                  ? 'text-[#005daa] bg-[#005daa]/8 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50',
+                  ? 'text-[#005daa] bg-[#005daa]/8 font-medium'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium',
                 appState.sidebarCollapsed
                   ? 'w-10 h-10 justify-center rounded-xl p-0'
-                  : 'w-full pl-8 pr-3 py-2 rounded-lg justify-start text-[13px]'
+                  : 'w-full pl-8 pr-3 py-2 rounded-lg justify-start'
               ]"
               class="relative group flex items-center transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] cursor-pointer select-none"
             >
+              <!-- 展开态下图标统一放大至 18px，更具分量 -->
               <component
                 :is="menuIcons[item.meta.icon]"
                 class="flex-shrink-0 transition-all duration-200"
                 :class="[
                   isMenuItemActive(item) ? 'text-[#005daa]' : 'text-slate-400',
-                  appState.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'
+                  appState.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[18px] h-[18px]'
                 ]"
               />
               
-              <!-- Label Text -->
+              <!-- Label Text (菜单文本字号全局统一提升至 15px，并且赋予更突出的字重以拉开与面包屑的层级) -->
               <span 
                 v-if="!appState.sidebarCollapsed"
-                class="transition-all duration-200 whitespace-nowrap overflow-hidden text-left ml-2.5"
+                class="text-[15px] transition-all duration-200 whitespace-nowrap overflow-hidden text-left ml-2.5"
               >
                 {{ item.meta.title }}
               </span>
 
-              <!-- Claude-like Tooltip -->
+              <!-- Tooltip -->
               <span 
                 v-if="appState.sidebarCollapsed"
-                class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150"
+                class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[13px] text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150"
               >
                 {{ item.meta.title }}
               </span>
@@ -135,12 +135,11 @@
           <button
             v-show="!appState.sidebarCollapsed"
             @click="configOpen = !configOpen"
-            class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-[#191c1d] hover:bg-slate-200/50 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] cursor-pointer select-none h-10 mb-0.5"
-            :class="configOpen ? 'font-semibold opacity-100' : 'opacity-50'"
+            class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-[#191c1d] hover:bg-slate-200/50 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] cursor-pointer select-none h-10 mb-0.5 font-bold"
           >
             <div class="flex items-center gap-2">
-              <Settings2 class="w-4 h-4 text-slate-400" />
-              <span class="text-[12px] tracking-wide uppercase font-bold text-slate-400">配置</span>
+              <Settings2 class="w-[18px] h-[18px] text-slate-600" />
+              <span class="text-[14.5px] tracking-wide uppercase font-bold text-slate-700">配置</span>
             </div>
             <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': configOpen }" />
           </button>
@@ -156,11 +155,11 @@
               :to="item.path"
               :class="[
                 isMenuItemActive(item)
-                  ? 'text-[#005daa] bg-[#005daa]/8 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50',
+                  ? 'text-[#005daa] bg-[#005daa]/8 font-medium'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium',
                 appState.sidebarCollapsed
                   ? 'w-10 h-10 justify-center rounded-xl p-0'
-                  : 'w-full pl-8 pr-3 py-2 rounded-lg justify-start text-[13px]'
+                  : 'w-full pl-8 pr-3 py-2 rounded-lg justify-start'
               ]"
               class="relative group flex items-center transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] cursor-pointer select-none"
             >
@@ -169,22 +168,22 @@
                 class="flex-shrink-0 transition-all duration-200"
                 :class="[
                   isMenuItemActive(item) ? 'text-[#005daa]' : 'text-slate-400',
-                  appState.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'
+                  appState.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[18px] h-[18px]'
                 ]"
               />
               
               <!-- Label Text -->
               <span 
                 v-if="!appState.sidebarCollapsed"
-                class="transition-all duration-200 whitespace-nowrap overflow-hidden text-left ml-2.5"
+                class="text-[15px] transition-all duration-200 whitespace-nowrap overflow-hidden text-left ml-2.5"
               >
                 {{ item.meta.title }}
               </span>
 
-              <!-- Claude-like Tooltip -->
+              <!-- Tooltip -->
               <span 
                 v-if="appState.sidebarCollapsed"
-                class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150"
+                class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[13px] text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150"
               >
                 {{ item.meta.title }}
               </span>
@@ -206,8 +205,8 @@
             class="relative group w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-all duration-150 cursor-pointer"
           >
             <component :is="btn.icon" class="w-[18px] h-[18px]" />
-            <!-- Claude-like Tooltip -->
-            <span class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150">
+            <!-- Tooltip -->
+            <span class="pointer-events-none absolute left-11 z-50 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[13px] text-white shadow-md opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:left-13 transition-all duration-150">
               {{ btn.label }}
             </span>
           </button>
@@ -218,10 +217,12 @@
           <button
             v-for="btn in bottomActions"
             :key="btn.label"
-            class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 transition-all duration-150 cursor-pointer text-[13px]"
+            class="flex items-center w-full px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 transition-all duration-150 cursor-pointer"
           >
-            <component :is="btn.icon" class="w-4 h-4 text-slate-400" />
-            {{ btn.label }}
+            <component :is="btn.icon" class="w-[18px] h-[18px] text-slate-500 flex-shrink-0" />
+            <span class="text-[15px] transition-all duration-200 whitespace-nowrap overflow-hidden text-left ml-2.5 font-bold text-slate-700">
+              {{ btn.label }}
+            </span>
           </button>
         </template>
       </div>
